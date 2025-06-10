@@ -153,6 +153,45 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/cancel/order": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Cancel an order by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okx"
+                ],
+                "summary": "Cancel an existing order",
+                "parameters": [
+                    {
+                        "description": "Order cancellation parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CancelOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/create/mock": {
             "post": {
                 "security": [
@@ -724,6 +763,18 @@ const docTemplate = `{
                 }
             }
         },
+        "model.CancelOrderRequest": {
+            "type": "object",
+            "required": [
+                "order_id"
+            ],
+            "properties": {
+                "order_id": {
+                    "description": "Order ID to cancel",
+                    "type": "string"
+                }
+            }
+        },
         "model.CreateOrderRequest": {
             "type": "object",
             "required": [
@@ -750,22 +801,6 @@ const docTemplate = `{
                     "description": "\"buy\" or \"sell\"",
                     "type": "string"
                 },
-                "stopLoss": {
-                    "description": "Stop loss configuration",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.StopLossConfig"
-                        }
-                    ]
-                },
-                "takeProfit": {
-                    "description": "Optional parameters for TP/SL",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.TakeProfitConfig"
-                        }
-                    ]
-                },
                 "type": {
                     "description": "\"limit\" or \"market\"",
                     "type": "string"
@@ -785,48 +820,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "created_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "model.StopLossConfig": {
-            "type": "object",
-            "required": [
-                "amount",
-                "price"
-            ],
-            "properties": {
-                "amount": {
-                    "description": "Amount to sell at stop loss",
-                    "type": "number"
-                },
-                "price": {
-                    "description": "Stop loss price",
-                    "type": "number"
-                },
-                "triggerBy": {
-                    "description": "\"last\" or \"index\" or \"mark\"",
-                    "type": "string"
-                }
-            }
-        },
-        "model.TakeProfitConfig": {
-            "type": "object",
-            "required": [
-                "amount",
-                "price"
-            ],
-            "properties": {
-                "amount": {
-                    "description": "Amount to sell at take profit",
-                    "type": "number"
-                },
-                "price": {
-                    "description": "Take profit price",
-                    "type": "number"
-                },
-                "triggerBy": {
-                    "description": "\"last\" or \"index\" or \"mark\"",
                     "type": "string"
                 }
             }

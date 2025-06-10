@@ -54,6 +54,14 @@ definitions:
     - password
     - phone_number
     type: object
+  model.CancelOrderRequest:
+    properties:
+      order_id:
+        description: Order ID to cancel
+        type: string
+    required:
+    - order_id
+    type: object
   model.CreateOrderRequest:
     properties:
       amount:
@@ -68,14 +76,6 @@ definitions:
       side:
         description: '"buy" or "sell"'
         type: string
-      stopLoss:
-        allOf:
-        - $ref: '#/definitions/model.StopLossConfig'
-        description: Stop loss configuration
-      takeProfit:
-        allOf:
-        - $ref: '#/definitions/model.TakeProfitConfig'
-        description: Optional parameters for TP/SL
       type:
         description: '"limit" or "market"'
         type: string
@@ -96,36 +96,6 @@ definitions:
         type: string
       created_at:
         type: string
-    type: object
-  model.StopLossConfig:
-    properties:
-      amount:
-        description: Amount to sell at stop loss
-        type: number
-      price:
-        description: Stop loss price
-        type: number
-      triggerBy:
-        description: '"last" or "index" or "mark"'
-        type: string
-    required:
-    - amount
-    - price
-    type: object
-  model.TakeProfitConfig:
-    properties:
-      amount:
-        description: Amount to sell at take profit
-        type: number
-      price:
-        description: Take profit price
-        type: number
-      triggerBy:
-        description: '"last" or "index" or "mark"'
-        type: string
-    required:
-    - amount
-    - price
     type: object
   model.User:
     properties:
@@ -261,6 +231,30 @@ paths:
       summary: Register with email and password
       tags:
       - Authentication
+  /v1/cancel/order:
+    post:
+      consumes:
+      - application/json
+      description: Cancel an order by its ID
+      parameters:
+      - description: Order cancellation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CancelOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      security:
+      - Bearer: []
+      summary: Cancel an existing order
+      tags:
+      - Okx
   /v1/create/mock:
     post:
       description: Create a new Okx

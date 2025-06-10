@@ -60,6 +60,7 @@ type OKXService struct {
 	apiSecret  string
 	passphrase string
 	client     *http.Client
+	baseURL    string
 }
 
 // syncTimeWithOKX synchronizes the local time with OKX server time
@@ -140,6 +141,7 @@ func GetInstance() *OKXService {
 			apiSecret:  apiSecret,
 			passphrase: passphrase,
 			client:     &http.Client{Timeout: 10 * time.Second},
+			baseURL:    "https://www.okx.com",
 		}
 
 		// Initial time sync
@@ -327,4 +329,69 @@ func (s *OKXService) generateSign(timestamp, method, requestPath, body string) s
 	mac := hmac.New(sha256.New, []byte(s.apiSecret))
 	mac.Write([]byte(message))
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func (s *OKXService) CancelOrder(orderID string, instId string) ([]byte, error) {
+	// Sync time with OKX before making API call
+	if err := syncTimeWithOKX(); err != nil {
+		return nil, err
+	}
+
+	// Get the current timestamp in ISO 8601 format with milliseconds
+	timestamp := getAdjustedTime().Format("2006-01-02T15:04:05.000Z")
+
+	// Prepare the request body
+	orderData := map[string]string{
+		"ordId":  orderID,
+		"instId": instId,
+	}
+
+	body, err := json.Marshal(orderData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepare the request
+	url := "https://www.okx.com/api/v5/trade/cancel-order"
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	// Add required headers
+	req.Header.Set("OK-ACCESS-KEY", s.apiKey)
+	req.Header.Set("OK-ACCESS-SIGN", s.generateSign(timestamp, "POST", "/api/v5/trade/cancel-order", string(body)))
+	req.Header.Set("OK-ACCESS-TIMESTAMP", timestamp)
+	req.Header.Set("OK-ACCESS-PASSPHRASE", s.passphrase)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Make the request
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read the response
+	rawResponse, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the response
+	var result struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+
+	if err := json.Unmarshal(rawResponse, &result); err != nil {
+		return rawResponse, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	// Check for API error
+	if result.Code != "0" {
+		return rawResponse, fmt.Errorf("API error: %s", result.Msg)
+	}
+
+	return rawResponse, nil
 }

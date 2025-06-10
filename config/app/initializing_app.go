@@ -79,6 +79,7 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.PUT("/update/okx/:id", ginMock.UpdateMock(appContext.GetMainDBConnection()))
 			protected.DELETE("/delete/okx/:id", ginMock.DeleteMock(appContext.GetMainDBConnection()))
 			protected.POST("/create/order", ginMock.CreateOrder(appContext.GetMainDBConnection()))
+			protected.POST("/cancel/order", ginMock.CancelOrder(appContext.GetMainDBConnection()))
 		}
 	}
 
