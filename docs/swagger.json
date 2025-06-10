@@ -183,6 +183,45 @@
                 }
             }
         },
+        "/v1/create/order": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new order with specified currency and USDT pair",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okx"
+                ],
+                "summary": "Create a new order",
+                "parameters": [
+                    {
+                        "description": "Order creation parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CreateOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/create/user": {
             "post": {
                 "security": [
@@ -679,6 +718,54 @@
                 }
             }
         },
+        "model.CreateOrderRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "currency",
+                "price",
+                "side",
+                "type"
+            ],
+            "properties": {
+                "amount": {
+                    "description": "Amount to buy/sell",
+                    "type": "number"
+                },
+                "currency": {
+                    "description": "Currency code (e.g., \"ADA\")",
+                    "type": "string"
+                },
+                "price": {
+                    "description": "Price in USDT",
+                    "type": "number"
+                },
+                "side": {
+                    "description": "\"buy\" or \"sell\"",
+                    "type": "string"
+                },
+                "stopLoss": {
+                    "description": "Stop loss configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.StopLossConfig"
+                        }
+                    ]
+                },
+                "takeProfit": {
+                    "description": "Optional parameters for TP/SL",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.TakeProfitConfig"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "\"limit\" or \"market\"",
+                    "type": "string"
+                }
+            }
+        },
         "model.MockAddRequest": {
             "type": "object"
         },
@@ -692,6 +779,48 @@
                     "type": "string"
                 },
                 "created_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.StopLossConfig": {
+            "type": "object",
+            "required": [
+                "amount",
+                "price"
+            ],
+            "properties": {
+                "amount": {
+                    "description": "Amount to sell at stop loss",
+                    "type": "number"
+                },
+                "price": {
+                    "description": "Stop loss price",
+                    "type": "number"
+                },
+                "triggerBy": {
+                    "description": "\"last\" or \"index\" or \"mark\"",
+                    "type": "string"
+                }
+            }
+        },
+        "model.TakeProfitConfig": {
+            "type": "object",
+            "required": [
+                "amount",
+                "price"
+            ],
+            "properties": {
+                "amount": {
+                    "description": "Amount to sell at take profit",
+                    "type": "number"
+                },
+                "price": {
+                    "description": "Take profit price",
+                    "type": "number"
+                },
+                "triggerBy": {
+                    "description": "\"last\" or \"index\" or \"mark\"",
                     "type": "string"
                 }
             }

@@ -54,6 +54,38 @@ definitions:
     - password
     - phone_number
     type: object
+  model.CreateOrderRequest:
+    properties:
+      amount:
+        description: Amount to buy/sell
+        type: number
+      currency:
+        description: Currency code (e.g., "ADA")
+        type: string
+      price:
+        description: Price in USDT
+        type: number
+      side:
+        description: '"buy" or "sell"'
+        type: string
+      stopLoss:
+        allOf:
+        - $ref: '#/definitions/model.StopLossConfig'
+        description: Stop loss configuration
+      takeProfit:
+        allOf:
+        - $ref: '#/definitions/model.TakeProfitConfig'
+        description: Optional parameters for TP/SL
+      type:
+        description: '"limit" or "market"'
+        type: string
+    required:
+    - amount
+    - currency
+    - price
+    - side
+    - type
+    type: object
   model.MockAddRequest:
     type: object
   model.MockUpdateRequest:
@@ -64,6 +96,36 @@ definitions:
         type: string
       created_at:
         type: string
+    type: object
+  model.StopLossConfig:
+    properties:
+      amount:
+        description: Amount to sell at stop loss
+        type: number
+      price:
+        description: Stop loss price
+        type: number
+      triggerBy:
+        description: '"last" or "index" or "mark"'
+        type: string
+    required:
+    - amount
+    - price
+    type: object
+  model.TakeProfitConfig:
+    properties:
+      amount:
+        description: Amount to sell at take profit
+        type: number
+      price:
+        description: Take profit price
+        type: number
+      triggerBy:
+        description: '"last" or "index" or "mark"'
+        type: string
+    required:
+    - amount
+    - price
     type: object
   model.User:
     properties:
@@ -219,6 +281,30 @@ paths:
       security:
       - Bearer: []
       summary: Create new Okx
+      tags:
+      - Okx
+  /v1/create/order:
+    post:
+      consumes:
+      - application/json
+      description: Create a new order with specified currency and USDT pair
+      parameters:
+      - description: Order creation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      security:
+      - Bearer: []
+      summary: Create a new order
       tags:
       - Okx
   /v1/create/user:
