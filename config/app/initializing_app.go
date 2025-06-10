@@ -4,7 +4,7 @@ import (
 	appContext "j-okx-ai/components/app_context"
 	"j-okx-ai/middlewares"
 	ginAuth "j-okx-ai/modules/auth/transport/gin"
-	ginMock "j-okx-ai/modules/mock/transport/gin"
+	ginMock "j-okx-ai/modules/okx/transport/gin"
 	ginUser "j-okx-ai/modules/user/transport/gin"
 
 	"github.com/gin-contrib/cors"
@@ -69,14 +69,14 @@ func InitializeApp(appContext appContext.AppContext) {
 		}
 	}
 
-	// Mock API
+	// Okx API
 	{
 		{
 			protected.POST("/create/mock", ginMock.CreateMock(appContext.GetMainDBConnection()))
-			protected.GET("/get/mock/:id", ginMock.GetMockById(appContext.GetMainDBConnection()))
+			protected.GET("/get/okx/:id", ginMock.GetMockById(appContext.GetMainDBConnection()))
 			protected.GET("/get/mocks", ginMock.GetMocks(appContext.GetMainDBConnection()))
-			protected.PUT("/update/mock/:id", ginMock.UpdateMock(appContext.GetMainDBConnection()))
-			protected.DELETE("/delete/mock/:id", ginMock.DeleteMock(appContext.GetMainDBConnection()))
+			protected.PUT("/update/okx/:id", ginMock.UpdateMock(appContext.GetMainDBConnection()))
+			protected.DELETE("/delete/okx/:id", ginMock.DeleteMock(appContext.GetMainDBConnection()))
 
 		}
 	}

@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/Auth/Login": {
+        "/v1/auth/login": {
             "post": {
                 "description": "Verify Login with email and password",
                 "consumes": [
@@ -61,7 +61,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/Auth/RefreshToken": {
+        "/v1/auth/refresh-token": {
             "post": {
                 "description": "Get new AccessToken and RefreshToken",
                 "consumes": [
@@ -107,7 +107,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/Auth/Register": {
+        "/v1/auth/register": {
             "post": {
                 "description": "Register with email and password",
                 "consumes": [
@@ -153,25 +153,25 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/Create/Mock": {
+        "/v1/create/mock": {
             "post": {
                 "security": [
                     {
                         "Bearer": []
                     }
                 ],
-                "description": "Create a new Mock",
+                "description": "Create a new Okx",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Mock"
+                    "Okx"
                 ],
-                "summary": "Create new Mock",
+                "summary": "Create new Okx",
                 "parameters": [
                     {
-                        "description": "Create Mock",
-                        "name": "Mock",
+                        "description": "Create Okx",
+                        "name": "Okx",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -183,13 +183,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.Mock"
+                            "$ref": "#/definitions/model.Okx"
                         }
                     }
                 }
             }
         },
-        "/v1/Create/User": {
+        "/v1/create/user": {
             "post": {
                 "security": [
                     {
@@ -225,25 +225,25 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/Delete/Mock/{id}": {
+        "/v1/delete/okx/{id}": {
             "delete": {
                 "security": [
                     {
                         "Bearer": []
                     }
                 ],
-                "description": "Delete a new Mock",
+                "description": "Delete a new Okx",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Mock"
+                    "Okx"
                 ],
-                "summary": "Delete new Mock",
+                "summary": "Delete new Okx",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Mock ID",
+                        "description": "Okx ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -253,13 +253,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.Mock"
+                            "$ref": "#/definitions/model.Okx"
                         }
                     }
                 }
             }
         },
-        "/v1/Delete/User/{id}": {
+        "/v1/delete/user/{id}": {
             "delete": {
                 "security": [
                     {
@@ -293,25 +293,25 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/Get/Mock/{id}": {
+        "/v1/get/okx/{id}": {
             "get": {
                 "security": [
                     {
                         "Bearer": []
                     }
                 ],
-                "description": "Return Mock",
+                "description": "Return Okx",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Mock"
+                    "Okx"
                 ],
-                "summary": "Get Mock",
+                "summary": "Get Okx",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Mock ID",
+                        "description": "Okx ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -321,13 +321,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.Mock"
+                            "$ref": "#/definitions/model.Okx"
                         }
                     }
                 }
             }
         },
-        "/v1/Get/Mocks": {
+        "/v1/get/mocks": {
             "get": {
                 "security": [
                     {
@@ -339,9 +339,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Mock"
+                    "Okx"
                 ],
-                "summary": "Get a list of Mock",
+                "summary": "Get a list of Okx",
                 "parameters": [
                     {
                         "type": "integer",
@@ -364,14 +364,14 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/model.Mock"
+                                "$ref": "#/definitions/model.Okx"
                             }
                         }
                     }
                 }
             }
         },
-        "/v1/Get/User/{id}": {
+        "/v1/get/user/{id}": {
             "get": {
                 "security": [
                     {
@@ -405,7 +405,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/Get/Users": {
+        "/v1/get/users": {
             "get": {
                 "security": [
                     {
@@ -449,32 +449,32 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/Update/Mock/{id}": {
+        "/v1/update/okx/{id}": {
             "put": {
                 "security": [
                     {
                         "Bearer": []
                     }
                 ],
-                "description": "Update Mock",
+                "description": "Update Okx",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Mock"
+                    "Okx"
                 ],
-                "summary": "Update Mock",
+                "summary": "Update Okx",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Mock ID",
+                        "description": "Okx ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Update Mock",
-                        "name": "Mock",
+                        "description": "Update Okx",
+                        "name": "Okx",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -486,13 +486,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.Mock"
+                            "$ref": "#/definitions/model.Okx"
                         }
                     }
                 }
             }
         },
-        "/v1/Update/Password/User/{id}": {
+        "/v1/update/password/user/{id}": {
             "put": {
                 "security": [
                     {
@@ -535,7 +535,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/Update/User/{id}": {
+        "/v1/update/user/{id}": {
             "put": {
                 "security": [
                     {
@@ -577,31 +577,6 @@ const docTemplate = `{
                     }
                 }
             }
-        },
-        "/v1/analyze/orders": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Analyzes all orders to find pricing inconsistencies, missing products, and top customers",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Order"
-                ],
-                "summary": "Analyze orders for inconsistencies and generate customer statistics",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/common.BaseApiResponse-model_OrderAnalyzeResponse"
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
@@ -625,23 +600,6 @@ const docTemplate = `{
             "properties": {
                 "data": {
                     "type": "boolean"
-                },
-                "http_request_status": {
-                    "type": "integer"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "success": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "common.BaseApiResponse-model_OrderAnalyzeResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "$ref": "#/definitions/model.OrderAnalyzeResponse"
                 },
                 "http_request_status": {
                     "type": "integer"
@@ -702,47 +660,7 @@ const docTemplate = `{
                 }
             }
         },
-        "model.CustomerStats": {
-            "type": "object",
-            "properties": {
-                "customerId": {
-                    "type": "integer"
-                },
-                "customerName": {
-                    "type": "string"
-                },
-                "totalCount": {
-                    "type": "integer"
-                },
-                "totalRevenue": {
-                    "type": "number"
-                }
-            }
-        },
-        "model.InconsistentOrder": {
-            "type": "object",
-            "properties": {
-                "actualTotal": {
-                    "type": "number"
-                },
-                "customerId": {
-                    "type": "integer"
-                },
-                "customerName": {
-                    "type": "string"
-                },
-                "expectedTotal": {
-                    "type": "number"
-                },
-                "orderId": {
-                    "type": "integer"
-                },
-                "reason": {
-                    "type": "string"
-                }
-            }
-        },
-        "model.Mock": {
+        "model.Okx": {
             "type": "object",
             "properties": {
                 "_id": {
@@ -758,35 +676,6 @@ const docTemplate = `{
         },
         "model.MockUpdateRequest": {
             "type": "object"
-        },
-        "model.OrderAnalyzeResponse": {
-            "type": "object",
-            "properties": {
-                "inconsistentOrders": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.InconsistentOrder"
-                    }
-                },
-                "missingProducts": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "topCustomersByCount": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.CustomerStats"
-                    }
-                },
-                "topCustomersByRevenue": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.CustomerStats"
-                    }
-                }
-            }
         },
         "model.User": {
             "type": "object",

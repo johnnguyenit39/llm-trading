@@ -21,17 +21,6 @@ definitions:
       success:
         type: boolean
     type: object
-  common.BaseApiResponse-model_OrderAnalyzeResponse:
-    properties:
-      data:
-        $ref: '#/definitions/model.OrderAnalyzeResponse'
-      http_request_status:
-        type: integer
-      message:
-        type: string
-      success:
-        type: boolean
-    type: object
   dto.LoginRequest:
     properties:
       password:
@@ -65,33 +54,7 @@ definitions:
     - password
     - phone_number
     type: object
-  model.CustomerStats:
-    properties:
-      customerId:
-        type: integer
-      customerName:
-        type: string
-      totalCount:
-        type: integer
-      totalRevenue:
-        type: number
-    type: object
-  model.InconsistentOrder:
-    properties:
-      actualTotal:
-        type: number
-      customerId:
-        type: integer
-      customerName:
-        type: string
-      expectedTotal:
-        type: number
-      orderId:
-        type: integer
-      reason:
-        type: string
-    type: object
-  model.Mock:
+  model.Okx:
     properties:
       _id:
         type: string
@@ -101,25 +64,6 @@ definitions:
   model.MockAddRequest:
     type: object
   model.MockUpdateRequest:
-    type: object
-  model.OrderAnalyzeResponse:
-    properties:
-      inconsistentOrders:
-        items:
-          $ref: '#/definitions/model.InconsistentOrder'
-        type: array
-      missingProducts:
-        items:
-          type: integer
-        type: array
-      topCustomersByCount:
-        items:
-          $ref: '#/definitions/model.CustomerStats'
-        type: array
-      topCustomersByRevenue:
-        items:
-          $ref: '#/definitions/model.CustomerStats'
-        type: array
     type: object
   model.User:
     properties:
@@ -165,7 +109,7 @@ info:
   title: WB Author API
   version: "1.0"
 paths:
-  /v1/Auth/Login:
+  /v1/auth/login:
     post:
       consumes:
       - application/json
@@ -195,7 +139,7 @@ paths:
       summary: Verify Login with email and password
       tags:
       - Authentication
-  /v1/Auth/RefreshToken:
+  /v1/auth/refresh-token:
     post:
       consumes:
       - application/json
@@ -225,7 +169,7 @@ paths:
       summary: Get new AccessToken and RefreshToken
       tags:
       - Authentication
-  /v1/Auth/Register:
+  /v1/auth/register:
     post:
       consumes:
       - application/json
@@ -255,13 +199,13 @@ paths:
       summary: Register with email and password
       tags:
       - Authentication
-  /v1/Create/Mock:
+  /v1/create/mock:
     post:
-      description: Create a new Mock
+      description: Create a new Okx
       parameters:
-      - description: Create Mock
+      - description: Create Okx
         in: body
-        name: Mock
+        name: Okx
         required: true
         schema:
           $ref: '#/definitions/model.MockAddRequest'
@@ -271,13 +215,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.Mock'
+            $ref: '#/definitions/model.Okx'
       security:
       - Bearer: []
-      summary: Create new Mock
+      summary: Create new Okx
       tags:
-      - Mock
-  /v1/Create/User:
+      - Okx
+  /v1/create/user:
     post:
       description: Create a new User
       parameters:
@@ -299,11 +243,11 @@ paths:
       summary: Create new User
       tags:
       - User
-  /v1/Delete/Mock/{id}:
+  /v1/delete/okx/{id}:
     delete:
-      description: Delete a new Mock
+      description: Delete a new Okx
       parameters:
-      - description: Mock ID
+      - description: Okx ID
         in: path
         name: id
         required: true
@@ -314,13 +258,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.Mock'
+            $ref: '#/definitions/model.Okx'
       security:
       - Bearer: []
-      summary: Delete new Mock
+      summary: Delete new Okx
       tags:
-      - Mock
-  /v1/Delete/User/{id}:
+      - Okx
+  /v1/delete/user/{id}:
     delete:
       description: Delete a new User
       parameters:
@@ -341,11 +285,11 @@ paths:
       summary: Delete new User
       tags:
       - User
-  /v1/Get/Mock/{id}:
+  /v1/get/okx/{id}:
     get:
-      description: Return Mock
+      description: Return Okx
       parameters:
-      - description: Mock ID
+      - description: Okx ID
         in: path
         name: id
         required: true
@@ -356,13 +300,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.Mock'
+            $ref: '#/definitions/model.Okx'
       security:
       - Bearer: []
-      summary: Get Mock
+      summary: Get Okx
       tags:
-      - Mock
-  /v1/Get/Mocks:
+      - Okx
+  /v1/get/mocks:
     get:
       description: Retrieve a list of Mocks based on provided filters and pagination
       parameters:
@@ -383,14 +327,14 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/model.Mock'
+              $ref: '#/definitions/model.Okx'
             type: array
       security:
       - Bearer: []
-      summary: Get a list of Mock
+      summary: Get a list of Okx
       tags:
-      - Mock
-  /v1/Get/User/{id}:
+      - Okx
+  /v1/get/user/{id}:
     get:
       description: Return User
       parameters:
@@ -411,7 +355,7 @@ paths:
       summary: Get User
       tags:
       - User
-  /v1/Get/Users:
+  /v1/get/users:
     get:
       description: Retrieve a list of Users based on provided filters and pagination
       parameters:
@@ -439,18 +383,18 @@ paths:
       summary: Get a list of User
       tags:
       - User
-  /v1/Update/Mock/{id}:
+  /v1/update/okx/{id}:
     put:
-      description: Update Mock
+      description: Update Okx
       parameters:
-      - description: Mock ID
+      - description: Okx ID
         in: path
         name: id
         required: true
         type: string
-      - description: Update Mock
+      - description: Update Okx
         in: body
-        name: Mock
+        name: Okx
         required: true
         schema:
           $ref: '#/definitions/model.MockUpdateRequest'
@@ -460,13 +404,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.Mock'
+            $ref: '#/definitions/model.Okx'
       security:
       - Bearer: []
-      summary: Update Mock
+      summary: Update Okx
       tags:
-      - Mock
-  /v1/Update/Password/User/{id}:
+      - Okx
+  /v1/update/password/user/{id}:
     put:
       description: Update User Password
       parameters:
@@ -493,7 +437,7 @@ paths:
       summary: Update User Password
       tags:
       - User
-  /v1/Update/User/{id}:
+  /v1/update/user/{id}:
     put:
       description: Update User
       parameters:
@@ -520,22 +464,6 @@ paths:
       summary: Update User
       tags:
       - User
-  /v1/analyze/orders:
-    get:
-      description: Analyzes all orders to find pricing inconsistencies, missing products,
-        and top customers
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/common.BaseApiResponse-model_OrderAnalyzeResponse'
-      security:
-      - Bearer: []
-      summary: Analyze orders for inconsistencies and generate customer statistics
-      tags:
-      - Order
 securityDefinitions:
   Bearer:
     in: header

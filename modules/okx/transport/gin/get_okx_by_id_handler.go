@@ -1,0 +1,67 @@
+package ginNovel
+
+import (
+	"j-okx-ai/common"
+	"j-okx-ai/logger"
+	"j-okx-ai/middlewares"
+	"j-okx-ai/modules/okx/biz"
+	model "j-okx-ai/modules/okx/model"
+	"j-okx-ai/modules/okx/storage"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/mongo"
+)
+
+// GetMock godoc
+// @Summary Get Okx
+// @Description Return Okx
+// @Param id path string true "Okx ID" // Updated to just type string
+// @Produce application/json
+// @Tags Okx
+// @Success 200 {object} model.Okx
+// @securityDefinitions.apiKey token
+// @in header
+// @name Authorization
+// @Security Bearer
+// @Router /v1/get/okx/{id} [get]
+func GetMockById(db *mongo.Database) func(*gin.Context) {
+	return func(c *gin.Context) {
+		log := logger.GetLogger("GetMockById", c.GetString(middlewares.RequestIDKey))
+
+		id := c.Param("id")
+		if id == "" {
+			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
+				HttpRequestStatus: http.StatusBadRequest,
+				Success:           false,
+				Message:           "id is required",
+				Data:              nil,
+			})
+			log.Error().Msg("id is required")
+			return
+		}
+
+		store := storage.NewMongoDbStore(db)
+		business := biz.NewGetMockByIdBiz(store)
+
+		data, err := business.GetMockById(c.Request.Context(), id)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
+				HttpRequestStatus: http.StatusBadRequest,
+				Success:           false,
+				Message:           err.Error(),
+				Data:              nil,
+			})
+			log.Error().Err(err).Str("Mock_id", id).Msg("failed to get Okx by id")
+			return
+		}
+
+		c.JSON(http.StatusOK, common.BaseApiResponse[model.Okx]{
+			Success:           true,
+			HttpRequestStatus: http.StatusOK,
+			Message:           "Okx user successfully",
+			Data:              *data,
+		})
+		log.Info().Str("Mock_id", id).Msg("get Okx by id successfully")
+	}
+}
