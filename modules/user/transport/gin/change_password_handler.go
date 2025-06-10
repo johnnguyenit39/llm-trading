@@ -26,7 +26,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Update/Password/User/{id} [put]
+// @Router /v1/update/password/user/{id} [put]
 func UpdateUserPassword(db *mongo.Database) func(*gin.Context) {
 	return func(c *gin.Context) {
 

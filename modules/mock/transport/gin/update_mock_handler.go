@@ -26,7 +26,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Update/Mock/{id} [put]
+// @Router /v1/update/mock/{id} [put]
 func UpdateMock(db *mongo.Database) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("UpdateMock", c.GetString(middlewares.RequestIDKey))

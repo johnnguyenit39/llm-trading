@@ -23,7 +23,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Delete/Mock/{id} [delete]
+// @Router /v1/delete/mock/{id} [delete]
 func DeleteMock(db *mongo.Database) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("DeleteMock", c.GetString(middlewares.RequestIDKey))

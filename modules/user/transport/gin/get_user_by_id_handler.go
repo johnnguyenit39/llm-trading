@@ -24,7 +24,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Get/User/{id} [get]
+// @Router /v1/get/user/{id} [get]
 func GetUserById(db *mongo.Database) func(*gin.Context) {
 	return func(c *gin.Context) {
 

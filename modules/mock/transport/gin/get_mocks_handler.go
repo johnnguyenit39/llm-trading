@@ -26,7 +26,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Get/Mocks [get]
+// @Router /v1/get/mocks [get]
 func GetMocks(db *mongo.Database) func(*gin.Context) {
 	return func(c *gin.Context) {
 

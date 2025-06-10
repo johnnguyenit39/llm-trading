@@ -20,7 +20,7 @@ import (
 // @Success 201 {object} common.BaseApiResponse[bool] "User created successfully"
 // @Failure 400 {object} common.BaseApiResponse[any] "Bad Request"
 // @Failure 500 {object} common.BaseApiResponse[any] "Internal Server Error"
-// @Router /v1/Auth/RefreshToken [post]
+// @Router /v1/auth/refresh-token [post]
 func RefreshToken() func(*gin.Context) {
 	return func(c *gin.Context) {
 		userID, _ := c.Get("userID")

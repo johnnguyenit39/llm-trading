@@ -24,7 +24,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Get/Mock/{id} [get]
+// @Router /v1/get/mock/{id} [get]
 func GetMockById(db *mongo.Database) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("GetMockById", c.GetString(middlewares.RequestIDKey))

@@ -35,10 +35,10 @@ func InitializeApp(appContext appContext.AppContext) {
 
 	// Authentication routes (no authentication required)
 	{
-		auth := v1.Group("/Auth")
+		auth := v1.Group("/auth")
 		{
-			auth.POST("/Login", ginAuth.Login(appContext.GetMainDBConnection()))
-			auth.POST("/Register", ginAuth.Register(appContext.GetMainDBConnection()))
+			auth.POST("/login", ginAuth.Login(appContext.GetMainDBConnection()))
+			auth.POST("/register", ginAuth.Register(appContext.GetMainDBConnection()))
 		}
 
 	}
@@ -49,9 +49,9 @@ func InitializeApp(appContext appContext.AppContext) {
 
 	//Protected Auth
 	{
-		auth := v1.Group("/Auth")
+		auth := v1.Group("/auth")
 		{
-			auth.POST("/RefreshToken", ginAuth.RefreshToken())
+			auth.POST("/refresh-token", ginAuth.RefreshToken())
 		}
 
 	}
@@ -59,12 +59,12 @@ func InitializeApp(appContext appContext.AppContext) {
 	// User API
 	{
 		{
-			protected.POST("/Create/User/", ginUser.CreateUser(appContext.GetMainDBConnection()))
-			protected.GET("/Get/User/:id", ginUser.GetUserById(appContext.GetMainDBConnection()))
-			protected.GET("/Get/Users", ginUser.GetUsers(appContext.GetMainDBConnection()))
-			protected.PUT("/Update/User/:id", ginUser.UpdateUser(appContext.GetMainDBConnection()))
-			protected.DELETE("/Delete/User/:id", ginUser.DeleteUser(appContext.GetMainDBConnection()))
-			protected.PUT("/Update/Password/User/:id", ginUser.UpdateUserPassword(appContext.GetMainDBConnection()))
+			protected.POST("/create/user/", ginUser.CreateUser(appContext.GetMainDBConnection()))
+			protected.GET("/get/user/:id", ginUser.GetUserById(appContext.GetMainDBConnection()))
+			protected.GET("/get/users", ginUser.GetUsers(appContext.GetMainDBConnection()))
+			protected.PUT("/update/user/:id", ginUser.UpdateUser(appContext.GetMainDBConnection()))
+			protected.DELETE("/delete/user/:id", ginUser.DeleteUser(appContext.GetMainDBConnection()))
+			protected.PUT("/update/password/user/:id", ginUser.UpdateUserPassword(appContext.GetMainDBConnection()))
 
 		}
 	}
@@ -72,11 +72,11 @@ func InitializeApp(appContext appContext.AppContext) {
 	// Mock API
 	{
 		{
-			protected.POST("/Create/Mock", ginMock.CreateMock(appContext.GetMainDBConnection()))
-			protected.GET("/Get/Mock/:id", ginMock.GetMockById(appContext.GetMainDBConnection()))
-			protected.GET("/Get/Mocks", ginMock.GetMocks(appContext.GetMainDBConnection()))
-			protected.PUT("/Update/Mock/:id", ginMock.UpdateMock(appContext.GetMainDBConnection()))
-			protected.DELETE("/Delete/Mock/:id", ginMock.DeleteMock(appContext.GetMainDBConnection()))
+			protected.POST("/create/mock", ginMock.CreateMock(appContext.GetMainDBConnection()))
+			protected.GET("/get/mock/:id", ginMock.GetMockById(appContext.GetMainDBConnection()))
+			protected.GET("/get/mocks", ginMock.GetMocks(appContext.GetMainDBConnection()))
+			protected.PUT("/update/mock/:id", ginMock.UpdateMock(appContext.GetMainDBConnection()))
+			protected.DELETE("/delete/mock/:id", ginMock.DeleteMock(appContext.GetMainDBConnection()))
 
 		}
 	}

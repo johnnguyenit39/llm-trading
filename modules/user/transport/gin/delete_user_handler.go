@@ -23,7 +23,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Delete/User/{id} [delete]
+// @Router /v1/delete/user/{id} [delete]
 func DeleteUser(db *mongo.Database) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("DeleteUser", c.GetString(middlewares.RequestIDKey))

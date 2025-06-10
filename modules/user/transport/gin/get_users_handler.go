@@ -26,7 +26,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Get/Users [get]
+// @Router /v1/get/users [get]
 func GetUsers(db *mongo.Database) func(*gin.Context) {
 	return func(c *gin.Context) {
 

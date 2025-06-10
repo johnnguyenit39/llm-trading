@@ -24,7 +24,7 @@ import (
 // @Success 201 {object} common.BaseApiResponse[bool] "User created successfully"
 // @Failure 400 {object} common.BaseApiResponse[any] "Bad Request"
 // @Failure 500 {object} common.BaseApiResponse[any] "Internal Server Error"
-// @Router /v1/Auth/Register [post]
+// @Router /v1/auth/register [post]
 func Register(db *mongo.Database) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("Register", c.GetString(middlewares.RequestIDKey))
