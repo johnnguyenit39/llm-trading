@@ -54,16 +54,16 @@ definitions:
     - password
     - phone_number
     type: object
+  model.MockAddRequest:
+    type: object
+  model.MockUpdateRequest:
+    type: object
   model.Okx:
     properties:
       _id:
         type: string
       created_at:
         type: string
-    type: object
-  model.MockAddRequest:
-    type: object
-  model.MockUpdateRequest:
     type: object
   model.User:
     properties:
@@ -285,27 +285,6 @@ paths:
       summary: Delete new User
       tags:
       - User
-  /v1/get/okx/{id}:
-    get:
-      description: Return Okx
-      parameters:
-      - description: Okx ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Okx'
-      security:
-      - Bearer: []
-      summary: Get Okx
-      tags:
-      - Okx
   /v1/get/mocks:
     get:
       description: Retrieve a list of Mocks based on provided filters and pagination
@@ -332,6 +311,42 @@ paths:
       security:
       - Bearer: []
       summary: Get a list of Okx
+      tags:
+      - Okx
+  /v1/get/okx-info:
+    get:
+      description: Return Okx
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Okx'
+      security:
+      - Bearer: []
+      summary: Get Okx
+      tags:
+      - Okx
+  /v1/get/okx/{id}:
+    get:
+      description: Return Okx
+      parameters:
+      - description: Okx ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Okx'
+      security:
+      - Bearer: []
+      summary: Get Okx
       tags:
       - Okx
   /v1/get/user/{id}:

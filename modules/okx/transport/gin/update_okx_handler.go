@@ -17,8 +17,8 @@ import (
 // UpdateMock godoc
 // @Summary Update Okx
 // @Description Update Okx
-// @Param id path string true "Okx ID" // Updated to just type string
-// @Param Okx body model.MockUpdateRequest true "Update Okx"  // Correctly specify the request body
+// @Param id path string true "Okx ID"
+// @Param Okx body model.MockUpdateRequest true "Update Okx"
 // @Produce application/json
 // @Tags Okx
 // @Success 200 {object} model.Okx

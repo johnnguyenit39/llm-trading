@@ -6,6 +6,7 @@ import (
 	storage "j-okx-ai/config/mongodb"
 	_ "j-okx-ai/docs"
 	"j-okx-ai/logger"
+	"j-okx-ai/okx"
 	"os"
 
 	"github.com/rs/zerolog/log"
@@ -36,6 +37,10 @@ func main() {
 			log.Fatal().Err(err).Msg("error loading .env file")
 		}
 	}
+
+	// Initialize OKX service
+	_ = okx.GetInstance() // Initialize the singleton
+	log.Info().Msg("OKX service initialized successfully")
 
 	// Establish connection to MongoDB
 	db, err := storage.NewConnection()

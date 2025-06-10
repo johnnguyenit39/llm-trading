@@ -293,40 +293,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/get/okx/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Okx",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Okx"
-                ],
-                "summary": "Get Okx",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Okx ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Okx"
-                        }
-                    }
-                }
-            }
-        },
         "/v1/get/mocks": {
             "get": {
                 "security": [
@@ -366,6 +332,65 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/model.Okx"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/get/okx-info": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Okx",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okx"
+                ],
+                "summary": "Get Okx",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Okx"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/get/okx/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Okx",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okx"
+                ],
+                "summary": "Get Okx",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Okx ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Okx"
                         }
                     }
                 }
@@ -660,6 +685,12 @@ const docTemplate = `{
                 }
             }
         },
+        "model.MockAddRequest": {
+            "type": "object"
+        },
+        "model.MockUpdateRequest": {
+            "type": "object"
+        },
         "model.Okx": {
             "type": "object",
             "properties": {
@@ -670,12 +701,6 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
-        },
-        "model.MockAddRequest": {
-            "type": "object"
-        },
-        "model.MockUpdateRequest": {
-            "type": "object"
         },
         "model.User": {
             "type": "object",
