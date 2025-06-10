@@ -1,0 +1,16 @@
+package common
+
+const ErrorCannotCreate = "ErrorCannotCreate"
+const ErrorCannotGet = "ErrorCannotGet"
+const ErrorCannotUpdate = "ErrorCannotUpdate"
+const ErrorCannotDelete = "ErrorCannotDelete"
+const ErrorCannotGetList = "ErrorCannotGetList"
+const ErrorExistedEntity = "ErrorExistedEntity"
+const ErrorNotFoundEntity = "ErrorNotFoundEntity"
+const ErrorServerPanic = "ErrorServerPanic"
+const ErrorBadRequest = "ErrorBadRequest"
+const ErrorInvalidRequest = "ErrorInvalidRequest"
+const ErrorInternalServer = "ErrorInternalServer"
+const ErrorNoPermission = "ErrorNoPermission"
+const ErrorUnauthorized = "ErrorUnauthorized"
+const ErrorDatabase = "ErrorDatabase"

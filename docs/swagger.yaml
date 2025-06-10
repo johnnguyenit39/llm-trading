@@ -1,0 +1,544 @@
+basePath: /api
+definitions:
+  common.BaseApiResponse-any:
+    properties:
+      data: {}
+      http_request_status:
+        type: integer
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  common.BaseApiResponse-bool:
+    properties:
+      data:
+        type: boolean
+      http_request_status:
+        type: integer
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  common.BaseApiResponse-model_OrderAnalyzeResponse:
+    properties:
+      data:
+        $ref: '#/definitions/model.OrderAnalyzeResponse'
+      http_request_status:
+        type: integer
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  dto.LoginRequest:
+    properties:
+      password:
+        minLength: 8
+        type: string
+      phone_number:
+        type: string
+    required:
+    - password
+    - phone_number
+    type: object
+  dto.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        minLength: 8
+        type: string
+      token:
+        type: string
+    required:
+    - refresh_token
+    - token
+    type: object
+  dto.RegisterRequest:
+    properties:
+      password:
+        minLength: 8
+        type: string
+      phone_number:
+        type: string
+    required:
+    - password
+    - phone_number
+    type: object
+  model.CustomerStats:
+    properties:
+      customerId:
+        type: integer
+      customerName:
+        type: string
+      totalCount:
+        type: integer
+      totalRevenue:
+        type: number
+    type: object
+  model.InconsistentOrder:
+    properties:
+      actualTotal:
+        type: number
+      customerId:
+        type: integer
+      customerName:
+        type: string
+      expectedTotal:
+        type: number
+      orderId:
+        type: integer
+      reason:
+        type: string
+    type: object
+  model.Mock:
+    properties:
+      _id:
+        type: string
+      created_at:
+        type: string
+    type: object
+  model.MockAddRequest:
+    type: object
+  model.MockUpdateRequest:
+    type: object
+  model.OrderAnalyzeResponse:
+    properties:
+      inconsistentOrders:
+        items:
+          $ref: '#/definitions/model.InconsistentOrder'
+        type: array
+      missingProducts:
+        items:
+          type: integer
+        type: array
+      topCustomersByCount:
+        items:
+          $ref: '#/definitions/model.CustomerStats'
+        type: array
+      topCustomersByRevenue:
+        items:
+          $ref: '#/definitions/model.CustomerStats'
+        type: array
+    type: object
+  model.User:
+    properties:
+      _id:
+        type: string
+      created_at:
+        type: string
+      phone_number:
+        type: string
+    type: object
+  model.UserAddRequest:
+    properties:
+      password:
+        type: string
+      phone_number:
+        type: string
+    required:
+    - password
+    - phone_number
+    type: object
+  model.UserUpdatePasswordRequest:
+    properties:
+      new_password:
+        minLength: 8
+        type: string
+      new_password_confirmation:
+        minLength: 8
+        type: string
+      old_password:
+        minLength: 8
+        type: string
+    required:
+    - new_password
+    - new_password_confirmation
+    - old_password
+    type: object
+  model.UserUpdateRequest:
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Description of the API
+  title: WB Author API
+  version: "1.0"
+paths:
+  /v1/Auth/Login:
+    post:
+      consumes:
+      - application/json
+      description: Verify Login with email and password
+      parameters:
+      - description: Verify Login
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-bool'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      summary: Verify Login with email and password
+      tags:
+      - Authentication
+  /v1/Auth/RefreshToken:
+    post:
+      consumes:
+      - application/json
+      description: Get new AccessToken and RefreshToken
+      parameters:
+      - description: Register
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-bool'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      summary: Get new AccessToken and RefreshToken
+      tags:
+      - Authentication
+  /v1/Auth/Register:
+    post:
+      consumes:
+      - application/json
+      description: Register with email and password
+      parameters:
+      - description: Register
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-bool'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      summary: Register with email and password
+      tags:
+      - Authentication
+  /v1/Create/Mock:
+    post:
+      description: Create a new Mock
+      parameters:
+      - description: Create Mock
+        in: body
+        name: Mock
+        required: true
+        schema:
+          $ref: '#/definitions/model.MockAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Mock'
+      security:
+      - Bearer: []
+      summary: Create new Mock
+      tags:
+      - Mock
+  /v1/Create/User:
+    post:
+      description: Create a new User
+      parameters:
+      - description: Create User
+        in: body
+        name: User
+        required: true
+        schema:
+          $ref: '#/definitions/model.UserAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+      security:
+      - Bearer: []
+      summary: Create new User
+      tags:
+      - User
+  /v1/Delete/Mock/{id}:
+    delete:
+      description: Delete a new Mock
+      parameters:
+      - description: Mock ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Mock'
+      security:
+      - Bearer: []
+      summary: Delete new Mock
+      tags:
+      - Mock
+  /v1/Delete/User/{id}:
+    delete:
+      description: Delete a new User
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+      security:
+      - Bearer: []
+      summary: Delete new User
+      tags:
+      - User
+  /v1/Get/Mock/{id}:
+    get:
+      description: Return Mock
+      parameters:
+      - description: Mock ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Mock'
+      security:
+      - Bearer: []
+      summary: Get Mock
+      tags:
+      - Mock
+  /v1/Get/Mocks:
+    get:
+      description: Retrieve a list of Mocks based on provided filters and pagination
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page_number
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Mock'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of Mock
+      tags:
+      - Mock
+  /v1/Get/User/{id}:
+    get:
+      description: Return User
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+      security:
+      - Bearer: []
+      summary: Get User
+      tags:
+      - User
+  /v1/Get/Users:
+    get:
+      description: Retrieve a list of Users based on provided filters and pagination
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page_number
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.User'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of User
+      tags:
+      - User
+  /v1/Update/Mock/{id}:
+    put:
+      description: Update Mock
+      parameters:
+      - description: Mock ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update Mock
+        in: body
+        name: Mock
+        required: true
+        schema:
+          $ref: '#/definitions/model.MockUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Mock'
+      security:
+      - Bearer: []
+      summary: Update Mock
+      tags:
+      - Mock
+  /v1/Update/Password/User/{id}:
+    put:
+      description: Update User Password
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: User
+        required: true
+        schema:
+          $ref: '#/definitions/model.UserUpdatePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+      security:
+      - Bearer: []
+      summary: Update User Password
+      tags:
+      - User
+  /v1/Update/User/{id}:
+    put:
+      description: Update User
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: User
+        required: true
+        schema:
+          $ref: '#/definitions/model.UserUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+      security:
+      - Bearer: []
+      summary: Update User
+      tags:
+      - User
+  /v1/analyze/orders:
+    get:
+      description: Analyzes all orders to find pricing inconsistencies, missing products,
+        and top customers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-model_OrderAnalyzeResponse'
+      security:
+      - Bearer: []
+      summary: Analyze orders for inconsistencies and generate customer statistics
+      tags:
+      - Order
+securityDefinitions:
+  Bearer:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
