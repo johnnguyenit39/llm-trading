@@ -281,6 +281,7 @@ func (s *OKXService) CreateOrder(pair CurrencyPair, amount, price float64, side 
 	req.Header.Set("OK-ACCESS-SIGN", s.generateSign(timestamp, "POST", "/api/v5/trade/order", string(body)))
 	req.Header.Set("OK-ACCESS-TIMESTAMP", timestamp)
 	req.Header.Set("OK-ACCESS-PASSPHRASE", s.passphrase)
+	req.Header.Set("x-simulated-trading", "1")
 	req.Header.Set("Content-Type", "application/json")
 
 	// Make the request
