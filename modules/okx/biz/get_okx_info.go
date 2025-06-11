@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	dto "j-okx-ai/modules/okx/model/dto"
+	dto "j-ai-trade/modules/okx/model/dto"
 )
 
 type GetOkxInfoStorage interface {

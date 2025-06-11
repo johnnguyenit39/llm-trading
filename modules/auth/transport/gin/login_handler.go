@@ -1,13 +1,13 @@
 package transport
 
 import (
-	"j-okx-ai/common"
-	"j-okx-ai/logger"
-	"j-okx-ai/middlewares"
-	"j-okx-ai/modules/auth/biz"
-	dto "j-okx-ai/modules/auth/model/dto"
-	"j-okx-ai/modules/auth/storage"
-	userModel "j-okx-ai/modules/user/model"
+	"j-ai-trade/common"
+	"j-ai-trade/logger"
+	"j-ai-trade/middlewares"
+	"j-ai-trade/modules/auth/biz"
+	dto "j-ai-trade/modules/auth/model/dto"
+	"j-ai-trade/modules/auth/storage"
+	userModel "j-ai-trade/modules/user/model"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

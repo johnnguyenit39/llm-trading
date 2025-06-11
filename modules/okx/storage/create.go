@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"j-okx-ai/modules/okx/model"
+	"j-ai-trade/modules/okx/model"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"

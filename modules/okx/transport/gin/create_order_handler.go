@@ -1,10 +1,10 @@
 package ginNovel
 
 import (
-	"j-okx-ai/common"
-	"j-okx-ai/modules/okx/biz"
-	dto "j-okx-ai/modules/okx/model/dto"
-	"j-okx-ai/modules/okx/storage"
+	"j-ai-trade/common"
+	"j-ai-trade/modules/okx/biz"
+	dto "j-ai-trade/modules/okx/model/dto"
+	"j-ai-trade/modules/okx/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

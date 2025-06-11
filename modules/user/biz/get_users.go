@@ -2,8 +2,8 @@ package biz
 
 import (
 	"context"
-	"j-okx-ai/common"
-	"j-okx-ai/modules/user/model"
+	"j-ai-trade/common"
+	"j-ai-trade/modules/user/model"
 )
 
 type GetUsersStorage interface {

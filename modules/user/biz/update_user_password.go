@@ -2,10 +2,10 @@ package biz
 
 import (
 	"context"
-	"j-okx-ai/common"
-	"j-okx-ai/modules/user/model"
-	requestModel "j-okx-ai/modules/user/model/requests"
-	"j-okx-ai/utils"
+	"j-ai-trade/common"
+	"j-ai-trade/modules/user/model"
+	requestModel "j-ai-trade/modules/user/model/requests"
+	"j-ai-trade/utils"
 )
 
 type UpdateUserPasswordStorage interface {

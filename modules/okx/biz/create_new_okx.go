@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	"j-okx-ai/modules/okx/model"
+	"j-ai-trade/modules/okx/model"
 )
 
 type MockStorage interface {

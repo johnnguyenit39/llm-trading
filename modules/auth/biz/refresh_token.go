@@ -2,8 +2,8 @@ package biz
 
 import (
 	"context"
-	"j-okx-ai/modules/user/model"
-	"j-okx-ai/utils"
+	"j-ai-trade/modules/user/model"
+	"j-ai-trade/utils"
 )
 
 type GetRefreshTokenStorage interface {

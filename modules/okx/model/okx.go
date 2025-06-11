@@ -1,7 +1,7 @@
 package model
 
 import (
-	"j-okx-ai/common"
+	"j-ai-trade/common"
 )
 
 const (

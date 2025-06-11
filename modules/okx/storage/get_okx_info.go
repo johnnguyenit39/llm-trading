@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	dto "j-okx-ai/modules/okx/model/dto"
-	"j-okx-ai/okx"
+	dto "j-ai-trade/modules/okx/model/dto"
+	"j-ai-trade/okx"
 )
 
 func (mongodbStore *mongodbStore) GetOkxInfo(ctx context.Context, cond map[string]interface{}) (*dto.OkxInfoResponse, error) {

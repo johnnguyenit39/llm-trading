@@ -1,12 +1,14 @@
 package main
 
 import (
-	appContext "j-okx-ai/components/app_context"
-	appConfig "j-okx-ai/config/app"
-	storage "j-okx-ai/config/mongodb"
-	_ "j-okx-ai/docs"
-	"j-okx-ai/logger"
-	"j-okx-ai/okx"
+	appContext "j-ai-trade/components/app_context"
+	appConfig "j-ai-trade/config/app"
+	storage "j-ai-trade/config/postgres"
+	"j-ai-trade/config/pubsub"
+	"j-ai-trade/config/redis"
+	_ "j-ai-trade/docs"
+	"j-ai-trade/logger"
+	"j-ai-trade/okx"
 	"os"
 
 	"github.com/rs/zerolog/log"
@@ -38,11 +40,18 @@ func main() {
 		}
 	}
 
+	//Pub sub
+	pubSub := pubsub.NewPubSub()
+	redisClient, err := redis.NewRedisClient()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Could not load the Redis")
+	}
+	pubsub.ListenEvent(redisClient.GetClient(), pubSub)
+
 	// Initialize OKX service
 	_ = okx.GetInstance() // Initialize the singleton
 	log.Info().Msg("OKX service initialized successfully")
 
-	// Establish connection to MongoDB
 	db, err := storage.NewConnection()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to load the database")
@@ -52,7 +61,7 @@ func main() {
 	app := gin.Default()
 
 	// Initialize AppContext with DB and app
-	appContext := appContext.NewAppContext(db, app)
+	appContext := appContext.NewAppContext(db, redisClient.GetClient(), pubSub, app)
 
 	// Initialize application config
 	appConfig.InitializeApp(appContext)

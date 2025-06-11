@@ -1,8 +1,8 @@
 package model
 
 import (
-	"j-okx-ai/common"
-	model "j-okx-ai/modules/okx/model"
+	"j-ai-trade/common"
+	model "j-ai-trade/modules/okx/model"
 )
 
 type MockGetListResponse struct {

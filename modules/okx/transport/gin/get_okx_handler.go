@@ -1,12 +1,12 @@
 package ginNovel
 
 import (
-	"j-okx-ai/common"
-	"j-okx-ai/logger"
-	"j-okx-ai/middlewares"
-	"j-okx-ai/modules/okx/biz"
-	dto "j-okx-ai/modules/okx/model/dto"
-	"j-okx-ai/modules/okx/storage"
+	"j-ai-trade/common"
+	"j-ai-trade/logger"
+	"j-ai-trade/middlewares"
+	"j-ai-trade/modules/okx/biz"
+	dto "j-ai-trade/modules/okx/model/dto"
+	"j-ai-trade/modules/okx/storage"
 	"net/http"
 	"strconv"
 

@@ -2,8 +2,8 @@ package storage
 
 import (
 	"context"
-	common "j-okx-ai/common"
-	"j-okx-ai/modules/okx/model"
+	common "j-ai-trade/common"
+	"j-ai-trade/modules/okx/model"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"

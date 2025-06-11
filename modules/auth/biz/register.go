@@ -2,9 +2,9 @@ package biz
 
 import (
 	"context"
-	common "j-okx-ai/common"
-	userModel "j-okx-ai/modules/user/model"
-	"j-okx-ai/utils"
+	common "j-ai-trade/common"
+	userModel "j-ai-trade/modules/user/model"
+	"j-ai-trade/utils"
 )
 
 type RegisterStorage interface {

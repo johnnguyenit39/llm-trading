@@ -1,11 +1,11 @@
 package app
 
 import (
-	appContext "j-okx-ai/components/app_context"
-	"j-okx-ai/middlewares"
-	ginAuth "j-okx-ai/modules/auth/transport/gin"
-	ginMock "j-okx-ai/modules/okx/transport/gin"
-	ginUser "j-okx-ai/modules/user/transport/gin"
+	appContext "j-ai-trade/components/app_context"
+	"j-ai-trade/middlewares"
+	ginAuth "j-ai-trade/modules/auth/transport/gin"
+	ginMock "j-ai-trade/modules/okx/transport/gin"
+	ginUser "j-ai-trade/modules/user/transport/gin"
 
 	"github.com/gin-contrib/cors"
 	swaggerFiles "github.com/swaggo/files"

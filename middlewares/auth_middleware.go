@@ -1,8 +1,8 @@
 package middlewares
 
 import (
-	"j-okx-ai/common"
-	"j-okx-ai/utils"
+	"j-ai-trade/common"
+	"j-ai-trade/utils"
 	"net/http"
 
 	"github.com/dgrijalva/jwt-go"

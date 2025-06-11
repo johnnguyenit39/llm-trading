@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	"j-okx-ai/modules/user/model"
+	"j-ai-trade/modules/user/model"
 )
 
 type GetUserByIdStorage interface {

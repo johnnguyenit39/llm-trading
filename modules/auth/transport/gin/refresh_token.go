@@ -1,9 +1,9 @@
 package transport
 
 import (
-	"j-okx-ai/common"
-	"j-okx-ai/modules/auth/biz"
-	dto "j-okx-ai/modules/auth/model/dto"
+	"j-ai-trade/common"
+	"j-ai-trade/modules/auth/biz"
+	dto "j-ai-trade/modules/auth/model/dto"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

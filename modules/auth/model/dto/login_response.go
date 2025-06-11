@@ -1,7 +1,7 @@
 package dto
 
 import (
-	userModel "j-okx-ai/modules/user/model"
+	userModel "j-ai-trade/modules/user/model"
 )
 
 type LoginResponse struct {

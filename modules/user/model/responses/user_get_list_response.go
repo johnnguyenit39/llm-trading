@@ -1,8 +1,8 @@
 package model
 
 import (
-	"j-okx-ai/common"
-	model "j-okx-ai/modules/user/model"
+	"j-ai-trade/common"
+	model "j-ai-trade/modules/user/model"
 )
 
 type UserGetListResponse struct {

@@ -1,13 +1,13 @@
 package ginUser
 
 import (
-	"j-okx-ai/common"
-	"j-okx-ai/logger"
-	"j-okx-ai/middlewares"
-	"j-okx-ai/modules/user/biz"
-	model "j-okx-ai/modules/user/model"
-	requestModel "j-okx-ai/modules/user/model/requests"
-	"j-okx-ai/modules/user/storage"
+	"j-ai-trade/common"
+	"j-ai-trade/logger"
+	"j-ai-trade/middlewares"
+	"j-ai-trade/modules/user/biz"
+	model "j-ai-trade/modules/user/model"
+	requestModel "j-ai-trade/modules/user/model/requests"
+	"j-ai-trade/modules/user/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

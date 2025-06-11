@@ -2,10 +2,10 @@ package biz
 
 import (
 	"context"
-	common "j-okx-ai/common"
-	dto "j-okx-ai/modules/auth/model/dto"
-	userModel "j-okx-ai/modules/user/model"
-	"j-okx-ai/utils"
+	common "j-ai-trade/common"
+	dto "j-ai-trade/modules/auth/model/dto"
+	userModel "j-ai-trade/modules/user/model"
+	"j-ai-trade/utils"
 )
 
 type LoginStorage interface {

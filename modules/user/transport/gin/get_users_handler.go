@@ -1,12 +1,12 @@
 package ginUser
 
 import (
-	"j-okx-ai/common"
-	"j-okx-ai/logger"
-	"j-okx-ai/middlewares"
-	"j-okx-ai/modules/user/biz"
-	responseModel "j-okx-ai/modules/user/model/responses"
-	"j-okx-ai/modules/user/storage"
+	"j-ai-trade/common"
+	"j-ai-trade/logger"
+	"j-ai-trade/middlewares"
+	"j-ai-trade/modules/user/biz"
+	responseModel "j-ai-trade/modules/user/model/responses"
+	"j-ai-trade/modules/user/storage"
 	"net/http"
 	"strconv"
 
