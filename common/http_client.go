@@ -14,7 +14,7 @@ import (
 type HTTPRequest struct {
 	URL     string
 	Method  string
-	Body    interface{}
+	Body    any
 	Headers map[string]string
 }
 
@@ -91,10 +91,4 @@ func (c *HTTPClient) Send(ctx context.Context, req HTTPRequest, result interface
 	}
 
 	return nil
-}
-
-// Helper function to marshal without error handling
-func mustMarshal(v interface{}) []byte {
-	b, _ := json.Marshal(v)
-	return b
 }

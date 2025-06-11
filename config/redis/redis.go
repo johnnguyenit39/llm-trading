@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"os"
 	"time"
@@ -23,13 +22,13 @@ func NewRedisClient() (*RedisClient, error) {
 	host := os.Getenv("REDIS_HOST")
 	port := os.Getenv("REDIS_PORT")
 	addr := host + ":" + port
-	password := os.Getenv("REDIS_PASSWORD")
+	//password := os.Getenv("REDIS_PASSWORD")
 	fmt.Println("Establish connection to: " + addr)
 	rdb := redis.NewClient(&redis.Options{
-		Addr:      addr,
-		Password:  password,
-		DB:        0,
-		TLSConfig: &tls.Config{},
+		Addr: addr,
+		//Password:  password,
+		DB: 0,
+		//TLSConfig: &tls.Config{},
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

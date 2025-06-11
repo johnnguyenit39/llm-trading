@@ -50,7 +50,7 @@ func main() {
 
 	// Initialize OKX service
 	_ = okx.GetInstance() // Initialize the singleton
-	log.Info().Msg("OKX service initialized successfully")
+	log.Info().Msg("J AI Trade service initialized successfully")
 
 	db, err := storage.NewConnection()
 	if err != nil {

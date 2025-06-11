@@ -69,7 +69,7 @@ func Login(db *gorm.DB) func(*gin.Context) {
 			Message:           "Logged in created successfully",
 			Data:              *userData,
 		})
-		log.Info().Str("user_id", userData.User.ID.Hex()).Msg("logged in successfully")
+		log.Info().Str("user_id", userData.User.ID.String()).Msg("logged in successfully")
 
 	}
 }

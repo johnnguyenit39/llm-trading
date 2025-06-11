@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	userModel "j-ai-trade/modules/user/model"
 	"log"
 	"os"
 
@@ -48,5 +49,5 @@ func NewConnection() (*gorm.DB, error) {
 }
 
 func AutoMigrate(db *gorm.DB) {
-
+	db.AutoMigrate(&userModel.User{})
 }
