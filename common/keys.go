@@ -1,6 +1,12 @@
 package common
 
-//Role
+//Brokers
+const (
+	Okx     string = "okx"
+	Binance string = "binance"
+)
+
+//Roles
 const (
 	SuperAdmin string = "super_admin"
 	Admin      string = "admin"
@@ -8,7 +14,7 @@ const (
 	User       string = "user"
 )
 
-//UserStatus
+//Subscriptions
 const (
 	Free         string = "free"
 	Professional string = "professional"

@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// GetMock godoc
+// GetSubscription godoc
 // @Summary Get Okx
 // @Description Return Okx
 // @Param id path string true "Okx ID" // Updated to just type string
@@ -25,9 +25,9 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/get/okx/{id} [get]
-func GetMockById(db *gorm.DB) func(*gin.Context) {
+func GetSubscriptionById(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
-		log := logger.GetLogger("GetMockById", c.GetString(middlewares.RequestIDKey))
+		log := logger.GetLogger("GetSubscriptionById", c.GetString(middlewares.RequestIDKey))
 
 		id := c.Param("id")
 		if id == "" {
@@ -42,9 +42,9 @@ func GetMockById(db *gorm.DB) func(*gin.Context) {
 		}
 
 		store := storage.NewPostgresStore(db)
-		business := biz.NewGetMockByIdBiz(store)
+		business := biz.NewGetSubscriptionByIdBiz(store)
 
-		data, err := business.GetMockById(c.Request.Context(), id)
+		data, err := business.GetSubscriptionById(c.Request.Context(), id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusBadRequest,
@@ -52,7 +52,7 @@ func GetMockById(db *gorm.DB) func(*gin.Context) {
 				Message:           err.Error(),
 				Data:              nil,
 			})
-			log.Error().Err(err).Str("Mock_id", id).Msg("failed to get Okx by id")
+			log.Error().Err(err).Str("Subscription_id", id).Msg("failed to get Okx by id")
 			return
 		}
 
@@ -62,6 +62,6 @@ func GetMockById(db *gorm.DB) func(*gin.Context) {
 			Message:           "Okx user successfully",
 			Data:              *data,
 		})
-		log.Info().Str("Mock_id", id).Msg("get Okx by id successfully")
+		log.Info().Str("Subscription_id", id).Msg("get Okx by id successfully")
 	}
 }

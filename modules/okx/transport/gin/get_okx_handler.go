@@ -14,9 +14,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// GetMocks godoc
+// GetSubscriptions godoc
 // @Summary Get a list of Okx
-// @Description Retrieve a list of Mocks based on provided filters and pagination
+// @Description Retrieve a list of Subscriptions based on provided filters and pagination
 // @Param page_number query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(10)
 // @Produce json
@@ -27,10 +27,10 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/get/mocks [get]
-func GetMocks(db *gorm.DB) func(*gin.Context) {
+func GetSubscriptions(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 
-		log := logger.GetLogger("GetMocks", c.GetString(middlewares.RequestIDKey))
+		log := logger.GetLogger("GetSubscriptions", c.GetString(middlewares.RequestIDKey))
 
 		pageNumber := c.DefaultQuery("page_number", "1")
 		pageSize := c.DefaultQuery("page_size", "10")
@@ -51,14 +51,14 @@ func GetMocks(db *gorm.DB) func(*gin.Context) {
 		}
 
 		pagination := &common.Pagination{
-			PageSize:   pageSizeInt,
-			PageNumber: pageNumberInt,
+			Size:  pageSizeInt,
+			Index: pageNumberInt,
 		}
 
 		store := storage.NewPostgresStore(db)
-		business := biz.NewGetMocksBiz(store)
+		business := biz.NewGetSubscriptionsBiz(store)
 
-		list, err := business.GetMocks(c.Request.Context(), pagination)
+		list, err := business.GetSubscriptions(c.Request.Context(), pagination)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusBadRequest,
@@ -66,15 +66,15 @@ func GetMocks(db *gorm.DB) func(*gin.Context) {
 				Message:           err.Error(),
 				Data:              nil,
 			})
-			log.Error().Err(err).Msg("failed to get Mocks")
+			log.Error().Err(err).Msg("failed to get Subscriptions")
 			return
 		}
 
-		c.JSON(http.StatusOK, common.BaseApiResponse[dto.MockGetListResponse]{
+		c.JSON(http.StatusOK, common.BaseApiResponse[dto.SubscriptionGetListResponse]{
 			Success:           true,
 			HttpRequestStatus: http.StatusOK,
 			Message:           "Get Okx list successfully",
-			Data: dto.MockGetListResponse{
+			Data: dto.SubscriptionGetListResponse{
 				List:   list,
 				Paging: *pagination,
 			},

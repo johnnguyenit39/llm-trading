@@ -1,4 +1,4 @@
 package model
 
-type MockAddRequest struct {
+type SubscriptionAddRequest struct {
 }

@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// DeleteMock godoc
+// DeleteSubscription godoc
 // @Summary Delete new Okx
 // @Description Delete a new Okx
 // @Param id path string true "Okx ID" // Updated to just type string
@@ -24,9 +24,9 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/delete/okx/{id} [delete]
-func DeleteMock(db *gorm.DB) func(*gin.Context) {
+func DeleteSubscription(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
-		log := logger.GetLogger("DeleteMock", c.GetString(middlewares.RequestIDKey))
+		log := logger.GetLogger("DeleteSubscription", c.GetString(middlewares.RequestIDKey))
 
 		id := c.Param("id")
 		if id == "" {
@@ -41,9 +41,9 @@ func DeleteMock(db *gorm.DB) func(*gin.Context) {
 		}
 
 		store := storage.NewPostgresStore(db)
-		business := biz.NewDeleteMockBiz(store)
+		business := biz.NewDeleteSubscriptionBiz(store)
 
-		data, err := business.DeleteMock(c.Request.Context(), id)
+		data, err := business.DeleteSubscription(c.Request.Context(), id)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusBadRequest,
@@ -51,7 +51,7 @@ func DeleteMock(db *gorm.DB) func(*gin.Context) {
 				Message:           err.Error(),
 				Data:              nil,
 			})
-			log.Error().Err(err).Str("Mock_id", id).Msg("failed to delete Okx")
+			log.Error().Err(err).Str("Subscription_id", id).Msg("failed to delete Okx")
 			return
 		}
 
@@ -61,6 +61,6 @@ func DeleteMock(db *gorm.DB) func(*gin.Context) {
 			Message:           "Delete Okx successfully",
 			Data:              nil,
 		})
-		log.Info().Str("Mock_id", id).Msg("Delete Okx successfully")
+		log.Info().Str("Subscription_id", id).Msg("Delete Okx successfully")
 	}
 }

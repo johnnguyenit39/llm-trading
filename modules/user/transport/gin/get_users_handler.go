@@ -61,8 +61,8 @@ func GetUsers(db *gorm.DB) func(*gin.Context) {
 		}
 
 		pagination := &common.Pagination{
-			PageSize:   pageSizeInt,
-			PageNumber: pageNumberInt,
+			Size:  pageSizeInt,
+			Index: pageNumberInt,
 		}
 
 		store := storage.NewPostgresStore(db)

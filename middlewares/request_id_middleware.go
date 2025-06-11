@@ -13,7 +13,7 @@ func RequestIDMiddleware() gin.HandlerFunc {
 		// Check if the request already has a Request-ID
 		requestID := c.GetHeader(RequestIDKey)
 		if requestID == "" {
-			// GeneMock a new UUID if none exists
+			// GeneSubscription a new UUID if none exists
 			requestID = uuid.New().String()
 		}
 

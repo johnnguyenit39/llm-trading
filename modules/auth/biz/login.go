@@ -30,12 +30,12 @@ func (biz *createLoginBiz) Login(ctx context.Context, input *userModel.User) (*d
 		return nil, common.ErrorSimpleMessage("The password is incorrect please try again.")
 	}
 
-	token, err := utils.GeneMockJWT(exsitedUser.BaseModel.ID.String())
+	token, err := utils.GeneSubscriptionJWT(exsitedUser.BaseModel.ID.String())
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := utils.GeneMockRefreshToken(exsitedUser.BaseModel.ID.String())
+	refreshToken, err := utils.GeneSubscriptionRefreshToken(exsitedUser.BaseModel.ID.String())
 	if err != nil {
 		return nil, err
 	}

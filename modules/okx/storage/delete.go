@@ -4,6 +4,6 @@ import (
 	"context"
 )
 
-func (postgresStore *postgresStore) DeleteMock(ctx context.Context, cond map[string]interface{}) (bool, error) {
+func (postgresStore *postgresStore) DeleteSubscription(ctx context.Context, cond map[string]interface{}) (bool, error) {
 	return false, nil
 }

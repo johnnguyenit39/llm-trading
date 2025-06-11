@@ -6,7 +6,7 @@ import (
 
 // HashPassword hashes the given password using bcrypt.
 func HashPassword(password string) (string, error) {
-	// GeneMockFromPassword returns a bcrypt hashed password
+	// GeneSubscriptionFromPassword returns a bcrypt hashed password
 	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err

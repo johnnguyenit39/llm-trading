@@ -14,11 +14,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// UpdateMock godoc
+// UpdateSubscription godoc
 // @Summary Update Okx
 // @Description Update Okx
 // @Param id path string true "Okx ID"
-// @Param Okx body model.MockUpdateRequest true "Update Okx"
+// @Param Okx body dto.SubscriptionUpdateRequest true "Update Okx"
 // @Produce application/json
 // @Tags Okx
 // @Success 200 {object} model.Okx
@@ -27,9 +27,9 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/update/okx/{id} [put]
-func UpdateMock(db *gorm.DB) func(*gin.Context) {
+func UpdateSubscription(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
-		log := logger.GetLogger("UpdateMock", c.GetString(middlewares.RequestIDKey))
+		log := logger.GetLogger("UpdateSubscription", c.GetString(middlewares.RequestIDKey))
 		id := c.Param("id")
 		if id == "" {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
@@ -42,7 +42,7 @@ func UpdateMock(db *gorm.DB) func(*gin.Context) {
 			return
 		}
 
-		var input dto.MockUpdateRequest
+		var input dto.SubscriptionUpdateRequest
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusBadRequest,
@@ -57,9 +57,9 @@ func UpdateMock(db *gorm.DB) func(*gin.Context) {
 		data := model.Okx{}
 
 		store := storage.NewPostgresStore(db)
-		business := biz.NewUpdateMockBiz(store)
+		business := biz.NewUpdateSubscriptionBiz(store)
 
-		if err := business.UpdateMock(c.Request.Context(), id, &data); err != nil {
+		if err := business.UpdateSubscription(c.Request.Context(), id, &data); err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusBadRequest,
 				Success:           false,
@@ -76,6 +76,6 @@ func UpdateMock(db *gorm.DB) func(*gin.Context) {
 			Message:           "Okx is updated successfully",
 			Data:              data,
 		})
-		log.Info().Str("Mock_id", id).Msg("Okx is updated successfully")
+		log.Info().Str("Subscription_id", id).Msg("Okx is updated successfully")
 	}
 }

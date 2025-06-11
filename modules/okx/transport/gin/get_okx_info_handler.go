@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// GetMock godoc
+// GetSubscription godoc
 // @Summary Get Okx
 // @Description Return Okx
 // @Produce application/json

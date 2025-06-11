@@ -13,5 +13,5 @@ type Okx struct {
 }
 
 func (*Okx) CollectionName() string {
-	return "Mocks"
+	return "Subscriptions"
 }

@@ -5,20 +5,20 @@ import (
 	"j-ai-trade/modules/okx/model"
 )
 
-type GetMockByIdStorage interface {
-	GetMockById(ctx context.Context, cond map[string]interface{}) (*model.Okx, error)
+type GetSubscriptionByIdStorage interface {
+	GetSubscriptionById(ctx context.Context, cond map[string]interface{}) (*model.Okx, error)
 }
 
-func NewGetMockByIdBiz(store GetMockByIdStorage) *getMockByIdBiz {
-	return &getMockByIdBiz{store: store}
+func NewGetSubscriptionByIdBiz(store GetSubscriptionByIdStorage) *getSubscriptionByIdBiz {
+	return &getSubscriptionByIdBiz{store: store}
 }
 
-type getMockByIdBiz struct {
-	store GetMockByIdStorage
+type getSubscriptionByIdBiz struct {
+	store GetSubscriptionByIdStorage
 }
 
-func (biz *getMockByIdBiz) GetMockById(ctx context.Context, id string) (*model.Okx, error) {
-	data, err := biz.store.GetMockById(ctx, map[string]interface{}{"_id": id})
+func (biz *getSubscriptionByIdBiz) GetSubscriptionById(ctx context.Context, id string) (*model.Okx, error) {
+	data, err := biz.store.GetSubscriptionById(ctx, map[string]interface{}{"_id": id})
 
 	if err != nil {
 		return nil, err

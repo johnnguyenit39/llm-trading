@@ -6,20 +6,20 @@ import (
 	"j-ai-trade/modules/okx/model"
 )
 
-type GetMocksStorage interface {
-	GetMocks(ctx context.Context, paging *common.Pagination) ([]model.Okx, error)
+type GetSubscriptionsStorage interface {
+	GetSubscriptions(ctx context.Context, paging *common.Pagination) ([]model.Okx, error)
 }
 
-func NewGetMocksBiz(store GetMocksStorage) *getMocksBiz {
-	return &getMocksBiz{store: store}
+func NewGetSubscriptionsBiz(store GetSubscriptionsStorage) *getSubscriptionsBiz {
+	return &getSubscriptionsBiz{store: store}
 }
 
-type getMocksBiz struct {
-	store GetMocksStorage
+type getSubscriptionsBiz struct {
+	store GetSubscriptionsStorage
 }
 
-func (biz *getMocksBiz) GetMocks(ctx context.Context, paging *common.Pagination) ([]model.Okx, error) {
-	data, err := biz.store.GetMocks(ctx, paging)
+func (biz *getSubscriptionsBiz) GetSubscriptions(ctx context.Context, paging *common.Pagination) ([]model.Okx, error) {
+	data, err := biz.store.GetSubscriptions(ctx, paging)
 
 	if err != nil {
 		return nil, err

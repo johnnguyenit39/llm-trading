@@ -3,8 +3,10 @@ package app
 import (
 	appContext "j-ai-trade/components/app_context"
 	"j-ai-trade/middlewares"
+	ginApiKey "j-ai-trade/modules/api_key/transport/gin"
 	ginAuth "j-ai-trade/modules/auth/transport/gin"
-	ginMock "j-ai-trade/modules/okx/transport/gin"
+	ginOkx "j-ai-trade/modules/okx/transport/gin"
+	ginSubscription "j-ai-trade/modules/subscription/transport/gin"
 	ginUser "j-ai-trade/modules/user/transport/gin"
 
 	"github.com/gin-contrib/cors"
@@ -16,7 +18,12 @@ func InitializeApp(appContext appContext.AppContext) {
 	router := appContext.GetGinApp()
 
 	// Add swagger
-	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	swaggerGroup := router.Group("/docs")
+	// Add basic auth middleware for Swagger UI
+	swaggerGroup.Use(BasicAuthMiddleware())
+
+	// Add swagger
+	swaggerGroup.GET("/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Use CORS middleware
 	router.Use(cors.New(cors.Config{
@@ -69,17 +76,43 @@ func InitializeApp(appContext appContext.AppContext) {
 		}
 	}
 
+	// Subscription API
+	{
+		{
+			protected.POST("/create/user/", ginSubscription.CreateSubscription(appContext.GetMainDBConnection()))
+			protected.GET("/get/user/:id", ginSubscription.GetSubscriptionById(appContext.GetMainDBConnection()))
+			protected.GET("/get/users", ginSubscription.GetSubscriptions(appContext.GetMainDBConnection()))
+			protected.PUT("/update/user/:id", ginSubscription.UpdateSubscription(appContext.GetMainDBConnection()))
+			protected.DELETE("/delete/user/:id", ginSubscription.DeleteSubscription(appContext.GetMainDBConnection()))
+			protected.PUT("/update/password/user/:id", ginSubscription.UpdateSubscription(appContext.GetMainDBConnection()))
+
+		}
+	}
+
+	// ApiKey API
+	{
+		{
+			protected.POST("/create/user/", ginApiKey.CreateApiKey(appContext.GetMainDBConnection()))
+			protected.GET("/get/user/:id", ginApiKey.GetApiKeyById(appContext.GetMainDBConnection()))
+			protected.GET("/get/users", ginApiKey.GetApiKeys(appContext.GetMainDBConnection()))
+			protected.PUT("/update/user/:id", ginApiKey.UpdateApiKey(appContext.GetMainDBConnection()))
+			protected.DELETE("/delete/user/:id", ginApiKey.DeleteApiKey(appContext.GetMainDBConnection()))
+			protected.PUT("/update/password/user/:id", ginApiKey.UpdateApiKey(appContext.GetMainDBConnection()))
+
+		}
+	}
+
 	// Okx API
 	{
 		{
-			protected.POST("/create/mock", ginMock.CreateMock(appContext.GetMainDBConnection()))
-			protected.GET("/get/okx/:id", ginMock.GetMockById(appContext.GetMainDBConnection()))
-			protected.GET("/get/okx-info", ginMock.GetOkxInfo(appContext.GetMainDBConnection()))
-			protected.GET("/get/mocks", ginMock.GetMocks(appContext.GetMainDBConnection()))
-			protected.PUT("/update/okx/:id", ginMock.UpdateMock(appContext.GetMainDBConnection()))
-			protected.DELETE("/delete/okx/:id", ginMock.DeleteMock(appContext.GetMainDBConnection()))
-			protected.POST("/create/order", ginMock.CreateOrder(appContext.GetMainDBConnection()))
-			protected.POST("/cancel/order", ginMock.CancelOrder(appContext.GetMainDBConnection()))
+			protected.POST("/create/mock", ginOkx.CreateSubscription(appContext.GetMainDBConnection()))
+			protected.GET("/get/okx/:id", ginOkx.GetSubscriptionById(appContext.GetMainDBConnection()))
+			protected.GET("/get/okx-info", ginOkx.GetOkxInfo(appContext.GetMainDBConnection()))
+			protected.GET("/get/mocks", ginOkx.GetSubscriptions(appContext.GetMainDBConnection()))
+			protected.PUT("/update/okx/:id", ginOkx.UpdateSubscription(appContext.GetMainDBConnection()))
+			protected.DELETE("/delete/okx/:id", ginOkx.DeleteSubscription(appContext.GetMainDBConnection()))
+			protected.POST("/create/order", ginOkx.CreateOrder(appContext.GetMainDBConnection()))
+			protected.POST("/cancel/order", ginOkx.CancelOrder(appContext.GetMainDBConnection()))
 		}
 	}
 

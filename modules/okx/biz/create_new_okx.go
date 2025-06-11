@@ -5,20 +5,20 @@ import (
 	"j-ai-trade/modules/okx/model"
 )
 
-type MockStorage interface {
-	CreateMock(ctx context.Context, data *model.Okx) error
+type SubscriptionStorage interface {
+	CreateSubscription(ctx context.Context, data *model.Okx) error
 }
 
-func NewCreateMockBiz(store MockStorage) *createMockBiz {
-	return &createMockBiz{store: store}
+func NewCreateSubscriptionBiz(store SubscriptionStorage) *createSubscriptionBiz {
+	return &createSubscriptionBiz{store: store}
 }
 
-type createMockBiz struct {
-	store MockStorage
+type createSubscriptionBiz struct {
+	store SubscriptionStorage
 }
 
-func (biz *createMockBiz) CreateMock(ctx context.Context, data *model.Okx) error {
-	if err := biz.store.CreateMock(ctx, data); err != nil {
+func (biz *createSubscriptionBiz) CreateSubscription(ctx context.Context, data *model.Okx) error {
+	if err := biz.store.CreateSubscription(ctx, data); err != nil {
 		return err
 	}
 	return nil

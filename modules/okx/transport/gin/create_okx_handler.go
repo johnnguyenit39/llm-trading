@@ -14,10 +14,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// CreateMock godoc
+// CreateSubscription godoc
 // @Summary Create new Okx
 // @Description Create a new Okx
-// @Param Okx body model.MockAddRequest true "Create Okx"
+// @Param Okx body dto.SubscriptionAddRequest true "Create Okx"
 // @Produce application/json
 // @Tags Okx
 // @Success 200 {object} model.Okx
@@ -25,13 +25,13 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/create/mock [post]
-func CreateMock(db *gorm.DB) func(*gin.Context) {
+// @Router /v1/create/subscription [post]
+func CreateSubscription(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 
-		log := logger.GetLogger("CreateMock", c.GetString(middlewares.RequestIDKey))
+		log := logger.GetLogger("CreateSubscription", c.GetString(middlewares.RequestIDKey))
 
-		var input dto.MockAddRequest
+		var input dto.SubscriptionAddRequest
 		if err := c.ShouldBindJSON(&input); err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusBadRequest,
@@ -46,9 +46,9 @@ func CreateMock(db *gorm.DB) func(*gin.Context) {
 		data := model.Okx{}
 
 		store := storage.NewPostgresStore(db)
-		business := biz.NewCreateMockBiz(store)
+		business := biz.NewCreateSubscriptionBiz(store)
 
-		if err := business.CreateMock(c.Request.Context(), &data); err != nil {
+		if err := business.CreateSubscription(c.Request.Context(), &data); err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusBadRequest,
 				Success:           false,
@@ -65,6 +65,6 @@ func CreateMock(db *gorm.DB) func(*gin.Context) {
 			Message:           "Okx created successfully",
 			Data:              data,
 		})
-		log.Info().Str("Mock_id", data.ID.String()).Msg("Okx created successfully")
+		log.Info().Str("Subscription_id", data.ID.String()).Msg("Okx created successfully")
 	}
 }

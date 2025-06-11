@@ -9,7 +9,7 @@ import (
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
-func GeneMockJWT(userID string) (string, error) {
+func GeneSubscriptionJWT(userID string) (string, error) {
 	claims := jwt.MapClaims{
 		"userID": userID,
 		"exp":    time.Now().Add(time.Minute * 30).Unix(), // Token expires in 30 mins
@@ -19,7 +19,7 @@ func GeneMockJWT(userID string) (string, error) {
 	return token.SignedString(jwtSecret)
 }
 
-func GeneMockRefreshToken(userID string) (string, error) {
+func GeneSubscriptionRefreshToken(userID string) (string, error) {
 	claims := jwt.MapClaims{
 		"userID": userID,
 		"exp":    time.Now().Add(time.Hour * 24 * 90).Unix(), // Refresh token expires in 90 days

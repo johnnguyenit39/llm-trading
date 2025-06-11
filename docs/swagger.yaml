@@ -21,6 +21,13 @@ definitions:
       success:
         type: boolean
     type: object
+  common.PaginationRequest:
+    properties:
+      index:
+        type: integer
+      size:
+        type: integer
+    type: object
   dto.LoginRequest:
     properties:
       password:
@@ -54,12 +61,36 @@ definitions:
     - password
     - phone_number
     type: object
+  j-ai-trade_modules_okx_model_dto.SubscriptionAddRequest:
+    type: object
+  j-ai-trade_modules_okx_model_dto.SubscriptionUpdateRequest:
+    type: object
+  j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest:
+    type: object
+  model.ApiKey:
+    properties:
+      ID:
+        type: string
+      createdAt:
+        type: string
+    type: object
+  model.ApiKeyGetListRequest:
+    properties:
+      Pagination:
+        $ref: '#/definitions/common.PaginationRequest'
+    type: object
+  model.ApiKeyUpdateRequest:
+    type: object
   model.CancelOrderRequest:
     properties:
+      currency:
+        description: Currency code (e.g., "ADA")
+        type: string
       order_id:
         description: Order ID to cancel
         type: string
     required:
+    - currency
     - order_id
     type: object
   model.CreateOrderRequest:
@@ -86,24 +117,64 @@ definitions:
     - side
     - type
     type: object
-  model.MockAddRequest:
-    type: object
-  model.MockUpdateRequest:
-    type: object
   model.Okx:
     properties:
-      _id:
+      ID:
         type: string
-      created_at:
+      createdAt:
         type: string
+    type: object
+  model.Permission:
+    properties:
+      ID:
+        type: string
+      createdAt:
+        type: string
+    type: object
+  model.PermissionGetListRequest:
+    properties:
+      Pagination:
+        $ref: '#/definitions/common.PaginationRequest'
+    type: object
+  model.PermissionUpdateRequest:
+    type: object
+  model.Subscription:
+    properties:
+      ID:
+        type: string
+      createdAt:
+        type: string
+      title:
+        type: string
+    type: object
+  model.SubscriptionGetListRequest:
+    properties:
+      Pagination:
+        $ref: '#/definitions/common.PaginationRequest'
     type: object
   model.User:
     properties:
-      _id:
+      ID:
         type: string
-      created_at:
+      country_code:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
         type: string
       phone_number:
+        type: string
+      profile_imageUrl:
+        type: string
+      role:
+        example: super_admin
+        type: string
+      status:
+        example: active
         type: string
     type: object
   model.UserAddRequest:
@@ -255,28 +326,6 @@ paths:
       summary: Cancel an existing order
       tags:
       - Okx
-  /v1/create/mock:
-    post:
-      description: Create a new Okx
-      parameters:
-      - description: Create Okx
-        in: body
-        name: Okx
-        required: true
-        schema:
-          $ref: '#/definitions/model.MockAddRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Okx'
-      security:
-      - Bearer: []
-      summary: Create new Okx
-      tags:
-      - Okx
   /v1/create/order:
     post:
       consumes:
@@ -299,6 +348,28 @@ paths:
       security:
       - Bearer: []
       summary: Create a new order
+      tags:
+      - Okx
+  /v1/create/subscription:
+    post:
+      description: Create a new Okx
+      parameters:
+      - description: Create Okx
+        in: body
+        name: Okx
+        required: true
+        schema:
+          $ref: '#/definitions/j-ai-trade_modules_okx_model_dto.SubscriptionAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Okx'
+      security:
+      - Bearer: []
+      summary: Create new Okx
       tags:
       - Okx
   /v1/create/user:
@@ -367,7 +438,8 @@ paths:
       - User
   /v1/get/mocks:
     get:
-      description: Retrieve a list of Mocks based on provided filters and pagination
+      description: Retrieve a list of Subscriptions based on provided filters and
+        pagination
       parameters:
       - default: 1
         description: Page number
@@ -492,7 +564,7 @@ paths:
         name: Okx
         required: true
         schema:
-          $ref: '#/definitions/model.MockUpdateRequest'
+          $ref: '#/definitions/j-ai-trade_modules_okx_model_dto.SubscriptionUpdateRequest'
       produces:
       - application/json
       responses:
@@ -559,6 +631,361 @@ paths:
       summary: Update User
       tags:
       - User
+  /v2/Permission/create:
+    post:
+      description: Create a new Permission
+      parameters:
+      - description: Create Permission
+        in: body
+        name: Permission
+        required: true
+        schema:
+          $ref: '#/definitions/model.Permission'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Create new Permission
+      tags:
+      - Permission
+  /v2/Permission/delete:
+    delete:
+      description: Delete a new Permission
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Delete new Permission
+      tags:
+      - Permission
+  /v2/Permission/get:
+    get:
+      description: Return Permission
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Get Permission
+      tags:
+      - Permission
+  /v2/Permission/list:
+    post:
+      description: Retrieve a list of Permissions based on provided filters and pagination
+      parameters:
+      - description: Get Permissions
+        in: body
+        name: Permission
+        required: true
+        schema:
+          $ref: '#/definitions/model.PermissionGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Permission'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of Permission
+      tags:
+      - Permission
+  /v2/Permission/update:
+    put:
+      description: Update Permission
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.PermissionUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Update Permission
+      tags:
+      - Permission
+  /v2/api-key/create:
+    post:
+      description: Create a new ApiKey
+      parameters:
+      - description: Create ApiKey
+        in: body
+        name: ApiKey
+        required: true
+        schema:
+          $ref: '#/definitions/model.ApiKey'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ApiKey'
+      security:
+      - Bearer: []
+      summary: Create new ApiKey
+      tags:
+      - ApiKey
+  /v2/api-key/delete:
+    delete:
+      description: Delete a new ApiKey
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ApiKey'
+      security:
+      - Bearer: []
+      summary: Delete new ApiKey
+      tags:
+      - ApiKey
+  /v2/api-key/get:
+    get:
+      description: Return ApiKey
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ApiKey'
+      security:
+      - Bearer: []
+      summary: Get ApiKey
+      tags:
+      - ApiKey
+  /v2/api-key/list:
+    post:
+      description: Retrieve a list of ApiKeys based on provided filters and pagination
+      parameters:
+      - description: Get ApiKeys
+        in: body
+        name: ApiKey
+        required: true
+        schema:
+          $ref: '#/definitions/model.ApiKeyGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.ApiKey'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of ApiKey
+      tags:
+      - ApiKey
+  /v2/api-key/update:
+    put:
+      description: Update ApiKey
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.ApiKeyUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ApiKey'
+      security:
+      - Bearer: []
+      summary: Update ApiKey
+      tags:
+      - ApiKey
+  /v2/subscription/create:
+    post:
+      description: Create a new Subscription
+      parameters:
+      - description: Create Subscription
+        in: body
+        name: Subscription
+        required: true
+        schema:
+          $ref: '#/definitions/model.Subscription'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Subscription'
+      security:
+      - Bearer: []
+      summary: Create new Subscription
+      tags:
+      - Subscription
+  /v2/subscription/delete:
+    delete:
+      description: Delete a new Subscription
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Subscription'
+      security:
+      - Bearer: []
+      summary: Delete new Subscription
+      tags:
+      - Subscription
+  /v2/subscription/get:
+    get:
+      description: Return Subscription
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Subscription'
+      security:
+      - Bearer: []
+      summary: Get Subscription
+      tags:
+      - Subscription
+  /v2/subscription/list:
+    post:
+      description: Retrieve a list of Subscriptions based on provided filters and
+        pagination
+      parameters:
+      - description: Get Subscriptions
+        in: body
+        name: Subscription
+        required: true
+        schema:
+          $ref: '#/definitions/model.SubscriptionGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Subscription'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of Subscription
+      tags:
+      - Subscription
+  /v2/subscription/update:
+    put:
+      description: Update Subscription
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Subscription'
+      security:
+      - Bearer: []
+      summary: Update Subscription
+      tags:
+      - Subscription
 securityDefinitions:
   Bearer:
     in: header

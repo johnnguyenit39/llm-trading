@@ -5,7 +5,7 @@ import (
 	model "j-ai-trade/modules/okx/model"
 )
 
-type MockGetListResponse struct {
+type SubscriptionGetListResponse struct {
 	Paging common.Pagination `json:"Paging"`
 	List   []model.Okx       `json:"List"`
 }

@@ -4,6 +4,9 @@ import (
 	"j-ai-trade/common"
 	"log"
 
+	subscriptionModel "j-ai-trade/modules/subscription/model"
+
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -14,16 +17,18 @@ const (
 
 type User struct {
 	common.BaseModel
-	FirstName       string         `gorm:"type:varchar(50)" json:"first_name"`
-	LastName        string         `gorm:"type:varchar(50)" json:"last_name"`
-	Email           string         `gorm:"type:varchar(100);unique" json:"email"`
-	Password        string         `gorm:"type:varchar(255)" json:"-"`
-	Status          string         `json:"status" example:"active"`
-	CountryCode     string         `gorm:"type:varchar(50)" json:"country_code"`
-	PhoneNumber     string         `gorm:"type:varchar(50)" json:"phone_number"`
-	ProfileImageUrl string         `gorm:"type:text" json:"profile_imageUrl"`
-	Role            string         `gorm:"type:varchar(50)" json:"role" example:"super_admin"`
-	Metadata        datatypes.JSON `gorm:"type:jsonb" json:"-"`
+	FirstName       string                         `gorm:"type:varchar(50)" json:"first_name"`
+	LastName        string                         `gorm:"type:varchar(50)" json:"last_name"`
+	Email           string                         `gorm:"type:varchar(100);unique" json:"email"`
+	Password        string                         `gorm:"type:varchar(255)" json:"-"`
+	Status          string                         `json:"status" example:"active"`
+	CountryCode     string                         `gorm:"type:varchar(50)" json:"country_code"`
+	PhoneNumber     string                         `gorm:"type:varchar(50)" json:"phone_number"`
+	ProfileImageUrl string                         `gorm:"type:text" json:"profile_imageUrl"`
+	Role            string                         `gorm:"type:varchar(50)" json:"role" example:"super_admin"`
+	Metadata        datatypes.JSON                 `gorm:"type:jsonb" json:"-"`
+	SubscriptionID  uuid.UUID                      `gorm:"column:subscription_id" json:"-"`
+	Subscription    subscriptionModel.Subscription `gorm:"foreignKey:SubscriptionID" json:"-"`
 }
 
 func (*User) TableName() string {

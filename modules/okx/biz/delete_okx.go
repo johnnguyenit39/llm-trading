@@ -5,27 +5,27 @@ import (
 	"j-ai-trade/modules/okx/model"
 )
 
-type DeleteNewMockStorage interface {
-	GetMockById(ctx context.Context, cond map[string]interface{}) (*model.Okx, error)
-	DeleteMock(ctx context.Context, cond map[string]interface{}) (bool, error)
+type DeleteNewSubscriptionStorage interface {
+	GetSubscriptionById(ctx context.Context, cond map[string]interface{}) (*model.Okx, error)
+	DeleteSubscription(ctx context.Context, cond map[string]interface{}) (bool, error)
 }
 
-func NewDeleteMockBiz(store DeleteNewMockStorage) *deleteMockBiz {
-	return &deleteMockBiz{store: store}
+func NewDeleteSubscriptionBiz(store DeleteNewSubscriptionStorage) *deleteSubscriptionBiz {
+	return &deleteSubscriptionBiz{store: store}
 }
 
-type deleteMockBiz struct {
-	store DeleteNewMockStorage
+type deleteSubscriptionBiz struct {
+	store DeleteNewSubscriptionStorage
 }
 
-func (biz *deleteMockBiz) DeleteMock(ctx context.Context, id string) (bool, error) {
-	_, err := biz.store.GetMockById(ctx, map[string]interface{}{"_id": id})
+func (biz *deleteSubscriptionBiz) DeleteSubscription(ctx context.Context, id string) (bool, error) {
+	_, err := biz.store.GetSubscriptionById(ctx, map[string]interface{}{"_id": id})
 
 	if err != nil {
 		return false, err
 	}
 
-	_, err = biz.store.DeleteMock(ctx, map[string]interface{}{"_id": id})
+	_, err = biz.store.DeleteSubscription(ctx, map[string]interface{}{"_id": id})
 
 	if err != nil {
 		return false, err

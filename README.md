@@ -71,7 +71,7 @@ Each layer is designed to be interchangeable and easy to extend. By following th
     Following Clean Architecture principles ensures your code remains modular, maintainable, and scalable as your project grows.
 
 - **Customizable**:  
-    Once the boilerplate code is geneMockd, you can easily modify it to meet your specific business and application logic requirements.
+    Once the boilerplate code is geneSubscriptiond, you can easily modify it to meet your specific business and application logic requirements.
 
 ---
 

@@ -5,6 +5,6 @@ import (
 	"j-ai-trade/modules/okx/model"
 )
 
-func (postgresStore *postgresStore) CreateMock(ctx context.Context, data *model.Okx) error {
+func (postgresStore *postgresStore) CreateSubscription(ctx context.Context, data *model.Okx) error {
 	return nil
 }
