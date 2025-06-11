@@ -11,7 +11,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // UpdateMock godoc
@@ -27,7 +27,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/update/okx/{id} [put]
-func UpdateMock(db *mongo.Database) func(*gin.Context) {
+func UpdateMock(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("UpdateMock", c.GetString(middlewares.RequestIDKey))
 		id := c.Param("id")
@@ -56,7 +56,7 @@ func UpdateMock(db *mongo.Database) func(*gin.Context) {
 
 		data := model.Okx{}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewUpdateMockBiz(store)
 
 		if err := business.UpdateMock(c.Request.Context(), id, &data); err != nil {

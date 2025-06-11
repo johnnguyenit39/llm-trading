@@ -11,14 +11,14 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // UpdateUserPassword godoc
 // @Summary Update User Password
 // @Description Update User Password
-// @Param id path string true "User ID" // Updated to just type string
-// @Param User body model.UserUpdatePasswordRequest true "Update User"  // Correctly specify the request body
+// @Param id path string true "User ID"
+// @Param User body model.UserUpdatePasswordRequest true "Update User"
 // @Produce application/json
 // @Tags User
 // @Success 200 {object} model.User
@@ -27,9 +27,8 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/update/password/user/{id} [put]
-func UpdateUserPassword(db *mongo.Database) func(*gin.Context) {
+func UpdateUserPassword(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
-
 		log := logger.GetLogger("UpdateUserPassword", c.GetString(middlewares.RequestIDKey))
 
 		id := c.Param("id")
@@ -66,7 +65,7 @@ func UpdateUserPassword(db *mongo.Database) func(*gin.Context) {
 			return
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 
 		business := biz.NewUpdateUserPasswordBiz(store)
 		data, err := business.UpdateUserPassword(c.Request.Context(), id, &input)

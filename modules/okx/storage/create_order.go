@@ -7,7 +7,7 @@ import (
 	"j-ai-trade/okx"
 )
 
-func (mongodbStore *mongodbStore) CreateOrder(ctx context.Context, req *dto.CreateOrderRequest) ([]byte, error) {
+func (postgresStore *postgresStore) CreateOrder(ctx context.Context, req *dto.CreateOrderRequest) ([]byte, error) {
 	// Get the OKX service instance
 	okxService := okx.GetInstance()
 

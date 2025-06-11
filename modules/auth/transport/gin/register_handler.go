@@ -11,7 +11,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // AuthLogin godoc
@@ -25,7 +25,7 @@ import (
 // @Failure 400 {object} common.BaseApiResponse[any] "Bad Request"
 // @Failure 500 {object} common.BaseApiResponse[any] "Internal Server Error"
 // @Router /v1/auth/register [post]
-func Register(db *mongo.Database) func(*gin.Context) {
+func Register(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("Register", c.GetString(middlewares.RequestIDKey))
 
@@ -47,7 +47,7 @@ func Register(db *mongo.Database) func(*gin.Context) {
 			Password:    input.Password,
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewRegisterBiz(store)
 
 		if err := business.Register(c.Request.Context(), &data); err != nil {
@@ -67,6 +67,6 @@ func Register(db *mongo.Database) func(*gin.Context) {
 			Message:           "User is created successfully",
 			Data:              data,
 		})
-		log.Info().Str("user_id", data.ID.Hex()).Msg("user is created successfully")
+		log.Info().Str("user_id", data.ID.String()).Msg("user is created successfully")
 	}
 }

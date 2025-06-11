@@ -11,7 +11,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // CreateMock godoc
@@ -26,7 +26,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/create/mock [post]
-func CreateMock(db *mongo.Database) func(*gin.Context) {
+func CreateMock(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 
 		log := logger.GetLogger("CreateMock", c.GetString(middlewares.RequestIDKey))
@@ -45,7 +45,7 @@ func CreateMock(db *mongo.Database) func(*gin.Context) {
 
 		data := model.Okx{}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewCreateMockBiz(store)
 
 		if err := business.CreateMock(c.Request.Context(), &data); err != nil {
@@ -65,6 +65,6 @@ func CreateMock(db *mongo.Database) func(*gin.Context) {
 			Message:           "Okx created successfully",
 			Data:              data,
 		})
-		log.Info().Str("Mock_id", data.ID.Hex()).Msg("Okx created successfully")
+		log.Info().Str("Mock_id", data.ID.String()).Msg("Okx created successfully")
 	}
 }

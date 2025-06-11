@@ -11,7 +11,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // UpdateUser godoc
@@ -27,7 +27,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/update/user/{id} [put]
-func UpdateUser(db *mongo.Database) func(*gin.Context) {
+func UpdateUser(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 
 		log := logger.GetLogger("UpdateUser", c.GetString(middlewares.RequestIDKey))
@@ -57,7 +57,7 @@ func UpdateUser(db *mongo.Database) func(*gin.Context) {
 		}
 
 		data := model.User{}
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 
 		business := biz.NewUpdateUserBiz(store)
 		if err := business.UpdateUser(c.Request.Context(), id, &data); err != nil {

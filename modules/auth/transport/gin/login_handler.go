@@ -11,7 +11,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // AuthLogin godoc
@@ -25,7 +25,7 @@ import (
 // @Failure 400 {object} common.BaseApiResponse[any] "Bad Request"
 // @Failure 500 {object} common.BaseApiResponse[any] "Internal Server Error"
 // @Router /v1/auth/login [post]
-func Login(db *mongo.Database) func(*gin.Context) {
+func Login(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 
 		log := logger.GetLogger("Login", c.GetString(middlewares.RequestIDKey))
@@ -48,7 +48,7 @@ func Login(db *mongo.Database) func(*gin.Context) {
 			Password:    input.Password,
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewLoginBiz(store)
 
 		userData, err := business.Login(c.Request.Context(), &data)

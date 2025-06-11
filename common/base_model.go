@@ -3,27 +3,30 @@ package common
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type BaseModel struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty" json:"_id"`
-	CreatedAt time.Time          `bson:"created_at,omitempty" json:"created_at"`
-	UpdatedAt time.Time          `bson:"updated_at,omitempty" json:"-"`
-	DeletedAt *time.Time         `bson:"deleted_at,omitempty" json:"-"`
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey" json:"ID"`
+	CreatedAt time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt time.Time  `gorm:"autoUpdateTime" json:"-"`
+	DeletedAt *time.Time `gorm:"index" json:"-"`
 }
 
-// NewBaseModel initializes a new BaseModel with UUID (or ObjectID) and timestamps
-func NewBaseModel() *BaseModel {
-	now := time.Now().UTC()
-	return &BaseModel{
-		ID:        primitive.NewObjectID(), // GeneMock ObjectID
-		CreatedAt: now,
-		UpdatedAt: now,
+// BeforeCreate is a GORM hook that runs before a new record is created
+func (baseModel *BaseModel) BeforeCreate(tx *gorm.DB) (err error) {
+	if baseModel.ID == uuid.Nil {
+		baseModel.ID = uuid.New()
 	}
+	if baseModel.CreatedAt.IsZero() {
+		baseModel.CreatedAt = time.Now().UTC()
+	}
+	baseModel.UpdatedAt = time.Now().UTC()
+	return nil
 }
 
-// SetUpdatedAt updates the UpdatedAt field
-func (baseModel *BaseModel) SetUpdatedAt() {
+func (baseModel *BaseModel) BeforeUpdate(tx *gorm.DB) (err error) {
 	baseModel.UpdatedAt = time.Now().UTC()
+	return
 }

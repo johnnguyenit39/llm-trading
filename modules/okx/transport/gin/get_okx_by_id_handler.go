@@ -10,7 +10,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // GetMock godoc
@@ -25,7 +25,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/get/okx/{id} [get]
-func GetMockById(db *mongo.Database) func(*gin.Context) {
+func GetMockById(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("GetMockById", c.GetString(middlewares.RequestIDKey))
 
@@ -41,7 +41,7 @@ func GetMockById(db *mongo.Database) func(*gin.Context) {
 			return
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewGetMockByIdBiz(store)
 
 		data, err := business.GetMockById(c.Request.Context(), id)

@@ -8,7 +8,7 @@ import (
 	"j-ai-trade/okx"
 )
 
-func (mongodbStore *mongodbStore) GetOkxInfo(ctx context.Context, cond map[string]interface{}) (*dto.OkxInfoResponse, error) {
+func (postgresStore *postgresStore) GetOkxInfo(ctx context.Context, cond map[string]interface{}) (*dto.OkxInfoResponse, error) {
 	// Get the OKX service instance
 	okxService := okx.GetInstance()
 

@@ -10,7 +10,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // GetUser godoc
@@ -25,7 +25,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/get/user/{id} [get]
-func GetUserById(db *mongo.Database) func(*gin.Context) {
+func GetUserById(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 
 		log := logger.GetLogger("GetUserById", c.GetString(middlewares.RequestIDKey))
@@ -42,7 +42,7 @@ func GetUserById(db *mongo.Database) func(*gin.Context) {
 			return
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewGetUserByIdBiz(store)
 
 		data, err := business.GetUserById(c.Request.Context(), id)

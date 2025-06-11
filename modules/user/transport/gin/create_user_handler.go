@@ -12,7 +12,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // CreateUver godoc
@@ -27,7 +27,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/create/user [post]
-func CreateUser(db *mongo.Database) func(*gin.Context) {
+func CreateUser(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 
 		log := logger.GetLogger("CreateUser", c.GetString(middlewares.RequestIDKey))
@@ -62,7 +62,7 @@ func CreateUser(db *mongo.Database) func(*gin.Context) {
 			Password:    hashedPassword,
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewCreateUserBiz(store)
 
 		if err := business.CreateUser(c.Request.Context(), &data); err != nil {
@@ -82,6 +82,6 @@ func CreateUser(db *mongo.Database) func(*gin.Context) {
 			Message:           "User is created successfully",
 			Data:              data,
 		})
-		log.Info().Str("user_id", data.ID.Hex()).Msg("User is created successfully")
+		log.Info().Str("user_id", data.ID.String()).Msg("User is created successfully")
 	}
 }

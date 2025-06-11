@@ -9,7 +9,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // DeleteMock godoc
@@ -24,7 +24,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/delete/okx/{id} [delete]
-func DeleteMock(db *mongo.Database) func(*gin.Context) {
+func DeleteMock(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("DeleteMock", c.GetString(middlewares.RequestIDKey))
 
@@ -40,7 +40,7 @@ func DeleteMock(db *mongo.Database) func(*gin.Context) {
 			return
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewDeleteMockBiz(store)
 
 		data, err := business.DeleteMock(c.Request.Context(), id)

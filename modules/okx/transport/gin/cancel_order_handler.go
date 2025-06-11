@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // CancelOrder godoc
@@ -24,7 +24,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/cancel/order [post]
-func CancelOrder(db *mongo.Database) func(*gin.Context) {
+func CancelOrder(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var req dto.CancelOrderRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -48,7 +48,7 @@ func CancelOrder(db *mongo.Database) func(*gin.Context) {
 			return
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewCancelOrderBiz(store)
 
 		response, err := business.CancelOrder(c.Request.Context(), &req)

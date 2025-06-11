@@ -11,7 +11,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // GetUser godoc
@@ -27,7 +27,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/get/users [get]
-func GetUsers(db *mongo.Database) func(*gin.Context) {
+func GetUsers(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 
 		log := logger.GetLogger("GetUsers", c.GetString(middlewares.RequestIDKey))
@@ -65,7 +65,7 @@ func GetUsers(db *mongo.Database) func(*gin.Context) {
 			PageNumber: pageNumberInt,
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewGetUsersBiz(store)
 
 		list, err := business.GetUsers(c.Request.Context(), pagination)

@@ -11,7 +11,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // GetMocks godoc
@@ -27,7 +27,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/get/mocks [get]
-func GetMocks(db *mongo.Database) func(*gin.Context) {
+func GetMocks(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 
 		log := logger.GetLogger("GetMocks", c.GetString(middlewares.RequestIDKey))
@@ -55,7 +55,7 @@ func GetMocks(db *mongo.Database) func(*gin.Context) {
 			PageNumber: pageNumberInt,
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewGetMocksBiz(store)
 
 		list, err := business.GetMocks(c.Request.Context(), pagination)

@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // GetMock godoc
@@ -22,9 +22,9 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/get/okx-info [get]
-func GetOkxInfo(db *mongo.Database) func(*gin.Context) {
+func GetOkxInfo(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewGetOkxInfoBiz(store)
 
 		data, err := business.GetOkxInfo(c.Request.Context())

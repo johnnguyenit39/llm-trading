@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // CreateOrder godoc
@@ -24,7 +24,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/create/order [post]
-func CreateOrder(db *mongo.Database) func(*gin.Context) {
+func CreateOrder(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var req dto.CreateOrderRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -68,7 +68,7 @@ func CreateOrder(db *mongo.Database) func(*gin.Context) {
 			return
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewCreateOrderBiz(store)
 
 		response, err := business.CreateOrder(c.Request.Context(), &req)

@@ -9,7 +9,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
 // DeleteUser godoc
@@ -24,7 +24,7 @@ import (
 // @name Authorization
 // @Security Bearer
 // @Router /v1/delete/user/{id} [delete]
-func DeleteUser(db *mongo.Database) func(*gin.Context) {
+func DeleteUser(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("DeleteUser", c.GetString(middlewares.RequestIDKey))
 
@@ -40,7 +40,7 @@ func DeleteUser(db *mongo.Database) func(*gin.Context) {
 			return
 		}
 
-		store := storage.NewMongoDbStore(db)
+		store := storage.NewPostgresStore(db)
 		business := biz.NewDeleteUserBiz(store)
 
 		data, err := business.DeleteUser(c.Request.Context(), id)
