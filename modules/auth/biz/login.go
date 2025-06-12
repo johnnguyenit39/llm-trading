@@ -9,7 +9,7 @@ import (
 )
 
 type LoginStorage interface {
-	GetUserByPhoneNumber(ctx context.Context, cond map[string]interface{}) (*userModel.User, error)
+	GetUserByEmail(ctx context.Context, cond map[string]interface{}) (*userModel.User, error)
 }
 
 func NewLoginBiz(store LoginStorage) *createLoginBiz {
@@ -21,7 +21,7 @@ type createLoginBiz struct {
 }
 
 func (biz *createLoginBiz) Login(ctx context.Context, input *userModel.User) (*dto.LoginResponse, error) {
-	exsitedUser, err := biz.store.GetUserByPhoneNumber(ctx, map[string]interface{}{"phone_number": input.PhoneNumber})
+	exsitedUser, err := biz.store.GetUserByEmail(ctx, map[string]interface{}{"email": input.Email})
 	if err != nil {
 		return nil, common.ErrEntityNotFoundEntity(userModel.EntityName, err)
 	}
@@ -30,12 +30,12 @@ func (biz *createLoginBiz) Login(ctx context.Context, input *userModel.User) (*d
 		return nil, common.ErrorSimpleMessage("The password is incorrect please try again.")
 	}
 
-	token, err := utils.GeneSubscriptionJWT(exsitedUser.BaseModel.ID.String())
+	token, err := utils.GenerateSubscriptionJWT(exsitedUser.BaseModel.ID.String())
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := utils.GeneSubscriptionRefreshToken(exsitedUser.BaseModel.ID.String())
+	refreshToken, err := utils.GenerateSubscriptionRefreshToken(exsitedUser.BaseModel.ID.String())
 	if err != nil {
 		return nil, err
 	}

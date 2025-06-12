@@ -39,14 +39,14 @@ definitions:
     type: object
   dto.LoginRequest:
     properties:
+      email:
+        type: string
       password:
         minLength: 8
         type: string
-      phone_number:
-        type: string
     required:
+    - email
     - password
-    - phone_number
     type: object
   dto.RefreshTokenRequest:
     properties:
@@ -61,14 +61,14 @@ definitions:
     type: object
   dto.RegisterRequest:
     properties:
+      email:
+        type: string
       password:
         minLength: 8
         type: string
-      phone_number:
-        type: string
     required:
+    - email
     - password
-    - phone_number
     type: object
   j-ai-trade_modules_okx_model_dto.SubscriptionAddRequest:
     type: object
@@ -293,6 +293,8 @@ definitions:
         type: string
       first_name:
         type: string
+      is_email_verified:
+        type: boolean
       last_name:
         type: string
       phone_number:

@@ -34,5 +34,8 @@ EXPOSE 8080
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/main .
 
+# Copy i18n files
+COPY --from=builder /app/appi18n/active.*.json ./appi18n/
+
 # Define the entry point
 CMD ["./main"]

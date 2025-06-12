@@ -1,6 +1,7 @@
 package main
 
 import (
+	"j-ai-trade/appi18n"
 	appContext "j-ai-trade/components/app_context"
 	appConfig "j-ai-trade/config/app"
 	storage "j-ai-trade/config/postgres"
@@ -28,6 +29,7 @@ import (
 // @host localhost:8080
 // @BasePath /api
 func main() {
+	appi18n.Init()
 
 	logger.InitializeLogger()
 

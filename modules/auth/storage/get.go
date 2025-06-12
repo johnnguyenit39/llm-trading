@@ -2,9 +2,20 @@ package storage
 
 import (
 	"context"
+	"errors"
+	"j-ai-trade/common"
 	"j-ai-trade/modules/user/model"
+
+	"gorm.io/gorm"
 )
 
-func (postgresStore *postgresStore) GetUserByPhoneNumber(ctx context.Context, cond map[string]interface{}) (*model.User, error) {
-	return nil, nil
+func (postgresStore *postgresStore) GetUserByEmail(ctx context.Context, cond map[string]interface{}) (*model.User, error) {
+	var data model.User
+	if err := postgresStore.db.Where("email = ?", cond["email"]).First(&data).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, common.ErrEntityNotFoundEntity(model.EntityName, err)
+		}
+		return nil, err
+	}
+	return &data, nil
 }

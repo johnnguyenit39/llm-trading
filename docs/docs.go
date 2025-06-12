@@ -2243,16 +2243,16 @@ const docTemplate = `{
         "dto.LoginRequest": {
             "type": "object",
             "required": [
-                "password",
-                "phone_number"
+                "email",
+                "password"
             ],
             "properties": {
+                "email": {
+                    "type": "string"
+                },
                 "password": {
                     "type": "string",
                     "minLength": 8
-                },
-                "phone_number": {
-                    "type": "string"
                 }
             }
         },
@@ -2275,16 +2275,16 @@ const docTemplate = `{
         "dto.RegisterRequest": {
             "type": "object",
             "required": [
-                "password",
-                "phone_number"
+                "email",
+                "password"
             ],
             "properties": {
+                "email": {
+                    "type": "string"
+                },
                 "password": {
                     "type": "string",
                     "minLength": 8
-                },
-                "phone_number": {
-                    "type": "string"
                 }
             }
         },
@@ -2627,6 +2627,9 @@ const docTemplate = `{
                 },
                 "first_name": {
                     "type": "string"
+                },
+                "is_email_verified": {
+                    "type": "boolean"
                 },
                 "last_name": {
                     "type": "string"

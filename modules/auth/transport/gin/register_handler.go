@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"j-ai-trade/appi18n"
 	"j-ai-trade/common"
 	"j-ai-trade/logger"
 	"j-ai-trade/middlewares"
@@ -43,8 +44,8 @@ func Register(db *gorm.DB) func(*gin.Context) {
 		}
 
 		data := userModel.User{
-			PhoneNumber: input.PhoneNumber,
-			Password:    input.Password,
+			Email:    input.Email,
+			Password: input.Password,
 		}
 
 		store := storage.NewPostgresStore(db)
@@ -64,7 +65,7 @@ func Register(db *gorm.DB) func(*gin.Context) {
 		c.JSON(http.StatusCreated, common.BaseApiResponse[userModel.User]{
 			Success:           true,
 			HttpRequestStatus: http.StatusOK,
-			Message:           "User is created successfully",
+			Message:           appi18n.UserRegisteredSuccessfully,
 			Data:              data,
 		})
 		log.Info().Str("user_id", data.ID.String()).Msg("user is created successfully")

@@ -14,9 +14,15 @@ const (
 	User       string = "user"
 )
 
+//User Status
+const (
+	Active      string = "active"
+	Deactivated string = "deactivated"
+)
+
 //Subscriptions
 const (
-	Free         string = "free"
+	Basic        string = "basic"
 	Professional string = "professional"
 	Ultimate     string = "ultimate"
 )
