@@ -25,5 +25,5 @@ func BasicAuthMiddleware() gin.HandlerFunc {
 func checkCredentials(username, password string) bool {
 	// Replace these with your desired credentials
 	// In production, you should use environment variables or a secure configuration
-	return username == "voralto_admin" && password == "Voralto@2025"
+	return username == "j_ai_trade_admin" && password == "Jnguyen123456@"
 }
