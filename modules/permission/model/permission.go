@@ -16,7 +16,7 @@ type Permission struct {
 }
 
 func (*Permission) TableName() string {
-	return "Permissions"
+	return "permissions"
 }
 
 func Migrate(db *gorm.DB) error {

@@ -8,19 +8,19 @@ import (
 )
 
 const (
-	EntityName = "AiExpert"
+	EntityName = "Jbot"
 )
 
-type AiExpert struct {
+type Jbot struct {
 	common.BaseModel
 }
 
-func (*AiExpert) TableName() string {
-	return "ai_experts"
+func (*Jbot) TableName() string {
+	return "jbots"
 }
 
 func Migrate(db *gorm.DB) error {
-	err := db.AutoMigrate(&AiExpert{})
+	err := db.AutoMigrate(&Jbot{})
 	if err != nil {
 		log.Println(err.Error())
 	}

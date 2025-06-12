@@ -870,6 +870,195 @@ const docTemplate = `{
                 }
             }
         },
+        "/v2/ai-expert/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new AiExpert",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Create new AiExpert",
+                "parameters": [
+                    {
+                        "description": "Create AiExpert",
+                        "name": "AiExpert",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/ai-expert/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new AiExpert",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Delete new AiExpert",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/ai-expert/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return AiExpert",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Get AiExpert",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/ai-expert/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of AiExperts based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Get a list of AiExpert",
+                "parameters": [
+                    {
+                        "description": "Get AiExperts",
+                        "name": "AiExpert",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpertGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.AiExpert"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/ai-expert/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update AiExpert",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Update AiExpert",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpertUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                }
+            }
+        },
         "/v2/api-key/create": {
             "post": {
                 "security": [
@@ -1054,6 +1243,378 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/model.ApiKey"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/jbot/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new JBot",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JBot"
+                ],
+                "summary": "Create new JBot",
+                "parameters": [
+                    {
+                        "description": "Create JBot",
+                        "name": "JBot",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.JBotAddRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.JBotGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/jbot/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new JBot",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JBot"
+                ],
+                "summary": "Delete new JBot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.JBot"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/jbot/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return JBot",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JBot"
+                ],
+                "summary": "Get JBot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.JBotGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/jbot/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of JBots based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JBot"
+                ],
+                "summary": "Get a list of JBot",
+                "parameters": [
+                    {
+                        "description": "Get JBots",
+                        "name": "JBot",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.JBotGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.JBotGetListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/jbot/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update JBot",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "JBot"
+                ],
+                "summary": "Update JBot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.JBotUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.JBotGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/otp/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Otp",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Create new Otp",
+                "parameters": [
+                    {
+                        "description": "Create Otp",
+                        "name": "Otp",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.Otp"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Otp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/otp/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Otp",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Delete new Otp",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Otp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/otp/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Otp",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Get Otp",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/otp/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Otps based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Get a list of Otp",
+                "parameters": [
+                    {
+                        "description": "Get Otps",
+                        "name": "Otp",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpGetListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/otp/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Otp",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Update Otp",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpGetResponse"
                         }
                     }
                 }
@@ -1282,6 +1843,20 @@ const docTemplate = `{
                 }
             }
         },
+        "common.Pagination": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
         "common.PaginationRequest": {
             "type": "object",
             "properties": {
@@ -1348,6 +1923,28 @@ const docTemplate = `{
             "type": "object"
         },
         "j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest": {
+            "type": "object"
+        },
+        "model.AiExpert": {
+            "type": "object",
+            "properties": {
+                "ID": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.AiExpertGetListRequest": {
+            "type": "object",
+            "properties": {
+                "Pagination": {
+                    "$ref": "#/definitions/common.PaginationRequest"
+                }
+            }
+        },
+        "model.AiExpertUpdateRequest": {
             "type": "object"
         },
         "model.ApiKey": {
@@ -1421,6 +2018,48 @@ const docTemplate = `{
                 }
             }
         },
+        "model.JBot": {
+            "type": "object",
+            "properties": {
+                "ID": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.JBotAddRequest": {
+            "type": "object"
+        },
+        "model.JBotGetListRequest": {
+            "type": "object",
+            "properties": {
+                "Pagination": {
+                    "$ref": "#/definitions/common.PaginationRequest"
+                }
+            }
+        },
+        "model.JBotGetListResponse": {
+            "type": "object",
+            "properties": {
+                "List": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.JBot"
+                    }
+                },
+                "Paging": {
+                    "$ref": "#/definitions/common.Pagination"
+                }
+            }
+        },
+        "model.JBotGetResponse": {
+            "type": "object"
+        },
+        "model.JBotUpdateRequest": {
+            "type": "object"
+        },
         "model.Okx": {
             "type": "object",
             "properties": {
@@ -1431,6 +2070,45 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "model.Otp": {
+            "type": "object",
+            "properties": {
+                "ID": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.OtpGetListRequest": {
+            "type": "object",
+            "properties": {
+                "Pagination": {
+                    "$ref": "#/definitions/common.PaginationRequest"
+                }
+            }
+        },
+        "model.OtpGetListResponse": {
+            "type": "object",
+            "properties": {
+                "List": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Otp"
+                    }
+                },
+                "Paging": {
+                    "$ref": "#/definitions/common.Pagination"
+                }
+            }
+        },
+        "model.OtpGetResponse": {
+            "type": "object"
+        },
+        "model.OtpUpdateRequest": {
+            "type": "object"
         },
         "model.Permission": {
             "type": "object",

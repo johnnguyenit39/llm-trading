@@ -21,6 +21,15 @@ definitions:
       success:
         type: boolean
     type: object
+  common.Pagination:
+    properties:
+      count:
+        type: integer
+      index:
+        type: integer
+      size:
+        type: integer
+    type: object
   common.PaginationRequest:
     properties:
       index:
@@ -66,6 +75,20 @@ definitions:
   j-ai-trade_modules_okx_model_dto.SubscriptionUpdateRequest:
     type: object
   j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest:
+    type: object
+  model.AiExpert:
+    properties:
+      ID:
+        type: string
+      createdAt:
+        type: string
+    type: object
+  model.AiExpertGetListRequest:
+    properties:
+      Pagination:
+        $ref: '#/definitions/common.PaginationRequest'
+    type: object
+  model.AiExpertUpdateRequest:
     type: object
   model.ApiKey:
     properties:
@@ -117,12 +140,64 @@ definitions:
     - side
     - type
     type: object
+  model.JBot:
+    properties:
+      ID:
+        type: string
+      createdAt:
+        type: string
+    type: object
+  model.JBotAddRequest:
+    type: object
+  model.JBotGetListRequest:
+    properties:
+      Pagination:
+        $ref: '#/definitions/common.PaginationRequest'
+    type: object
+  model.JBotGetListResponse:
+    properties:
+      List:
+        items:
+          $ref: '#/definitions/model.JBot'
+        type: array
+      Paging:
+        $ref: '#/definitions/common.Pagination'
+    type: object
+  model.JBotGetResponse:
+    type: object
+  model.JBotUpdateRequest:
+    type: object
   model.Okx:
     properties:
       ID:
         type: string
       createdAt:
         type: string
+    type: object
+  model.Otp:
+    properties:
+      ID:
+        type: string
+      createdAt:
+        type: string
+    type: object
+  model.OtpGetListRequest:
+    properties:
+      Pagination:
+        $ref: '#/definitions/common.PaginationRequest'
+    type: object
+  model.OtpGetListResponse:
+    properties:
+      List:
+        items:
+          $ref: '#/definitions/model.Otp'
+        type: array
+      Paging:
+        $ref: '#/definitions/common.Pagination'
+    type: object
+  model.OtpGetResponse:
+    type: object
+  model.OtpUpdateRequest:
     type: object
   model.Permission:
     properties:
@@ -749,6 +824,124 @@ paths:
       summary: Update Permission
       tags:
       - Permission
+  /v2/ai-expert/create:
+    post:
+      description: Create a new AiExpert
+      parameters:
+      - description: Create AiExpert
+        in: body
+        name: AiExpert
+        required: true
+        schema:
+          $ref: '#/definitions/model.AiExpert'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AiExpert'
+      security:
+      - Bearer: []
+      summary: Create new AiExpert
+      tags:
+      - AiExpert
+  /v2/ai-expert/delete:
+    delete:
+      description: Delete a new AiExpert
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AiExpert'
+      security:
+      - Bearer: []
+      summary: Delete new AiExpert
+      tags:
+      - AiExpert
+  /v2/ai-expert/get:
+    get:
+      description: Return AiExpert
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AiExpert'
+      security:
+      - Bearer: []
+      summary: Get AiExpert
+      tags:
+      - AiExpert
+  /v2/ai-expert/list:
+    post:
+      description: Retrieve a list of AiExperts based on provided filters and pagination
+      parameters:
+      - description: Get AiExperts
+        in: body
+        name: AiExpert
+        required: true
+        schema:
+          $ref: '#/definitions/model.AiExpertGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.AiExpert'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of AiExpert
+      tags:
+      - AiExpert
+  /v2/ai-expert/update:
+    put:
+      description: Update AiExpert
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.AiExpertUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AiExpert'
+      security:
+      - Bearer: []
+      summary: Update AiExpert
+      tags:
+      - AiExpert
   /v2/api-key/create:
     post:
       description: Create a new ApiKey
@@ -867,6 +1060,238 @@ paths:
       summary: Update ApiKey
       tags:
       - ApiKey
+  /v2/jbot/create:
+    post:
+      description: Create a new JBot
+      parameters:
+      - description: Create JBot
+        in: body
+        name: JBot
+        required: true
+        schema:
+          $ref: '#/definitions/model.JBotAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JBotGetResponse'
+      security:
+      - Bearer: []
+      summary: Create new JBot
+      tags:
+      - JBot
+  /v2/jbot/delete:
+    delete:
+      description: Delete a new JBot
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JBot'
+      security:
+      - Bearer: []
+      summary: Delete new JBot
+      tags:
+      - JBot
+  /v2/jbot/get:
+    get:
+      description: Return JBot
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JBotGetResponse'
+      security:
+      - Bearer: []
+      summary: Get JBot
+      tags:
+      - JBot
+  /v2/jbot/list:
+    post:
+      description: Retrieve a list of JBots based on provided filters and pagination
+      parameters:
+      - description: Get JBots
+        in: body
+        name: JBot
+        required: true
+        schema:
+          $ref: '#/definitions/model.JBotGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JBotGetListResponse'
+      security:
+      - Bearer: []
+      summary: Get a list of JBot
+      tags:
+      - JBot
+  /v2/jbot/update:
+    put:
+      description: Update JBot
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.JBotUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JBotGetResponse'
+      security:
+      - Bearer: []
+      summary: Update JBot
+      tags:
+      - JBot
+  /v2/otp/create:
+    post:
+      description: Create a new Otp
+      parameters:
+      - description: Create Otp
+        in: body
+        name: Otp
+        required: true
+        schema:
+          $ref: '#/definitions/model.Otp'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Otp'
+      security:
+      - Bearer: []
+      summary: Create new Otp
+      tags:
+      - Otp
+  /v2/otp/delete:
+    delete:
+      description: Delete a new Otp
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Otp'
+      security:
+      - Bearer: []
+      summary: Delete new Otp
+      tags:
+      - Otp
+  /v2/otp/get:
+    get:
+      description: Return Otp
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OtpGetResponse'
+      security:
+      - Bearer: []
+      summary: Get Otp
+      tags:
+      - Otp
+  /v2/otp/list:
+    post:
+      description: Retrieve a list of Otps based on provided filters and pagination
+      parameters:
+      - description: Get Otps
+        in: body
+        name: Otp
+        required: true
+        schema:
+          $ref: '#/definitions/model.OtpGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OtpGetListResponse'
+      security:
+      - Bearer: []
+      summary: Get a list of Otp
+      tags:
+      - Otp
+  /v2/otp/update:
+    put:
+      description: Update Otp
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.OtpUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OtpGetResponse'
+      security:
+      - Bearer: []
+      summary: Update Otp
+      tags:
+      - Otp
   /v2/subscription/create:
     post:
       description: Create a new Subscription
