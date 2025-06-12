@@ -147,6 +147,52 @@
                 }
             }
         },
+        "/v1/auth/reset-password": {
+            "post": {
+                "description": "Reset password with new password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Reset password",
+                "parameters": [
+                    {
+                        "description": "Reset password",
+                        "name": "auth",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ResetPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Password reset successfully",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-bool"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/auth/send-email-registration-code": {
             "post": {
                 "description": "Send registration code verification",
@@ -193,6 +239,52 @@
                 }
             }
         },
+        "/v1/auth/send-forgot-password-code": {
+            "post": {
+                "description": "Send reset password code to user's email",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Send reset password code",
+                "parameters": [
+                    {
+                        "description": "Send reset password code",
+                        "name": "auth",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ForgotPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reset password code sent successfully",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-bool"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/auth/verify-email-registration-code": {
             "post": {
                 "description": "Verify registration code",
@@ -220,6 +312,52 @@
                 "responses": {
                     "201": {
                         "description": "Verified registration code successfully",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-bool"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/verify-reset-password-code": {
+            "post": {
+                "description": "Verify reset password code",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Verify reset password code",
+                "parameters": [
+                    {
+                        "description": "Verify reset password code",
+                        "name": "auth",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.VerifyResetPasswordCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reset password code verified successfully",
                         "schema": {
                             "$ref": "#/definitions/common.BaseApiResponse-bool"
                         }
@@ -2326,6 +2464,17 @@
                 }
             }
         },
+        "dto.ForgotPasswordRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.LoginRequest": {
             "type": "object",
             "required": [
@@ -2374,6 +2523,31 @@
                 }
             }
         },
+        "dto.ResetPasswordRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "email",
+                "new_password",
+                "new_password_confirmation"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "new_password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "new_password_confirmation": {
+                    "type": "string",
+                    "minLength": 8
+                }
+            }
+        },
         "dto.SendEmailVerificationCodeRequest": {
             "type": "object",
             "required": [
@@ -2386,6 +2560,21 @@
             }
         },
         "dto.VerifyEmailRegistrationCodeRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "email"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.VerifyResetPasswordCodeRequest": {
             "type": "object",
             "required": [
                 "code",

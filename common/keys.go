@@ -42,7 +42,8 @@ const (
 type OTPType string
 
 const (
-	RegistrationOTP OTPType = "registration_otp"
+	RegistrationOTP  OTPType = "registration_otp"
+	ResetPasswordOTP OTPType = "reset_password_otp"
 )
 
 //OTP Expired Time

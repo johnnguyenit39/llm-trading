@@ -37,6 +37,13 @@ definitions:
       size:
         type: integer
     type: object
+  dto.ForgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
   dto.LoginRequest:
     properties:
       email:
@@ -70,6 +77,24 @@ definitions:
     - email
     - password
     type: object
+  dto.ResetPasswordRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+      new_password:
+        minLength: 8
+        type: string
+      new_password_confirmation:
+        minLength: 8
+        type: string
+    required:
+    - code
+    - email
+    - new_password
+    - new_password_confirmation
+    type: object
   dto.SendEmailVerificationCodeRequest:
     properties:
       email:
@@ -78,6 +103,16 @@ definitions:
     - email
     type: object
   dto.VerifyEmailRegistrationCodeRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+    required:
+    - code
+    - email
+    type: object
+  dto.VerifyResetPasswordCodeRequest:
     properties:
       code:
         type: string
@@ -460,6 +495,36 @@ paths:
       summary: Register with email and password
       tags:
       - Authentication
+  /v1/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Reset password with new password
+      parameters:
+      - description: Reset password
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password reset successfully
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-bool'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      summary: Reset password
+      tags:
+      - Authentication
   /v1/auth/send-email-registration-code:
     post:
       consumes:
@@ -490,6 +555,36 @@ paths:
       summary: Send registration code verification
       tags:
       - Authentication
+  /v1/auth/send-forgot-password-code:
+    post:
+      consumes:
+      - application/json
+      description: Send reset password code to user's email
+      parameters:
+      - description: Send reset password code
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reset password code sent successfully
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-bool'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      summary: Send reset password code
+      tags:
+      - Authentication
   /v1/auth/verify-email-registration-code:
     post:
       consumes:
@@ -518,6 +613,36 @@ paths:
           schema:
             $ref: '#/definitions/common.BaseApiResponse-any'
       summary: Verify registration code
+      tags:
+      - Authentication
+  /v1/auth/verify-reset-password-code:
+    post:
+      consumes:
+      - application/json
+      description: Verify reset password code
+      parameters:
+      - description: Verify reset password code
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VerifyResetPasswordCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reset password code verified successfully
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-bool'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      summary: Verify reset password code
       tags:
       - Authentication
   /v1/cancel/order:

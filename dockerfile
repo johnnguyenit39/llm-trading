@@ -36,6 +36,8 @@ COPY --from=builder /app/main .
 
 # Copy i18n files
 COPY --from=builder /app/appi18n/active.*.json ./appi18n/
+#Copy Assets
+COPY assets ./assets
 
 # Define the entry point
 CMD ["./main"]

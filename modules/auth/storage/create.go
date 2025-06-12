@@ -26,10 +26,10 @@ func (postgresStore *postgresStore) SendEmailRegistrationCode(ctx context.Contex
 	return nil
 }
 
-func (postgresStore *postgresStore) VerifyEmailRegistrationCode(ctx context.Context, userID string, data *dto.VerifyEmailRegistrationCodeRequest) error {
+func (postgresStore *postgresStore) VerifyEmailCode(ctx context.Context, userID string, otpType string, data *dto.VerifyEmailRegistrationCodeRequest) error {
 	//FIXME: Move more logic to biz layer
 	otp := otpModel.Otp{}
-	err := postgresStore.db.First(&otp, "user_id = ? AND code = ? AND type = ?", userID, data.Code, common.RegistrationOTP).Error
+	err := postgresStore.db.First(&otp, "user_id = ? AND code = ? AND type = ?", userID, data.Code, otpType).Error
 
 	if err != nil {
 		return common.ErrDB(err)
@@ -54,6 +54,11 @@ func (postgresStore *postgresStore) DeleteOtpByUserID(ctx context.Context, cond 
 }
 
 func (postgresStore *postgresStore) UpdateUserEmailVerificationStatus(ctx context.Context, cond map[string]interface{}, dataUpdate *model.User) error {
+	var user userModel.User
+	return postgresStore.db.Model(&user).Where(cond).Updates(dataUpdate).Error
+}
+
+func (postgresStore *postgresStore) UpdateUserPassword(ctx context.Context, cond map[string]interface{}, dataUpdate *model.User) error {
 	var user userModel.User
 	return postgresStore.db.Model(&user).Where(cond).Updates(dataUpdate).Error
 }

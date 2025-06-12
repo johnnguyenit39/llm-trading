@@ -50,7 +50,7 @@ func EmailRegistrationCodeVerification(db *gorm.DB) func(*gin.Context) {
 		store := storage.NewPostgresStore(db)
 		business := biz.NewRegisterBiz(store)
 
-		err := business.VerifyEmailRegistrationCode(c.Request.Context(), &data)
+		err := business.VerifyEmailCode(c.Request.Context(), &data)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{

@@ -58,6 +58,11 @@ func InitializeApp(appContext appContext.AppContext) {
 
 			//Login
 			auth.POST("/login", ginAuth.Login(appContext.GetMainDBConnection()))
+
+			// Forgot Password
+			auth.POST("/send-forgot-password-code", ginAuth.SendForgotPasswordCode(appContext.GetMainDBConnection()))
+			auth.POST("/verify-reset-password-code", ginAuth.VerifyResetPasswordCode(appContext.GetMainDBConnection()))
+			auth.POST("/reset-password", ginAuth.ResetPassword(appContext.GetMainDBConnection()))
 		}
 
 	}
