@@ -2,6 +2,13 @@ package storage
 
 import (
 	"fmt"
+	aiExpertModel "j-ai-trade/modules/ai_expert/model"
+	jbotModel "j-ai-trade/modules/j_bot/model"
+	orderModel "j-ai-trade/modules/order/model"
+	otpModel "j-ai-trade/modules/otp/model"
+	permissionModel "j-ai-trade/modules/permission/model"
+	signalModel "j-ai-trade/modules/signal/model"
+	subscriptionModel "j-ai-trade/modules/subscription/model"
 	userModel "j-ai-trade/modules/user/model"
 	"log"
 	"os"
@@ -49,5 +56,14 @@ func NewConnection() (*gorm.DB, error) {
 }
 
 func AutoMigrate(db *gorm.DB) {
-	db.AutoMigrate(&userModel.User{})
+	db.AutoMigrate(
+		&userModel.User{},
+		&subscriptionModel.Subscription{},
+		&jbotModel.Jbot{},
+		&otpModel.Otp{},
+		&permissionModel.Permission{},
+		&signalModel.Signal{},
+		&orderModel.Order{},
+		&aiExpertModel.AiExpert{},
+	)
 }
