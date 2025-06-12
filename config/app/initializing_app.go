@@ -6,6 +6,7 @@ import (
 	ginApiKey "j-ai-trade/modules/api_key/transport/gin"
 	ginAuth "j-ai-trade/modules/auth/transport/gin"
 	ginOkx "j-ai-trade/modules/okx/transport/gin"
+	ginPermission "j-ai-trade/modules/permission/transport/gin"
 	ginSubscription "j-ai-trade/modules/subscription/transport/gin"
 	ginUser "j-ai-trade/modules/user/transport/gin"
 
@@ -98,6 +99,19 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.PUT("/update/user/:id", ginApiKey.UpdateApiKey(appContext.GetMainDBConnection()))
 			protected.DELETE("/delete/user/:id", ginApiKey.DeleteApiKey(appContext.GetMainDBConnection()))
 			protected.PUT("/update/password/user/:id", ginApiKey.UpdateApiKey(appContext.GetMainDBConnection()))
+
+		}
+	}
+
+	// Permission API
+	{
+		{
+			protected.POST("/create/permission/", ginPermission.CreatePermission(appContext.GetMainDBConnection()))
+			protected.GET("/get/permission/:id", ginPermission.GetPermissionById(appContext.GetMainDBConnection()))
+			protected.GET("/get/permissions", ginPermission.GetPermissions(appContext.GetMainDBConnection()))
+			protected.PUT("/update/permission/:id", ginPermission.UpdatePermission(appContext.GetMainDBConnection()))
+			protected.DELETE("/delete/permission/:id", ginPermission.DeletePermission(appContext.GetMainDBConnection()))
+			protected.PUT("/update/password/permission/:id", ginPermission.UpdatePermission(appContext.GetMainDBConnection()))
 
 		}
 	}
