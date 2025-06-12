@@ -32,7 +32,7 @@ func main() {
 	logger.InitializeLogger()
 
 	// Load .env file only in local development
-	if os.Getenv("ENV") == "debug" {
+	if os.Getenv("ENV") != "PROD" {
 		// Only load .env if not in production (i.e., in development)
 		err := godotenv.Load()
 		if err != nil {
@@ -44,9 +44,10 @@ func main() {
 	pubSub := pubsub.NewPubSub()
 	redisClient, err := redis.NewRedisClient()
 	if err != nil {
-		log.Fatal().Err(err).Msg("Could not load the Redis")
+		log.Warn().Err(err).Msg("Redis connection failed - continuing without Redis functionality")
+	} else {
+		pubsub.ListenEvent(redisClient.GetClient(), pubSub)
 	}
-	pubsub.ListenEvent(redisClient.GetClient(), pubSub)
 
 	// Initialize OKX service
 	_ = okx.GetInstance() // Initialize the singleton
@@ -58,13 +59,13 @@ func main() {
 	}
 
 	//Migrate data
-	storage.AutoMigrate(db)
+	//storage.AutoMigrate(db)
 
 	// Initialize Gin router
 	app := gin.Default()
 
 	// Initialize AppContext with DB and app
-	appContext := appContext.NewAppContext(db, redisClient.GetClient(), pubSub, app)
+	appContext := appContext.NewAppContext(db, nil, pubSub, app)
 
 	// Initialize application config
 	appConfig.InitializeApp(appContext)

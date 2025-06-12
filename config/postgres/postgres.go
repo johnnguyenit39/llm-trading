@@ -13,7 +13,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -29,10 +28,6 @@ type Config struct {
 }
 
 func NewConnection() (*gorm.DB, error) {
-	err := godotenv.Load()
-	if err != nil {
-		return nil, err
-	}
 
 	config := &Config{
 		Host:     os.Getenv("DB_HOST"),
