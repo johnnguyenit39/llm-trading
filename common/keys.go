@@ -1,28 +1,60 @@
 package common
 
+import "time"
+
 //Brokers
+type Broker string
+
 const (
-	Okx     string = "okx"
-	Binance string = "binance"
+	Okx     Broker = "okx"
+	Binance Broker = "binance"
 )
 
 //Roles
+type Role string
+
 const (
-	SuperAdmin string = "super_admin"
-	Admin      string = "admin"
-	Developer  string = "developer"
-	User       string = "user"
+	SuperAdmin Role = "super_admin"
+	Admin      Role = "admin"
+	Developer  Role = "developer"
+	User       Role = "user"
 )
 
 //User Status
+type UserStatus string
+
 const (
-	Active      string = "active"
-	Deactivated string = "deactivated"
+	Active      UserStatus = "active"
+	Deactivated UserStatus = "deactivated"
 )
 
 //Subscriptions
+type SubscriptionType string
+
 const (
-	Basic        string = "basic"
-	Professional string = "professional"
-	Ultimate     string = "ultimate"
+	Basic        SubscriptionType = "basic"
+	Professional SubscriptionType = "professional"
+	Ultimate     SubscriptionType = "ultimate"
+)
+
+//OTP Types
+
+type OTPType string
+
+const (
+	RegistrationOTP OTPType = "registration_otp"
+)
+
+//OTP Expired Time
+const (
+	OTPExpiredTime = 10 * time.Minute
+)
+
+//Email Types
+
+type EmailType string
+
+const (
+	SimulationResult EmailType = "SimulationResult"
+	OnboardingGQA    EmailType = "OnboardingGQA"
 )

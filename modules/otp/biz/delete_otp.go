@@ -8,6 +8,7 @@ import (
 type DeleteNewOtpStorage interface {
 	GetOtpById(ctx context.Context, cond map[string]interface{}) (*model.Otp, error)
 	DeleteOtp(ctx context.Context, cond map[string]interface{}) (bool, error)
+	DeleteOtpByEmail(ctx context.Context, cond map[string]interface{}) (bool, error)
 }
 
 func NewDeleteOtpBiz(store DeleteNewOtpStorage) *deleteOtpBiz {
@@ -26,6 +27,16 @@ func (biz *deleteOtpBiz) DeleteOtp(ctx context.Context, id string) (bool, error)
 	}
 
 	_, err = biz.store.DeleteOtp(ctx, map[string]interface{}{"id": id})
+
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (biz *deleteOtpBiz) DeleteOtpByEmail(ctx context.Context, email string) (bool, error) {
+	_, err := biz.store.DeleteOtpByEmail(ctx, map[string]interface{}{"email": email})
 
 	if err != nil {
 		return false, err

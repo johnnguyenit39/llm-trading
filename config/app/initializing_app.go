@@ -51,8 +51,13 @@ func InitializeApp(appContext appContext.AppContext) {
 	{
 		auth := v1.Group("/auth")
 		{
-			auth.POST("/login", ginAuth.Login(appContext.GetMainDBConnection()))
+			//Register
 			auth.POST("/register", ginAuth.Register(appContext.GetMainDBConnection()))
+			auth.POST("/send-email-registration-code", ginAuth.SendEmailRegistrationCode(appContext.GetMainDBConnection()))
+			auth.POST("/verify-email-registration-code", ginAuth.EmailRegistrationCodeVerification(appContext.GetMainDBConnection()))
+
+			//Login
+			auth.POST("/login", ginAuth.Login(appContext.GetMainDBConnection()))
 		}
 
 	}

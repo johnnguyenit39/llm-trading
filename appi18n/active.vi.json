@@ -1,3 +1,4 @@
 {
-    "user_registered_successfully": "User registered successfully"
+    "user_registered_successfully": "User registered successfully",
+    "invalid_base64_data_uri_format": "Invalid base64 data URI format"
 }

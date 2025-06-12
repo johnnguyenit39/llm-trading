@@ -44,8 +44,8 @@ func Register(db *gorm.DB) func(*gin.Context) {
 		}
 
 		data := userModel.User{
-			Email:    input.Email,
-			Password: input.Password,
+			PhoneNumber: input.Email,
+			Password:    input.Password,
 		}
 
 		store := storage.NewPostgresStore(db)

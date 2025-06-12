@@ -25,3 +25,14 @@ func (postgresStore *postgresStore) DeleteOtp(ctx context.Context, cond map[stri
 	}
 	return true, nil
 }
+
+func (postgresStore *postgresStore) DeleteOtpByEmail(ctx context.Context, cond map[string]interface{}) (bool, error) {
+	var data model.Otp
+	if err := postgresStore.db.Where(cond).Delete(&data).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return false, common.ErrEntityNotFoundEntity(model.EntityName, err)
+		}
+		return false, err
+	}
+	return true, nil
+}

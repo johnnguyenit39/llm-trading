@@ -21,7 +21,7 @@ import (
 // @Accept json
 // @Produce json
 // @Param auth body dto.LoginRequest true "Verify Login"
-// @Success 201 {object} common.BaseApiResponse[bool] "User created successfully"
+// @Success 201 {object} common.BaseApiResponse[bool] "Logged in successfully"
 // @Failure 400 {object} common.BaseApiResponse[any] "Bad Request"
 // @Failure 500 {object} common.BaseApiResponse[any] "Internal Server Error"
 // @Router /v1/auth/login [post]
@@ -66,7 +66,7 @@ func Login(db *gorm.DB) func(*gin.Context) {
 		c.JSON(http.StatusOK, common.BaseApiResponse[dto.LoginResponse]{
 			Success:           true,
 			HttpRequestStatus: http.StatusOK,
-			Message:           "Logged in created successfully",
+			Message:           "Logged in successfully",
 			Data:              *userData,
 		})
 		log.Info().Str("user_id", userData.User.ID.String()).Msg("logged in successfully")

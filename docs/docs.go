@@ -41,7 +41,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "User created successfully",
+                        "description": "Logged in successfully",
                         "schema": {
                             "$ref": "#/definitions/common.BaseApiResponse-bool"
                         }
@@ -134,6 +134,98 @@ const docTemplate = `{
                 "responses": {
                     "201": {
                         "description": "User created successfully",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-bool"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/send-email-registration-code": {
+            "post": {
+                "description": "Send registration code verification",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Send registration code verification",
+                "parameters": [
+                    {
+                        "description": "Send registration code verification",
+                        "name": "auth",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.SendEmailVerificationCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Sent registration code successfully",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-bool"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/auth/verify-email-registration-code": {
+            "post": {
+                "description": "Verify registration code",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Verify registration code",
+                "parameters": [
+                    {
+                        "description": "Verify registration code",
+                        "name": "auth",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.VerifyEmailRegistrationCodeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Verified registration code successfully",
                         "schema": {
                             "$ref": "#/definitions/common.BaseApiResponse-bool"
                         }
@@ -2288,6 +2380,32 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.SendEmailVerificationCodeRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.VerifyEmailRegistrationCodeRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "email"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
         "j-ai-trade_modules_okx_model_dto.SubscriptionAddRequest": {
             "type": "object"
         },
@@ -2491,7 +2609,22 @@ const docTemplate = `{
                 "ID": {
                     "type": "string"
                 },
+                "code": {
+                    "type": "string"
+                },
                 "createdAt": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "used": {
+                    "type": "boolean"
+                },
+                "userID": {
                     "type": "string"
                 }
             }

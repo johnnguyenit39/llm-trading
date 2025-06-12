@@ -70,6 +70,23 @@ definitions:
     - email
     - password
     type: object
+  dto.SendEmailVerificationCodeRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  dto.VerifyEmailRegistrationCodeRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+    required:
+    - code
+    - email
+    type: object
   j-ai-trade_modules_okx_model_dto.SubscriptionAddRequest:
     type: object
   j-ai-trade_modules_okx_model_dto.SubscriptionUpdateRequest:
@@ -205,7 +222,17 @@ definitions:
     properties:
       ID:
         type: string
+      code:
+        type: string
       createdAt:
+        type: string
+      expiresAt:
+        type: string
+      type:
+        type: string
+      used:
+        type: boolean
+      userID:
         type: string
     type: object
   model.OtpGetListRequest:
@@ -359,7 +386,7 @@ paths:
       - application/json
       responses:
         "201":
-          description: User created successfully
+          description: Logged in successfully
           schema:
             $ref: '#/definitions/common.BaseApiResponse-bool'
         "400":
@@ -431,6 +458,66 @@ paths:
           schema:
             $ref: '#/definitions/common.BaseApiResponse-any'
       summary: Register with email and password
+      tags:
+      - Authentication
+  /v1/auth/send-email-registration-code:
+    post:
+      consumes:
+      - application/json
+      description: Send registration code verification
+      parameters:
+      - description: Send registration code verification
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SendEmailVerificationCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Sent registration code successfully
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-bool'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      summary: Send registration code verification
+      tags:
+      - Authentication
+  /v1/auth/verify-email-registration-code:
+    post:
+      consumes:
+      - application/json
+      description: Verify registration code
+      parameters:
+      - description: Verify registration code
+        in: body
+        name: auth
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VerifyEmailRegistrationCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Verified registration code successfully
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-bool'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      summary: Verify registration code
       tags:
       - Authentication
   /v1/cancel/order:

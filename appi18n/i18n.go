@@ -11,6 +11,7 @@ import (
 
 const (
 	UserRegisteredSuccessfully = "user_registered_successfully"
+	InvalidBase64DataUriFormat = "invalid_base64_data_uri_format"
 )
 
 //go:embed active.*.json
