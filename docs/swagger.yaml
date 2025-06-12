@@ -140,32 +140,32 @@ definitions:
     - side
     - type
     type: object
-  model.JBot:
+  model.Jbot:
     properties:
       ID:
         type: string
       createdAt:
         type: string
     type: object
-  model.JBotAddRequest:
+  model.JbotAddRequest:
     type: object
-  model.JBotGetListRequest:
+  model.JbotGetListRequest:
     properties:
       Pagination:
         $ref: '#/definitions/common.PaginationRequest'
     type: object
-  model.JBotGetListResponse:
+  model.JbotGetListResponse:
     properties:
       List:
         items:
-          $ref: '#/definitions/model.JBot'
+          $ref: '#/definitions/model.Jbot'
         type: array
       Paging:
         $ref: '#/definitions/common.Pagination'
     type: object
-  model.JBotGetResponse:
+  model.JbotGetResponse:
     type: object
-  model.JBotUpdateRequest:
+  model.JbotUpdateRequest:
     type: object
   model.Okx:
     properties:
@@ -173,6 +173,33 @@ definitions:
         type: string
       createdAt:
         type: string
+    type: object
+  model.Order:
+    properties:
+      ID:
+        type: string
+      createdAt:
+        type: string
+    type: object
+  model.OrderAddRequest:
+    type: object
+  model.OrderGetListRequest:
+    properties:
+      Pagination:
+        $ref: '#/definitions/common.PaginationRequest'
+    type: object
+  model.OrderGetListResponse:
+    properties:
+      List:
+        items:
+          $ref: '#/definitions/model.Order'
+        type: array
+      Paging:
+        $ref: '#/definitions/common.Pagination'
+    type: object
+  model.OrderGetResponse:
+    type: object
+  model.OrderUpdateRequest:
     type: object
   model.Otp:
     properties:
@@ -212,6 +239,33 @@ definitions:
         $ref: '#/definitions/common.PaginationRequest'
     type: object
   model.PermissionUpdateRequest:
+    type: object
+  model.Signal:
+    properties:
+      ID:
+        type: string
+      createdAt:
+        type: string
+    type: object
+  model.SignalAddRequest:
+    type: object
+  model.SignalGetListRequest:
+    properties:
+      Pagination:
+        $ref: '#/definitions/common.PaginationRequest'
+    type: object
+  model.SignalGetListResponse:
+    properties:
+      List:
+        items:
+          $ref: '#/definitions/model.Signal'
+        type: array
+      Paging:
+        $ref: '#/definitions/common.Pagination'
+    type: object
+  model.SignalGetResponse:
+    type: object
+  model.SignalUpdateRequest:
     type: object
   model.Subscription:
     properties:
@@ -1062,29 +1116,29 @@ paths:
       - ApiKey
   /v2/jbot/create:
     post:
-      description: Create a new JBot
+      description: Create a new Jbot
       parameters:
-      - description: Create JBot
+      - description: Create Jbot
         in: body
-        name: JBot
+        name: Jbot
         required: true
         schema:
-          $ref: '#/definitions/model.JBotAddRequest'
+          $ref: '#/definitions/model.JbotAddRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.JBotGetResponse'
+            $ref: '#/definitions/model.JbotGetResponse'
       security:
       - Bearer: []
-      summary: Create new JBot
+      summary: Create new Jbot
       tags:
-      - JBot
+      - Jbot
   /v2/jbot/delete:
     delete:
-      description: Delete a new JBot
+      description: Delete a new Jbot
       parameters:
       - description: User UUID
         format: uuid
@@ -1098,15 +1152,15 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.JBot'
+            $ref: '#/definitions/model.Jbot'
       security:
       - Bearer: []
-      summary: Delete new JBot
+      summary: Delete new Jbot
       tags:
-      - JBot
+      - Jbot
   /v2/jbot/get:
     get:
-      description: Return JBot
+      description: Return Jbot
       parameters:
       - description: User UUID
         format: uuid
@@ -1120,37 +1174,37 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.JBotGetResponse'
+            $ref: '#/definitions/model.JbotGetResponse'
       security:
       - Bearer: []
-      summary: Get JBot
+      summary: Get Jbot
       tags:
-      - JBot
+      - Jbot
   /v2/jbot/list:
     post:
-      description: Retrieve a list of JBots based on provided filters and pagination
+      description: Retrieve a list of Jbots based on provided filters and pagination
       parameters:
-      - description: Get JBots
+      - description: Get Jbots
         in: body
-        name: JBot
+        name: Jbot
         required: true
         schema:
-          $ref: '#/definitions/model.JBotGetListRequest'
+          $ref: '#/definitions/model.JbotGetListRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.JBotGetListResponse'
+            $ref: '#/definitions/model.JbotGetListResponse'
       security:
       - Bearer: []
-      summary: Get a list of JBot
+      summary: Get a list of Jbot
       tags:
-      - JBot
+      - Jbot
   /v2/jbot/update:
     put:
-      description: Update JBot
+      description: Update Jbot
       parameters:
       - description: User UUID
         format: uuid
@@ -1163,19 +1217,135 @@ paths:
         name: user
         required: true
         schema:
-          $ref: '#/definitions/model.JBotUpdateRequest'
+          $ref: '#/definitions/model.JbotUpdateRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/model.JBotGetResponse'
+            $ref: '#/definitions/model.JbotGetResponse'
       security:
       - Bearer: []
-      summary: Update JBot
+      summary: Update Jbot
       tags:
-      - JBot
+      - Jbot
+  /v2/order/create:
+    post:
+      description: Create a new Order
+      parameters:
+      - description: Create Order
+        in: body
+        name: Order
+        required: true
+        schema:
+          $ref: '#/definitions/model.OrderAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OrderGetResponse'
+      security:
+      - Bearer: []
+      summary: Create new Order
+      tags:
+      - Order
+  /v2/order/delete:
+    delete:
+      description: Delete a new Order
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Order'
+      security:
+      - Bearer: []
+      summary: Delete new Order
+      tags:
+      - Order
+  /v2/order/get:
+    get:
+      description: Return Order
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OrderGetResponse'
+      security:
+      - Bearer: []
+      summary: Get Order
+      tags:
+      - Order
+  /v2/order/list:
+    post:
+      description: Retrieve a list of Orders based on provided filters and pagination
+      parameters:
+      - description: Get Orders
+        in: body
+        name: Order
+        required: true
+        schema:
+          $ref: '#/definitions/model.OrderGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OrderGetListResponse'
+      security:
+      - Bearer: []
+      summary: Get a list of Order
+      tags:
+      - Order
+  /v2/order/update:
+    put:
+      description: Update Order
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.OrderUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OrderGetResponse'
+      security:
+      - Bearer: []
+      summary: Update Order
+      tags:
+      - Order
   /v2/otp/create:
     post:
       description: Create a new Otp
@@ -1292,6 +1462,122 @@ paths:
       summary: Update Otp
       tags:
       - Otp
+  /v2/signal/create:
+    post:
+      description: Create a new Signal
+      parameters:
+      - description: Create Signal
+        in: body
+        name: Signal
+        required: true
+        schema:
+          $ref: '#/definitions/model.SignalAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SignalGetResponse'
+      security:
+      - Bearer: []
+      summary: Create new Signal
+      tags:
+      - Signal
+  /v2/signal/delete:
+    delete:
+      description: Delete a new Signal
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Signal'
+      security:
+      - Bearer: []
+      summary: Delete new Signal
+      tags:
+      - Signal
+  /v2/signal/get:
+    get:
+      description: Return Signal
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SignalGetResponse'
+      security:
+      - Bearer: []
+      summary: Get Signal
+      tags:
+      - Signal
+  /v2/signal/list:
+    post:
+      description: Retrieve a list of Signals based on provided filters and pagination
+      parameters:
+      - description: Get Signals
+        in: body
+        name: Signal
+        required: true
+        schema:
+          $ref: '#/definitions/model.SignalGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SignalGetListResponse'
+      security:
+      - Bearer: []
+      summary: Get a list of Signal
+      tags:
+      - Signal
+  /v2/signal/update:
+    put:
+      description: Update Signal
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.SignalUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SignalGetResponse'
+      security:
+      - Bearer: []
+      summary: Update Signal
+      tags:
+      - Signal
   /v2/subscription/create:
     post:
       description: Create a new Subscription

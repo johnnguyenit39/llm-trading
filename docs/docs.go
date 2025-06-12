@@ -1255,22 +1255,22 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Create a new JBot",
+                "description": "Create a new Jbot",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "JBot"
+                    "Jbot"
                 ],
-                "summary": "Create new JBot",
+                "summary": "Create new Jbot",
                 "parameters": [
                     {
-                        "description": "Create JBot",
-                        "name": "JBot",
+                        "description": "Create Jbot",
+                        "name": "Jbot",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/model.JBotAddRequest"
+                            "$ref": "#/definitions/model.JbotAddRequest"
                         }
                     }
                 ],
@@ -1278,7 +1278,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.JBotGetResponse"
+                            "$ref": "#/definitions/model.JbotGetResponse"
                         }
                     }
                 }
@@ -1291,14 +1291,14 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Delete a new JBot",
+                "description": "Delete a new Jbot",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "JBot"
+                    "Jbot"
                 ],
-                "summary": "Delete new JBot",
+                "summary": "Delete new Jbot",
                 "parameters": [
                     {
                         "type": "string",
@@ -1313,7 +1313,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.JBot"
+                            "$ref": "#/definitions/model.Jbot"
                         }
                     }
                 }
@@ -1326,14 +1326,14 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Return JBot",
+                "description": "Return Jbot",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "JBot"
+                    "Jbot"
                 ],
-                "summary": "Get JBot",
+                "summary": "Get Jbot",
                 "parameters": [
                     {
                         "type": "string",
@@ -1348,7 +1348,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.JBotGetResponse"
+                            "$ref": "#/definitions/model.JbotGetResponse"
                         }
                     }
                 }
@@ -1361,22 +1361,22 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Retrieve a list of JBots based on provided filters and pagination",
+                "description": "Retrieve a list of Jbots based on provided filters and pagination",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "JBot"
+                    "Jbot"
                 ],
-                "summary": "Get a list of JBot",
+                "summary": "Get a list of Jbot",
                 "parameters": [
                     {
-                        "description": "Get JBots",
-                        "name": "JBot",
+                        "description": "Get Jbots",
+                        "name": "Jbot",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/model.JBotGetListRequest"
+                            "$ref": "#/definitions/model.JbotGetListRequest"
                         }
                     }
                 ],
@@ -1384,7 +1384,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.JBotGetListResponse"
+                            "$ref": "#/definitions/model.JbotGetListResponse"
                         }
                     }
                 }
@@ -1397,14 +1397,14 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Update JBot",
+                "description": "Update Jbot",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "JBot"
+                    "Jbot"
                 ],
-                "summary": "Update JBot",
+                "summary": "Update Jbot",
                 "parameters": [
                     {
                         "type": "string",
@@ -1420,7 +1420,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/model.JBotUpdateRequest"
+                            "$ref": "#/definitions/model.JbotUpdateRequest"
                         }
                     }
                 ],
@@ -1428,7 +1428,193 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/model.JBotGetResponse"
+                            "$ref": "#/definitions/model.JbotGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/order/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Order",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Create new Order",
+                "parameters": [
+                    {
+                        "description": "Create Order",
+                        "name": "Order",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderAddRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/order/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Order",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Delete new Order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Order"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/order/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Order",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Get Order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/order/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Orders based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Get a list of Order",
+                "parameters": [
+                    {
+                        "description": "Get Orders",
+                        "name": "Order",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/order/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Order",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Update Order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetResponse"
                         }
                     }
                 }
@@ -1615,6 +1801,192 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/model.OtpGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/signal/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Signal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Create new Signal",
+                "parameters": [
+                    {
+                        "description": "Create Signal",
+                        "name": "Signal",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalAddRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/signal/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Signal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Delete new Signal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Signal"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/signal/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Signal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Get Signal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/signal/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Signals based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Get a list of Signal",
+                "parameters": [
+                    {
+                        "description": "Get Signals",
+                        "name": "Signal",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/signal/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Signal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Update Signal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetResponse"
                         }
                     }
                 }
@@ -2018,7 +2390,7 @@ const docTemplate = `{
                 }
             }
         },
-        "model.JBot": {
+        "model.Jbot": {
             "type": "object",
             "properties": {
                 "ID": {
@@ -2029,10 +2401,10 @@ const docTemplate = `{
                 }
             }
         },
-        "model.JBotAddRequest": {
+        "model.JbotAddRequest": {
             "type": "object"
         },
-        "model.JBotGetListRequest": {
+        "model.JbotGetListRequest": {
             "type": "object",
             "properties": {
                 "Pagination": {
@@ -2040,13 +2412,13 @@ const docTemplate = `{
                 }
             }
         },
-        "model.JBotGetListResponse": {
+        "model.JbotGetListResponse": {
             "type": "object",
             "properties": {
                 "List": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/model.JBot"
+                        "$ref": "#/definitions/model.Jbot"
                     }
                 },
                 "Paging": {
@@ -2054,10 +2426,10 @@ const docTemplate = `{
                 }
             }
         },
-        "model.JBotGetResponse": {
+        "model.JbotGetResponse": {
             "type": "object"
         },
-        "model.JBotUpdateRequest": {
+        "model.JbotUpdateRequest": {
             "type": "object"
         },
         "model.Okx": {
@@ -2070,6 +2442,48 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "model.Order": {
+            "type": "object",
+            "properties": {
+                "ID": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.OrderAddRequest": {
+            "type": "object"
+        },
+        "model.OrderGetListRequest": {
+            "type": "object",
+            "properties": {
+                "Pagination": {
+                    "$ref": "#/definitions/common.PaginationRequest"
+                }
+            }
+        },
+        "model.OrderGetListResponse": {
+            "type": "object",
+            "properties": {
+                "List": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Order"
+                    }
+                },
+                "Paging": {
+                    "$ref": "#/definitions/common.Pagination"
+                }
+            }
+        },
+        "model.OrderGetResponse": {
+            "type": "object"
+        },
+        "model.OrderUpdateRequest": {
+            "type": "object"
         },
         "model.Otp": {
             "type": "object",
@@ -2130,6 +2544,48 @@ const docTemplate = `{
             }
         },
         "model.PermissionUpdateRequest": {
+            "type": "object"
+        },
+        "model.Signal": {
+            "type": "object",
+            "properties": {
+                "ID": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.SignalAddRequest": {
+            "type": "object"
+        },
+        "model.SignalGetListRequest": {
+            "type": "object",
+            "properties": {
+                "Pagination": {
+                    "$ref": "#/definitions/common.PaginationRequest"
+                }
+            }
+        },
+        "model.SignalGetListResponse": {
+            "type": "object",
+            "properties": {
+                "List": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Signal"
+                    }
+                },
+                "Paging": {
+                    "$ref": "#/definitions/common.Pagination"
+                }
+            }
+        },
+        "model.SignalGetResponse": {
+            "type": "object"
+        },
+        "model.SignalUpdateRequest": {
             "type": "object"
         },
         "model.Subscription": {
