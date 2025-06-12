@@ -2,8 +2,10 @@ package model
 
 import (
 	"j-ai-trade/common"
+	userModel "j-ai-trade/modules/user/model"
 	"log"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -13,6 +15,12 @@ const (
 
 type ApiKey struct {
 	common.BaseModel
+	UserID     uuid.UUID      `gorm:"column:user_id" json:"user_id"`
+	User       userModel.User `gorm:"foreignKey:UserID" json:"user"`
+	ApiKey     string         `json:"api_key" gorm:"type:varchar(255)"`
+	ApiSecret  string         `json:"api_secret" gorm:"type:varchar(255)"`
+	PassPhrase string         `json:"pass_phrase" gorm:"type:varchar(255)"`
+	Broker     string         `json:"broker" gorm:"type:varchar(255)"`
 }
 
 func (*ApiKey) TableName() string {

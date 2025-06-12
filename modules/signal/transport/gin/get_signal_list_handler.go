@@ -22,7 +22,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/signal/list [post]
+// @Router /v1/signal/list [post]
 func GetSignals(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input dto.SignalGetListRequest

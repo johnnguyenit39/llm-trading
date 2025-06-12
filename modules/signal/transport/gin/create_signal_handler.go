@@ -23,7 +23,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/signal/create [post]
+// @Router /v1/signal/create [post]
 func CreateSignal(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input dto.SignalAddRequest

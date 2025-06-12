@@ -22,7 +22,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/signal/get [get]
+// @Router /v1/signal/get [get]
 func GetSignalById(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id := c.Param("id")

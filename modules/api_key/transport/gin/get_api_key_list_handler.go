@@ -22,7 +22,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/api-key/list [post]
+// @Router /v1/api-key/list [post]
 func GetApiKeys(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input model.ApiKeyGetListRequest

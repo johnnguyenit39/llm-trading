@@ -22,7 +22,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/ai-expert/create [post]
+// @Router /v1/ai-expert/create [post]
 func CreateAiExpert(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input model.AiExpertAddRequest

@@ -2,7 +2,8 @@ package common
 
 import "time"
 
-//Brokers
+// Broker represents the type of broker
+// @Description The type of broker
 type Broker string
 
 const (

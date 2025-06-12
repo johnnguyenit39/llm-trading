@@ -24,7 +24,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/signal/update [put]
+// @Router /v1/signal/update [put]
 func UpdateSignal(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id := c.Param("id")

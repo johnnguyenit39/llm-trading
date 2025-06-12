@@ -23,7 +23,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/order/create [post]
+// @Router /v1/order/create [post]
 func CreateOrder(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input dto.OrderAddRequest

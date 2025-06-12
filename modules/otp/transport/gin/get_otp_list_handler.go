@@ -22,7 +22,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/otp/list [post]
+// @Router /v1/otp/list [post]
 func GetOtps(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input dto.OtpGetListRequest

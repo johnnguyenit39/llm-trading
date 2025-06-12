@@ -22,7 +22,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/subscription/get [get]
+// @Router /v1/subscription/get [get]
 func GetSubscriptionById(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id := c.Param("id")

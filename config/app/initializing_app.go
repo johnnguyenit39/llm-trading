@@ -9,6 +9,8 @@ import (
 	ginPermission "j-ai-trade/modules/permission/transport/gin"
 	ginSubscription "j-ai-trade/modules/subscription/transport/gin"
 	ginUser "j-ai-trade/modules/user/transport/gin"
+	"j-ai-trade/telegram"
+	ginTelegram "j-ai-trade/telegram/transport/gin"
 
 	ginAiExpert "j-ai-trade/modules/ai_expert/transport/gin"
 	ginJbot "j-ai-trade/modules/j_bot/transport/gin"
@@ -67,9 +69,17 @@ func InitializeApp(appContext appContext.AppContext) {
 
 	}
 
+	// Telegram API
+	{
+		telegramService := telegram.NewTelegramService()
+		{
+			v1.Group("").POST("/telegram/send", ginTelegram.SendTelegramMessage(telegramService))
+		}
+	}
+
 	//API configs
 	protected := v1.Group("")
-	//protected.Use(middlewares.AuthMiddleware())
+	protected.Use(middlewares.AuthMiddleware())
 
 	//Protected Auth
 	{
@@ -109,7 +119,7 @@ func InitializeApp(appContext appContext.AppContext) {
 	// ApiKey API
 	{
 		{
-			protected.POST("/create/api-key/", ginApiKey.CreateApiKey(appContext.GetMainDBConnection()))
+			protected.POST("/create/api-key", ginApiKey.CreateApiKey(appContext.GetMainDBConnection()))
 			protected.GET("/get/api-key/:id", ginApiKey.GetApiKeyById(appContext.GetMainDBConnection()))
 			protected.GET("/get/api-key/list", ginApiKey.GetApiKeys(appContext.GetMainDBConnection()))
 			protected.PUT("/update/api-key/:id", ginApiKey.UpdateApiKey(appContext.GetMainDBConnection()))

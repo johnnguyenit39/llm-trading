@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	aiExpertModel "j-ai-trade/modules/ai_expert/model"
+	apiKeyModel "j-ai-trade/modules/api_key/model"
 	jbotModel "j-ai-trade/modules/j_bot/model"
 	orderModel "j-ai-trade/modules/order/model"
 	otpModel "j-ai-trade/modules/otp/model"
@@ -59,6 +60,7 @@ func AutoMigrate(db *gorm.DB) {
 		&permissionModel.Permission{},
 		&signalModel.Signal{},
 		&orderModel.Order{},
+		&apiKeyModel.ApiKey{},
 		&aiExpertModel.AiExpert{},
 	)
 }

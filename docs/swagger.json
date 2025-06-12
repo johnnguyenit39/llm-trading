@@ -9,6 +9,502 @@
     "host": "localhost:8080",
     "basePath": "/api",
     "paths": {
+        "/v1/Permission/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Permission",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Create new Permission",
+                "parameters": [
+                    {
+                        "description": "Create Permission",
+                        "name": "Permission",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/Permission/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Permission",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Delete new Permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/Permission/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Permission",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Get Permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/Permission/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Permissions based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Get a list of Permission",
+                "parameters": [
+                    {
+                        "description": "Get Permissions",
+                        "name": "Permission",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.PermissionGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.Permission"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/Permission/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Permission",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Update Permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.PermissionUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/ai-expert/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new AiExpert",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Create new AiExpert",
+                "parameters": [
+                    {
+                        "description": "Create AiExpert",
+                        "name": "AiExpert",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/ai-expert/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new AiExpert",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Delete new AiExpert",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/ai-expert/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return AiExpert",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Get AiExpert",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/ai-expert/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of AiExperts based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Get a list of AiExpert",
+                "parameters": [
+                    {
+                        "description": "Get AiExperts",
+                        "name": "AiExpert",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpertGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.AiExpert"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/ai-expert/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update AiExpert",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AiExpert"
+                ],
+                "summary": "Update AiExpert",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpertUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.AiExpert"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/api-key/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return ApiKey",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiKey"
+                ],
+                "summary": "Get ApiKey",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.ApiKey"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/api-key/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of ApiKeys based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiKey"
+                ],
+                "summary": "Get a list of ApiKey",
+                "parameters": [
+                    {
+                        "description": "Get ApiKeys",
+                        "name": "ApiKey",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.ApiKeyGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.ApiKey"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/api-key/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update ApiKey",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiKey"
+                ],
+                "summary": "Update ApiKey",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.ApiKeyUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.ApiKey"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/auth/login": {
             "post": {
                 "description": "Verify Login with email and password",
@@ -416,6 +912,42 @@
                 }
             }
         },
+        "/v1/create/api-key": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new ApiKey",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiKey"
+                ],
+                "summary": "Create new ApiKey",
+                "parameters": [
+                    {
+                        "description": "Create ApiKey",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.ApiKeyAddRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/create/order": {
             "post": {
                 "security": [
@@ -522,6 +1054,41 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/model.User"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/delete/api-key": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new ApiKey",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ApiKey"
+                ],
+                "summary": "Delete new ApiKey",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.ApiKey"
                         }
                     }
                 }
@@ -776,6 +1343,979 @@
                 }
             }
         },
+        "/v1/jbot/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Jbot",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jbot"
+                ],
+                "summary": "Create new Jbot",
+                "parameters": [
+                    {
+                        "description": "Create Jbot",
+                        "name": "Jbot",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.JbotAddRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.JbotGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/jbot/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Jbot",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jbot"
+                ],
+                "summary": "Delete new Jbot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Jbot"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/jbot/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Jbot",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jbot"
+                ],
+                "summary": "Get Jbot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.JbotGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/jbot/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Jbots based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jbot"
+                ],
+                "summary": "Get a list of Jbot",
+                "parameters": [
+                    {
+                        "description": "Get Jbots",
+                        "name": "Jbot",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.JbotGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.JbotGetListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/jbot/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Jbot",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jbot"
+                ],
+                "summary": "Update Jbot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.JbotUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.JbotGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/order/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Order",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Create new Order",
+                "parameters": [
+                    {
+                        "description": "Create Order",
+                        "name": "Order",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderAddRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/order/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Order",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Delete new Order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Order"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/order/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Order",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Get Order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/order/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Orders based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Get a list of Order",
+                "parameters": [
+                    {
+                        "description": "Get Orders",
+                        "name": "Order",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/order/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Order",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Order"
+                ],
+                "summary": "Update Order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OrderGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/otp/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Otp",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Create new Otp",
+                "parameters": [
+                    {
+                        "description": "Create Otp",
+                        "name": "Otp",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.Otp"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Otp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/otp/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Otp",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Delete new Otp",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Otp"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/otp/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Otp",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Get Otp",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/otp/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Otps based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Get a list of Otp",
+                "parameters": [
+                    {
+                        "description": "Get Otps",
+                        "name": "Otp",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpGetListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/otp/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Otp",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Otp"
+                ],
+                "summary": "Update Otp",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.OtpGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/signal/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Signal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Create new Signal",
+                "parameters": [
+                    {
+                        "description": "Create Signal",
+                        "name": "Signal",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalAddRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/signal/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Signal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Delete new Signal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Signal"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/signal/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Signal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Get Signal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/signal/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Signals based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Get a list of Signal",
+                "parameters": [
+                    {
+                        "description": "Get Signals",
+                        "name": "Signal",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/signal/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Signal",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Signal"
+                ],
+                "summary": "Update Signal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.SignalGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/subscription/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Subscription",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subscription"
+                ],
+                "summary": "Create new Subscription",
+                "parameters": [
+                    {
+                        "description": "Create Subscription",
+                        "name": "Subscription",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.Subscription"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Subscription"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/subscription/delete": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Subscription",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subscription"
+                ],
+                "summary": "Delete new Subscription",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Subscription"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/subscription/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Subscription",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subscription"
+                ],
+                "summary": "Get Subscription",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Subscription"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/subscription/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Subscriptions based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subscription"
+                ],
+                "summary": "Get a list of Subscription",
+                "parameters": [
+                    {
+                        "description": "Get Subscriptions",
+                        "name": "Subscription",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.SubscriptionGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.Subscription"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/subscription/update": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Subscription",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Subscription"
+                ],
+                "summary": "Update Subscription",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Subscription"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/telegram/send": {
+            "post": {
+                "description": "Send a message to the configured Telegram channel",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Telegram"
+                ],
+                "summary": "Send a message to Telegram channel",
+                "parameters": [
+                    {
+                        "description": "Message details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/telegram.SendMessageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-bool"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-any"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/update/okx/{id}": {
             "put": {
                 "security": [
@@ -900,1506 +2440,6 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/model.User"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/Permission/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new Permission",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Create new Permission",
-                "parameters": [
-                    {
-                        "description": "Create Permission",
-                        "name": "Permission",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/Permission/delete": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new Permission",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Delete new Permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/Permission/get": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Permission",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Get Permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/Permission/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of Permissions based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Get a list of Permission",
-                "parameters": [
-                    {
-                        "description": "Get Permissions",
-                        "name": "Permission",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.PermissionGetListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/model.Permission"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/Permission/update": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update Permission",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Update Permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.PermissionUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/ai-expert/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new AiExpert",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AiExpert"
-                ],
-                "summary": "Create new AiExpert",
-                "parameters": [
-                    {
-                        "description": "Create AiExpert",
-                        "name": "AiExpert",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.AiExpert"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.AiExpert"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/ai-expert/delete": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new AiExpert",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AiExpert"
-                ],
-                "summary": "Delete new AiExpert",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.AiExpert"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/ai-expert/get": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return AiExpert",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AiExpert"
-                ],
-                "summary": "Get AiExpert",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.AiExpert"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/ai-expert/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of AiExperts based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AiExpert"
-                ],
-                "summary": "Get a list of AiExpert",
-                "parameters": [
-                    {
-                        "description": "Get AiExperts",
-                        "name": "AiExpert",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.AiExpertGetListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/model.AiExpert"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/ai-expert/update": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update AiExpert",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AiExpert"
-                ],
-                "summary": "Update AiExpert",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.AiExpertUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.AiExpert"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/api-key/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new ApiKey",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "ApiKey"
-                ],
-                "summary": "Create new ApiKey",
-                "parameters": [
-                    {
-                        "description": "Create ApiKey",
-                        "name": "ApiKey",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.ApiKey"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.ApiKey"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/api-key/delete": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new ApiKey",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "ApiKey"
-                ],
-                "summary": "Delete new ApiKey",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.ApiKey"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/api-key/get": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return ApiKey",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "ApiKey"
-                ],
-                "summary": "Get ApiKey",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.ApiKey"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/api-key/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of ApiKeys based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "ApiKey"
-                ],
-                "summary": "Get a list of ApiKey",
-                "parameters": [
-                    {
-                        "description": "Get ApiKeys",
-                        "name": "ApiKey",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.ApiKeyGetListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/model.ApiKey"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/api-key/update": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update ApiKey",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "ApiKey"
-                ],
-                "summary": "Update ApiKey",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.ApiKeyUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.ApiKey"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/jbot/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new Jbot",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Jbot"
-                ],
-                "summary": "Create new Jbot",
-                "parameters": [
-                    {
-                        "description": "Create Jbot",
-                        "name": "Jbot",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.JbotAddRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.JbotGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/jbot/delete": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new Jbot",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Jbot"
-                ],
-                "summary": "Delete new Jbot",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Jbot"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/jbot/get": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Jbot",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Jbot"
-                ],
-                "summary": "Get Jbot",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.JbotGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/jbot/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of Jbots based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Jbot"
-                ],
-                "summary": "Get a list of Jbot",
-                "parameters": [
-                    {
-                        "description": "Get Jbots",
-                        "name": "Jbot",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.JbotGetListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.JbotGetListResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/jbot/update": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update Jbot",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Jbot"
-                ],
-                "summary": "Update Jbot",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.JbotUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.JbotGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/order/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new Order",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Order"
-                ],
-                "summary": "Create new Order",
-                "parameters": [
-                    {
-                        "description": "Create Order",
-                        "name": "Order",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.OrderAddRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.OrderGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/order/delete": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new Order",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Order"
-                ],
-                "summary": "Delete new Order",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Order"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/order/get": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Order",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Order"
-                ],
-                "summary": "Get Order",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.OrderGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/order/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of Orders based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Order"
-                ],
-                "summary": "Get a list of Order",
-                "parameters": [
-                    {
-                        "description": "Get Orders",
-                        "name": "Order",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.OrderGetListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.OrderGetListResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/order/update": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update Order",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Order"
-                ],
-                "summary": "Update Order",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.OrderUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.OrderGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/otp/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new Otp",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Otp"
-                ],
-                "summary": "Create new Otp",
-                "parameters": [
-                    {
-                        "description": "Create Otp",
-                        "name": "Otp",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.Otp"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Otp"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/otp/delete": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new Otp",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Otp"
-                ],
-                "summary": "Delete new Otp",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Otp"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/otp/get": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Otp",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Otp"
-                ],
-                "summary": "Get Otp",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.OtpGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/otp/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of Otps based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Otp"
-                ],
-                "summary": "Get a list of Otp",
-                "parameters": [
-                    {
-                        "description": "Get Otps",
-                        "name": "Otp",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.OtpGetListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.OtpGetListResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/otp/update": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update Otp",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Otp"
-                ],
-                "summary": "Update Otp",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.OtpUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.OtpGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/signal/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new Signal",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Signal"
-                ],
-                "summary": "Create new Signal",
-                "parameters": [
-                    {
-                        "description": "Create Signal",
-                        "name": "Signal",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.SignalAddRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.SignalGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/signal/delete": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new Signal",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Signal"
-                ],
-                "summary": "Delete new Signal",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Signal"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/signal/get": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Signal",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Signal"
-                ],
-                "summary": "Get Signal",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.SignalGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/signal/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of Signals based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Signal"
-                ],
-                "summary": "Get a list of Signal",
-                "parameters": [
-                    {
-                        "description": "Get Signals",
-                        "name": "Signal",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.SignalGetListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.SignalGetListResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/signal/update": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update Signal",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Signal"
-                ],
-                "summary": "Update Signal",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.SignalUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.SignalGetResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/subscription/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new Subscription",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Subscription"
-                ],
-                "summary": "Create new Subscription",
-                "parameters": [
-                    {
-                        "description": "Create Subscription",
-                        "name": "Subscription",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.Subscription"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Subscription"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/subscription/delete": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new Subscription",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Subscription"
-                ],
-                "summary": "Delete new Subscription",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Subscription"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/subscription/get": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Subscription",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Subscription"
-                ],
-                "summary": "Get Subscription",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Subscription"
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/subscription/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of Subscriptions based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Subscription"
-                ],
-                "summary": "Get a list of Subscription",
-                "parameters": [
-                    {
-                        "description": "Get Subscriptions",
-                        "name": "Subscription",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.SubscriptionGetListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/model.Subscription"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v2/subscription/update": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update Subscription",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Subscription"
-                ],
-                "summary": "Update Subscription",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Subscription"
                         }
                     }
                 }
@@ -2626,7 +2666,52 @@
                 "ID": {
                     "type": "string"
                 },
+                "api_key": {
+                    "type": "string"
+                },
+                "api_secret": {
+                    "type": "string"
+                },
+                "broker": {
+                    "type": "string"
+                },
                 "createdAt": {
+                    "type": "string"
+                },
+                "pass_phrase": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/model.User"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.ApiKeyAddRequest": {
+            "type": "object",
+            "required": [
+                "api_key",
+                "api_secret",
+                "broker",
+                "pass_phrase"
+            ],
+            "properties": {
+                "api_key": {
+                    "description": "API key for OKX",
+                    "type": "string"
+                },
+                "api_secret": {
+                    "description": "Secret key for OKX",
+                    "type": "string"
+                },
+                "broker": {
+                    "description": "Broker type",
+                    "type": "string"
+                },
+                "pass_phrase": {
+                    "description": "Passphrase for OKX",
                     "type": "string"
                 }
             }
@@ -2640,7 +2725,31 @@
             }
         },
         "model.ApiKeyUpdateRequest": {
-            "type": "object"
+            "type": "object",
+            "required": [
+                "broker"
+            ],
+            "properties": {
+                "api_key": {
+                    "description": "API key for OKX",
+                    "type": "string"
+                },
+                "api_secret": {
+                    "description": "Secret key for OKX",
+                    "type": "string"
+                },
+                "broker": {
+                    "type": "string",
+                    "enum": [
+                        "okx"
+                    ],
+                    "example": "okx"
+                },
+                "pass_phrase": {
+                    "description": "Passphrase for OKX",
+                    "type": "string"
+                }
+            }
         },
         "model.CancelOrderRequest": {
             "type": "object",
@@ -3005,6 +3114,27 @@
         },
         "model.UserUpdateRequest": {
             "type": "object"
+        },
+        "telegram.SendMessageRequest": {
+            "description": "Request body for sending a Telegram message",
+            "type": "object",
+            "properties": {
+                "chat_id": {
+                    "description": "Chat ID where the message will be sent",
+                    "type": "string",
+                    "example": "-1001234567890"
+                },
+                "parse_mode": {
+                    "description": "Parse mode for the message (HTML, Markdown, etc.)",
+                    "type": "string",
+                    "example": "HTML"
+                },
+                "text": {
+                    "description": "Message text to be sent",
+                    "type": "string",
+                    "example": "Hello from J-AI-Trade!"
+                }
+            }
         }
     },
     "securityDefinitions": {

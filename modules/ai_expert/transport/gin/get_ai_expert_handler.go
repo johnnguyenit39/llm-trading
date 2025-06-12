@@ -22,7 +22,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/ai-expert/get [get]
+// @Router /v1/ai-expert/get [get]
 func GetAiExpertById(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id := c.Param("id")

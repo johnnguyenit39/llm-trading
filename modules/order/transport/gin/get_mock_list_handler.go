@@ -22,7 +22,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/order/list [post]
+// @Router /v1/order/list [post]
 func GetOrders(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input dto.OrderGetListRequest

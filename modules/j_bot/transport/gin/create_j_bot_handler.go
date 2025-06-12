@@ -23,7 +23,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/jbot/create [post]
+// @Router /v1/jbot/create [post]
 func CreateJbot(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input dto.JbotAddRequest

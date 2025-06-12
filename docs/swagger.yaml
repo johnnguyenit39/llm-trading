@@ -146,8 +146,40 @@ definitions:
     properties:
       ID:
         type: string
+      api_key:
+        type: string
+      api_secret:
+        type: string
+      broker:
+        type: string
       createdAt:
         type: string
+      pass_phrase:
+        type: string
+      user:
+        $ref: '#/definitions/model.User'
+      user_id:
+        type: string
+    type: object
+  model.ApiKeyAddRequest:
+    properties:
+      api_key:
+        description: API key for OKX
+        type: string
+      api_secret:
+        description: Secret key for OKX
+        type: string
+      broker:
+        description: Broker type
+        type: string
+      pass_phrase:
+        description: Passphrase for OKX
+        type: string
+    required:
+    - api_key
+    - api_secret
+    - broker
+    - pass_phrase
     type: object
   model.ApiKeyGetListRequest:
     properties:
@@ -155,6 +187,23 @@ definitions:
         $ref: '#/definitions/common.PaginationRequest'
     type: object
   model.ApiKeyUpdateRequest:
+    properties:
+      api_key:
+        description: API key for OKX
+        type: string
+      api_secret:
+        description: Secret key for OKX
+        type: string
+      broker:
+        enum:
+        - okx
+        example: okx
+        type: string
+      pass_phrase:
+        description: Passphrase for OKX
+        type: string
+    required:
+    - broker
     type: object
   model.CancelOrderRequest:
     properties:
@@ -398,6 +447,22 @@ definitions:
     type: object
   model.UserUpdateRequest:
     type: object
+  telegram.SendMessageRequest:
+    description: Request body for sending a Telegram message
+    properties:
+      chat_id:
+        description: Chat ID where the message will be sent
+        example: "-1001234567890"
+        type: string
+      parse_mode:
+        description: Parse mode for the message (HTML, Markdown, etc.)
+        example: HTML
+        type: string
+      text:
+        description: Message text to be sent
+        example: Hello from J-AI-Trade!
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -405,6 +470,316 @@ info:
   title: WB Author API
   version: "1.0"
 paths:
+  /v1/Permission/create:
+    post:
+      description: Create a new Permission
+      parameters:
+      - description: Create Permission
+        in: body
+        name: Permission
+        required: true
+        schema:
+          $ref: '#/definitions/model.Permission'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Create new Permission
+      tags:
+      - Permission
+  /v1/Permission/delete:
+    delete:
+      description: Delete a new Permission
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Delete new Permission
+      tags:
+      - Permission
+  /v1/Permission/get:
+    get:
+      description: Return Permission
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Get Permission
+      tags:
+      - Permission
+  /v1/Permission/list:
+    post:
+      description: Retrieve a list of Permissions based on provided filters and pagination
+      parameters:
+      - description: Get Permissions
+        in: body
+        name: Permission
+        required: true
+        schema:
+          $ref: '#/definitions/model.PermissionGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Permission'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of Permission
+      tags:
+      - Permission
+  /v1/Permission/update:
+    put:
+      description: Update Permission
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.PermissionUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Update Permission
+      tags:
+      - Permission
+  /v1/ai-expert/create:
+    post:
+      description: Create a new AiExpert
+      parameters:
+      - description: Create AiExpert
+        in: body
+        name: AiExpert
+        required: true
+        schema:
+          $ref: '#/definitions/model.AiExpert'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AiExpert'
+      security:
+      - Bearer: []
+      summary: Create new AiExpert
+      tags:
+      - AiExpert
+  /v1/ai-expert/delete:
+    delete:
+      description: Delete a new AiExpert
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AiExpert'
+      security:
+      - Bearer: []
+      summary: Delete new AiExpert
+      tags:
+      - AiExpert
+  /v1/ai-expert/get:
+    get:
+      description: Return AiExpert
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AiExpert'
+      security:
+      - Bearer: []
+      summary: Get AiExpert
+      tags:
+      - AiExpert
+  /v1/ai-expert/list:
+    post:
+      description: Retrieve a list of AiExperts based on provided filters and pagination
+      parameters:
+      - description: Get AiExperts
+        in: body
+        name: AiExpert
+        required: true
+        schema:
+          $ref: '#/definitions/model.AiExpertGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.AiExpert'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of AiExpert
+      tags:
+      - AiExpert
+  /v1/ai-expert/update:
+    put:
+      description: Update AiExpert
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.AiExpertUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.AiExpert'
+      security:
+      - Bearer: []
+      summary: Update AiExpert
+      tags:
+      - AiExpert
+  /v1/api-key/get:
+    get:
+      description: Return ApiKey
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ApiKey'
+      security:
+      - Bearer: []
+      summary: Get ApiKey
+      tags:
+      - ApiKey
+  /v1/api-key/list:
+    post:
+      description: Retrieve a list of ApiKeys based on provided filters and pagination
+      parameters:
+      - description: Get ApiKeys
+        in: body
+        name: ApiKey
+        required: true
+        schema:
+          $ref: '#/definitions/model.ApiKeyGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.ApiKey'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of ApiKey
+      tags:
+      - ApiKey
+  /v1/api-key/update:
+    put:
+      description: Update ApiKey
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.ApiKeyUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ApiKey'
+      security:
+      - Bearer: []
+      summary: Update ApiKey
+      tags:
+      - ApiKey
   /v1/auth/login:
     post:
       consumes:
@@ -669,6 +1044,28 @@ paths:
       summary: Cancel an existing order
       tags:
       - Okx
+  /v1/create/api-key:
+    post:
+      description: Create a new ApiKey
+      parameters:
+      - description: Create ApiKey
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.ApiKeyAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: boolean
+      security:
+      - Bearer: []
+      summary: Create new ApiKey
+      tags:
+      - ApiKey
   /v1/create/order:
     post:
       consumes:
@@ -737,6 +1134,28 @@ paths:
       summary: Create new User
       tags:
       - User
+  /v1/delete/api-key:
+    delete:
+      description: Delete a new ApiKey
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ApiKey'
+      security:
+      - Bearer: []
+      summary: Delete new ApiKey
+      tags:
+      - ApiKey
   /v1/delete/okx/{id}:
     delete:
       description: Delete a new Okx
@@ -893,6 +1312,615 @@ paths:
       summary: Get a list of User
       tags:
       - User
+  /v1/jbot/create:
+    post:
+      description: Create a new Jbot
+      parameters:
+      - description: Create Jbot
+        in: body
+        name: Jbot
+        required: true
+        schema:
+          $ref: '#/definitions/model.JbotAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JbotGetResponse'
+      security:
+      - Bearer: []
+      summary: Create new Jbot
+      tags:
+      - Jbot
+  /v1/jbot/delete:
+    delete:
+      description: Delete a new Jbot
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Jbot'
+      security:
+      - Bearer: []
+      summary: Delete new Jbot
+      tags:
+      - Jbot
+  /v1/jbot/get:
+    get:
+      description: Return Jbot
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JbotGetResponse'
+      security:
+      - Bearer: []
+      summary: Get Jbot
+      tags:
+      - Jbot
+  /v1/jbot/list:
+    post:
+      description: Retrieve a list of Jbots based on provided filters and pagination
+      parameters:
+      - description: Get Jbots
+        in: body
+        name: Jbot
+        required: true
+        schema:
+          $ref: '#/definitions/model.JbotGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JbotGetListResponse'
+      security:
+      - Bearer: []
+      summary: Get a list of Jbot
+      tags:
+      - Jbot
+  /v1/jbot/update:
+    put:
+      description: Update Jbot
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.JbotUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.JbotGetResponse'
+      security:
+      - Bearer: []
+      summary: Update Jbot
+      tags:
+      - Jbot
+  /v1/order/create:
+    post:
+      description: Create a new Order
+      parameters:
+      - description: Create Order
+        in: body
+        name: Order
+        required: true
+        schema:
+          $ref: '#/definitions/model.OrderAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OrderGetResponse'
+      security:
+      - Bearer: []
+      summary: Create new Order
+      tags:
+      - Order
+  /v1/order/delete:
+    delete:
+      description: Delete a new Order
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Order'
+      security:
+      - Bearer: []
+      summary: Delete new Order
+      tags:
+      - Order
+  /v1/order/get:
+    get:
+      description: Return Order
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OrderGetResponse'
+      security:
+      - Bearer: []
+      summary: Get Order
+      tags:
+      - Order
+  /v1/order/list:
+    post:
+      description: Retrieve a list of Orders based on provided filters and pagination
+      parameters:
+      - description: Get Orders
+        in: body
+        name: Order
+        required: true
+        schema:
+          $ref: '#/definitions/model.OrderGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OrderGetListResponse'
+      security:
+      - Bearer: []
+      summary: Get a list of Order
+      tags:
+      - Order
+  /v1/order/update:
+    put:
+      description: Update Order
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.OrderUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OrderGetResponse'
+      security:
+      - Bearer: []
+      summary: Update Order
+      tags:
+      - Order
+  /v1/otp/create:
+    post:
+      description: Create a new Otp
+      parameters:
+      - description: Create Otp
+        in: body
+        name: Otp
+        required: true
+        schema:
+          $ref: '#/definitions/model.Otp'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Otp'
+      security:
+      - Bearer: []
+      summary: Create new Otp
+      tags:
+      - Otp
+  /v1/otp/delete:
+    delete:
+      description: Delete a new Otp
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Otp'
+      security:
+      - Bearer: []
+      summary: Delete new Otp
+      tags:
+      - Otp
+  /v1/otp/get:
+    get:
+      description: Return Otp
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OtpGetResponse'
+      security:
+      - Bearer: []
+      summary: Get Otp
+      tags:
+      - Otp
+  /v1/otp/list:
+    post:
+      description: Retrieve a list of Otps based on provided filters and pagination
+      parameters:
+      - description: Get Otps
+        in: body
+        name: Otp
+        required: true
+        schema:
+          $ref: '#/definitions/model.OtpGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OtpGetListResponse'
+      security:
+      - Bearer: []
+      summary: Get a list of Otp
+      tags:
+      - Otp
+  /v1/otp/update:
+    put:
+      description: Update Otp
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.OtpUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.OtpGetResponse'
+      security:
+      - Bearer: []
+      summary: Update Otp
+      tags:
+      - Otp
+  /v1/signal/create:
+    post:
+      description: Create a new Signal
+      parameters:
+      - description: Create Signal
+        in: body
+        name: Signal
+        required: true
+        schema:
+          $ref: '#/definitions/model.SignalAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SignalGetResponse'
+      security:
+      - Bearer: []
+      summary: Create new Signal
+      tags:
+      - Signal
+  /v1/signal/delete:
+    delete:
+      description: Delete a new Signal
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Signal'
+      security:
+      - Bearer: []
+      summary: Delete new Signal
+      tags:
+      - Signal
+  /v1/signal/get:
+    get:
+      description: Return Signal
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SignalGetResponse'
+      security:
+      - Bearer: []
+      summary: Get Signal
+      tags:
+      - Signal
+  /v1/signal/list:
+    post:
+      description: Retrieve a list of Signals based on provided filters and pagination
+      parameters:
+      - description: Get Signals
+        in: body
+        name: Signal
+        required: true
+        schema:
+          $ref: '#/definitions/model.SignalGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SignalGetListResponse'
+      security:
+      - Bearer: []
+      summary: Get a list of Signal
+      tags:
+      - Signal
+  /v1/signal/update:
+    put:
+      description: Update Signal
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.SignalUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.SignalGetResponse'
+      security:
+      - Bearer: []
+      summary: Update Signal
+      tags:
+      - Signal
+  /v1/subscription/create:
+    post:
+      description: Create a new Subscription
+      parameters:
+      - description: Create Subscription
+        in: body
+        name: Subscription
+        required: true
+        schema:
+          $ref: '#/definitions/model.Subscription'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Subscription'
+      security:
+      - Bearer: []
+      summary: Create new Subscription
+      tags:
+      - Subscription
+  /v1/subscription/delete:
+    delete:
+      description: Delete a new Subscription
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Subscription'
+      security:
+      - Bearer: []
+      summary: Delete new Subscription
+      tags:
+      - Subscription
+  /v1/subscription/get:
+    get:
+      description: Return Subscription
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Subscription'
+      security:
+      - Bearer: []
+      summary: Get Subscription
+      tags:
+      - Subscription
+  /v1/subscription/list:
+    post:
+      description: Retrieve a list of Subscriptions based on provided filters and
+        pagination
+      parameters:
+      - description: Get Subscriptions
+        in: body
+        name: Subscription
+        required: true
+        schema:
+          $ref: '#/definitions/model.SubscriptionGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Subscription'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of Subscription
+      tags:
+      - Subscription
+  /v1/subscription/update:
+    put:
+      description: Update Subscription
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Subscription'
+      security:
+      - Bearer: []
+      summary: Update Subscription
+      tags:
+      - Subscription
+  /v1/telegram/send:
+    post:
+      consumes:
+      - application/json
+      description: Send a message to the configured Telegram channel
+      parameters:
+      - description: Message details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/telegram.SendMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-bool'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-any'
+      summary: Send a message to Telegram channel
+      tags:
+      - Telegram
   /v1/update/okx/{id}:
     put:
       description: Update Okx
@@ -974,943 +2002,6 @@ paths:
       summary: Update User
       tags:
       - User
-  /v2/Permission/create:
-    post:
-      description: Create a new Permission
-      parameters:
-      - description: Create Permission
-        in: body
-        name: Permission
-        required: true
-        schema:
-          $ref: '#/definitions/model.Permission'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Permission'
-      security:
-      - Bearer: []
-      summary: Create new Permission
-      tags:
-      - Permission
-  /v2/Permission/delete:
-    delete:
-      description: Delete a new Permission
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Permission'
-      security:
-      - Bearer: []
-      summary: Delete new Permission
-      tags:
-      - Permission
-  /v2/Permission/get:
-    get:
-      description: Return Permission
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Permission'
-      security:
-      - Bearer: []
-      summary: Get Permission
-      tags:
-      - Permission
-  /v2/Permission/list:
-    post:
-      description: Retrieve a list of Permissions based on provided filters and pagination
-      parameters:
-      - description: Get Permissions
-        in: body
-        name: Permission
-        required: true
-        schema:
-          $ref: '#/definitions/model.PermissionGetListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/model.Permission'
-            type: array
-      security:
-      - Bearer: []
-      summary: Get a list of Permission
-      tags:
-      - Permission
-  /v2/Permission/update:
-    put:
-      description: Update Permission
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/model.PermissionUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Permission'
-      security:
-      - Bearer: []
-      summary: Update Permission
-      tags:
-      - Permission
-  /v2/ai-expert/create:
-    post:
-      description: Create a new AiExpert
-      parameters:
-      - description: Create AiExpert
-        in: body
-        name: AiExpert
-        required: true
-        schema:
-          $ref: '#/definitions/model.AiExpert'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.AiExpert'
-      security:
-      - Bearer: []
-      summary: Create new AiExpert
-      tags:
-      - AiExpert
-  /v2/ai-expert/delete:
-    delete:
-      description: Delete a new AiExpert
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.AiExpert'
-      security:
-      - Bearer: []
-      summary: Delete new AiExpert
-      tags:
-      - AiExpert
-  /v2/ai-expert/get:
-    get:
-      description: Return AiExpert
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.AiExpert'
-      security:
-      - Bearer: []
-      summary: Get AiExpert
-      tags:
-      - AiExpert
-  /v2/ai-expert/list:
-    post:
-      description: Retrieve a list of AiExperts based on provided filters and pagination
-      parameters:
-      - description: Get AiExperts
-        in: body
-        name: AiExpert
-        required: true
-        schema:
-          $ref: '#/definitions/model.AiExpertGetListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/model.AiExpert'
-            type: array
-      security:
-      - Bearer: []
-      summary: Get a list of AiExpert
-      tags:
-      - AiExpert
-  /v2/ai-expert/update:
-    put:
-      description: Update AiExpert
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/model.AiExpertUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.AiExpert'
-      security:
-      - Bearer: []
-      summary: Update AiExpert
-      tags:
-      - AiExpert
-  /v2/api-key/create:
-    post:
-      description: Create a new ApiKey
-      parameters:
-      - description: Create ApiKey
-        in: body
-        name: ApiKey
-        required: true
-        schema:
-          $ref: '#/definitions/model.ApiKey'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.ApiKey'
-      security:
-      - Bearer: []
-      summary: Create new ApiKey
-      tags:
-      - ApiKey
-  /v2/api-key/delete:
-    delete:
-      description: Delete a new ApiKey
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.ApiKey'
-      security:
-      - Bearer: []
-      summary: Delete new ApiKey
-      tags:
-      - ApiKey
-  /v2/api-key/get:
-    get:
-      description: Return ApiKey
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.ApiKey'
-      security:
-      - Bearer: []
-      summary: Get ApiKey
-      tags:
-      - ApiKey
-  /v2/api-key/list:
-    post:
-      description: Retrieve a list of ApiKeys based on provided filters and pagination
-      parameters:
-      - description: Get ApiKeys
-        in: body
-        name: ApiKey
-        required: true
-        schema:
-          $ref: '#/definitions/model.ApiKeyGetListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/model.ApiKey'
-            type: array
-      security:
-      - Bearer: []
-      summary: Get a list of ApiKey
-      tags:
-      - ApiKey
-  /v2/api-key/update:
-    put:
-      description: Update ApiKey
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/model.ApiKeyUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.ApiKey'
-      security:
-      - Bearer: []
-      summary: Update ApiKey
-      tags:
-      - ApiKey
-  /v2/jbot/create:
-    post:
-      description: Create a new Jbot
-      parameters:
-      - description: Create Jbot
-        in: body
-        name: Jbot
-        required: true
-        schema:
-          $ref: '#/definitions/model.JbotAddRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.JbotGetResponse'
-      security:
-      - Bearer: []
-      summary: Create new Jbot
-      tags:
-      - Jbot
-  /v2/jbot/delete:
-    delete:
-      description: Delete a new Jbot
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Jbot'
-      security:
-      - Bearer: []
-      summary: Delete new Jbot
-      tags:
-      - Jbot
-  /v2/jbot/get:
-    get:
-      description: Return Jbot
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.JbotGetResponse'
-      security:
-      - Bearer: []
-      summary: Get Jbot
-      tags:
-      - Jbot
-  /v2/jbot/list:
-    post:
-      description: Retrieve a list of Jbots based on provided filters and pagination
-      parameters:
-      - description: Get Jbots
-        in: body
-        name: Jbot
-        required: true
-        schema:
-          $ref: '#/definitions/model.JbotGetListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.JbotGetListResponse'
-      security:
-      - Bearer: []
-      summary: Get a list of Jbot
-      tags:
-      - Jbot
-  /v2/jbot/update:
-    put:
-      description: Update Jbot
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/model.JbotUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.JbotGetResponse'
-      security:
-      - Bearer: []
-      summary: Update Jbot
-      tags:
-      - Jbot
-  /v2/order/create:
-    post:
-      description: Create a new Order
-      parameters:
-      - description: Create Order
-        in: body
-        name: Order
-        required: true
-        schema:
-          $ref: '#/definitions/model.OrderAddRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.OrderGetResponse'
-      security:
-      - Bearer: []
-      summary: Create new Order
-      tags:
-      - Order
-  /v2/order/delete:
-    delete:
-      description: Delete a new Order
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Order'
-      security:
-      - Bearer: []
-      summary: Delete new Order
-      tags:
-      - Order
-  /v2/order/get:
-    get:
-      description: Return Order
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.OrderGetResponse'
-      security:
-      - Bearer: []
-      summary: Get Order
-      tags:
-      - Order
-  /v2/order/list:
-    post:
-      description: Retrieve a list of Orders based on provided filters and pagination
-      parameters:
-      - description: Get Orders
-        in: body
-        name: Order
-        required: true
-        schema:
-          $ref: '#/definitions/model.OrderGetListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.OrderGetListResponse'
-      security:
-      - Bearer: []
-      summary: Get a list of Order
-      tags:
-      - Order
-  /v2/order/update:
-    put:
-      description: Update Order
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/model.OrderUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.OrderGetResponse'
-      security:
-      - Bearer: []
-      summary: Update Order
-      tags:
-      - Order
-  /v2/otp/create:
-    post:
-      description: Create a new Otp
-      parameters:
-      - description: Create Otp
-        in: body
-        name: Otp
-        required: true
-        schema:
-          $ref: '#/definitions/model.Otp'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Otp'
-      security:
-      - Bearer: []
-      summary: Create new Otp
-      tags:
-      - Otp
-  /v2/otp/delete:
-    delete:
-      description: Delete a new Otp
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Otp'
-      security:
-      - Bearer: []
-      summary: Delete new Otp
-      tags:
-      - Otp
-  /v2/otp/get:
-    get:
-      description: Return Otp
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.OtpGetResponse'
-      security:
-      - Bearer: []
-      summary: Get Otp
-      tags:
-      - Otp
-  /v2/otp/list:
-    post:
-      description: Retrieve a list of Otps based on provided filters and pagination
-      parameters:
-      - description: Get Otps
-        in: body
-        name: Otp
-        required: true
-        schema:
-          $ref: '#/definitions/model.OtpGetListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.OtpGetListResponse'
-      security:
-      - Bearer: []
-      summary: Get a list of Otp
-      tags:
-      - Otp
-  /v2/otp/update:
-    put:
-      description: Update Otp
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/model.OtpUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.OtpGetResponse'
-      security:
-      - Bearer: []
-      summary: Update Otp
-      tags:
-      - Otp
-  /v2/signal/create:
-    post:
-      description: Create a new Signal
-      parameters:
-      - description: Create Signal
-        in: body
-        name: Signal
-        required: true
-        schema:
-          $ref: '#/definitions/model.SignalAddRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.SignalGetResponse'
-      security:
-      - Bearer: []
-      summary: Create new Signal
-      tags:
-      - Signal
-  /v2/signal/delete:
-    delete:
-      description: Delete a new Signal
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Signal'
-      security:
-      - Bearer: []
-      summary: Delete new Signal
-      tags:
-      - Signal
-  /v2/signal/get:
-    get:
-      description: Return Signal
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.SignalGetResponse'
-      security:
-      - Bearer: []
-      summary: Get Signal
-      tags:
-      - Signal
-  /v2/signal/list:
-    post:
-      description: Retrieve a list of Signals based on provided filters and pagination
-      parameters:
-      - description: Get Signals
-        in: body
-        name: Signal
-        required: true
-        schema:
-          $ref: '#/definitions/model.SignalGetListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.SignalGetListResponse'
-      security:
-      - Bearer: []
-      summary: Get a list of Signal
-      tags:
-      - Signal
-  /v2/signal/update:
-    put:
-      description: Update Signal
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/model.SignalUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.SignalGetResponse'
-      security:
-      - Bearer: []
-      summary: Update Signal
-      tags:
-      - Signal
-  /v2/subscription/create:
-    post:
-      description: Create a new Subscription
-      parameters:
-      - description: Create Subscription
-        in: body
-        name: Subscription
-        required: true
-        schema:
-          $ref: '#/definitions/model.Subscription'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Subscription'
-      security:
-      - Bearer: []
-      summary: Create new Subscription
-      tags:
-      - Subscription
-  /v2/subscription/delete:
-    delete:
-      description: Delete a new Subscription
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Subscription'
-      security:
-      - Bearer: []
-      summary: Delete new Subscription
-      tags:
-      - Subscription
-  /v2/subscription/get:
-    get:
-      description: Return Subscription
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Subscription'
-      security:
-      - Bearer: []
-      summary: Get Subscription
-      tags:
-      - Subscription
-  /v2/subscription/list:
-    post:
-      description: Retrieve a list of Subscriptions based on provided filters and
-        pagination
-      parameters:
-      - description: Get Subscriptions
-        in: body
-        name: Subscription
-        required: true
-        schema:
-          $ref: '#/definitions/model.SubscriptionGetListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/model.Subscription'
-            type: array
-      security:
-      - Bearer: []
-      summary: Get a list of Subscription
-      tags:
-      - Subscription
-  /v2/subscription/update:
-    put:
-      description: Update Subscription
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Subscription'
-      security:
-      - Bearer: []
-      summary: Update Subscription
-      tags:
-      - Subscription
 securityDefinitions:
   Bearer:
     in: header

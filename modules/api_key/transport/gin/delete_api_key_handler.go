@@ -21,7 +21,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/api-key/delete [delete]
+// @Router /v1/delete/api-key [delete]
 func DeleteApiKey(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id := c.Param("id")

@@ -23,7 +23,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v2/subscription/create [post]
+// @Router /v1/subscription/create [post]
 func CreateSubscription(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input dto.SubscriptionAddRequest
