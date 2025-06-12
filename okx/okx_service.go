@@ -8,12 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // Account represents an OKX account balance
@@ -108,11 +109,11 @@ func syncTimeWithOKX() error {
 	timeOffset = timeDiff
 	timeOffsetMutex.Unlock()
 
-	log.Printf("Time difference between local and OKX server: %v", timeDiff)
+	log.Info().Dur("time_diff", timeDiff).Msg("Time difference between local and OKX server")
 
 	// If time difference is more than 1 second, log a warning
 	if timeDiff > time.Second || timeDiff < -time.Second {
-		log.Printf("WARNING: Local time is out of sync with OKX server by more than 1 second")
+		log.Warn().Dur("time_diff", timeDiff).Msg("Local time is out of sync with OKX server by more than 1 second")
 	}
 
 	return nil
@@ -133,7 +134,7 @@ func GetInstance() *OKXService {
 		passphrase := os.Getenv("API_PASSPHRASE")
 
 		if apiKey == "" || apiSecret == "" || passphrase == "" {
-			log.Fatal("OKX API credentials not found in environment variables")
+			log.Info().Msg("OKX API credentials not found in environment variables")
 		}
 
 		okxClient = &OKXService{
@@ -146,14 +147,14 @@ func GetInstance() *OKXService {
 
 		// Initial time sync
 		if err := syncTimeWithOKX(); err != nil {
-			log.Printf("Failed to sync time with OKX: %v", err)
+			log.Error().Err(err).Msg("Failed to sync time with OKX")
 		}
 
 		// Start periodic time synchronization
 		go func() {
 			for {
 				if err := syncTimeWithOKX(); err != nil {
-					log.Printf("Failed to sync time with OKX: %v", err)
+					log.Error().Err(err).Msg("Failed to sync time with OKX")
 				}
 				time.Sleep(30 * time.Second) // Sync every 30 seconds
 			}
