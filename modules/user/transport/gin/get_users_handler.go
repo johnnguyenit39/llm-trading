@@ -26,7 +26,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/get/users [get]
+// @Router /v1/user/list [get]
 func GetUsers(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 

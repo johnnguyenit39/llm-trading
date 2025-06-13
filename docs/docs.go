@@ -690,45 +690,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/cancel/order": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Cancel an order by its ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Okx"
-                ],
-                "summary": "Cancel an existing order",
-                "parameters": [
-                    {
-                        "description": "Order cancellation parameters",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.CancelOrderRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/common.BaseApiResponse-any"
-                        }
-                    }
-                }
-            }
-        },
         "/v1/create/api-key": {
             "post": {
                 "security": [
@@ -765,117 +726,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/create/order": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new order with specified currency and USDT pair",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Okx"
-                ],
-                "summary": "Create a new order",
-                "parameters": [
-                    {
-                        "description": "Order creation parameters",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.CreateOrderRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/common.BaseApiResponse-any"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/create/subscription": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new Okx",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Okx"
-                ],
-                "summary": "Create new Okx",
-                "parameters": [
-                    {
-                        "description": "Create Okx",
-                        "name": "Okx",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/j-ai-trade_modules_okx_model_dto.SubscriptionAddRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Okx"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/create/user": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new User",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "User"
-                ],
-                "summary": "Create new User",
-                "parameters": [
-                    {
-                        "description": "Create User",
-                        "name": "User",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.UserAddRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.User"
-                        }
-                    }
-                }
-            }
-        },
         "/v1/delete/api-key/{id}": {
             "delete": {
                 "security": [
@@ -906,255 +756,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/model.ApiKey"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/delete/okx/{id}": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new Okx",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Okx"
-                ],
-                "summary": "Delete new Okx",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Okx ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Okx"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/delete/user/{id}": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new User",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "User"
-                ],
-                "summary": "Delete new User",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.User"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/get/mocks": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of Subscriptions based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Okx"
-                ],
-                "summary": "Get a list of Okx",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page_number",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Page size",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/model.Okx"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/get/okx-info": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Okx",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Okx"
-                ],
-                "summary": "Get Okx",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Okx"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/get/okx/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Okx",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Okx"
-                ],
-                "summary": "Get Okx",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Okx ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Okx"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/get/user/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return User",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "User"
-                ],
-                "summary": "Get User",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.User"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/get/users": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of Users based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "User"
-                ],
-                "summary": "Get a list of User",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page_number",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Page size",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/model.User"
-                            }
                         }
                     }
                 }
@@ -1341,6 +942,109 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/model.JbotGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/okx/account/get": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve OKX account balance and details including available funds and positions",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okx"
+                ],
+                "summary": "Get OKX account information",
+                "responses": {
+                    "200": {
+                        "description": "OKX account information",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-model_OkxInfoResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/okx/order/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Cancel an existing order on OKX exchange by order ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okx"
+                ],
+                "summary": "Cancel an OKX order",
+                "parameters": [
+                    {
+                        "description": "OKX order cancellation parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CancelOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OKX order cancellation response",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-string"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/okx/order/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new order on OKX exchange with specified parameters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okx"
+                ],
+                "summary": "Create a new OKX order",
+                "parameters": [
+                    {
+                        "description": "OKX order creation parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CreateOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OKX order creation response",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-string"
                         }
                     }
                 }
@@ -1713,6 +1417,49 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/model.OtpGetResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/password/user/update/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update User Password",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Update User Password",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "User",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.UserUpdatePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.User"
                         }
                     }
                 }
@@ -2322,79 +2069,29 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/update/okx/{id}": {
-            "put": {
+        "/v1/user/create": {
+            "post": {
                 "security": [
                     {
                         "Bearer": []
                     }
                 ],
-                "description": "Update Okx",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Okx"
-                ],
-                "summary": "Update Okx",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Okx ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update Okx",
-                        "name": "Okx",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/j-ai-trade_modules_okx_model_dto.SubscriptionUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Okx"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/update/password/user/{id}": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update User Password",
+                "description": "Create a new User",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "User"
                 ],
-                "summary": "Update User Password",
+                "summary": "Create new User",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
+                        "description": "Create User",
                         "name": "User",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/model.UserUpdatePasswordRequest"
+                            "$ref": "#/definitions/model.UserAddRequest"
                         }
                     }
                 ],
@@ -2408,7 +2105,119 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/update/user/{id}": {
+        "/v1/user/dekete/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new User",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Delete new User",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.User"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/user/get/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return User",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get User",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.User"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/user/list": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Users based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Get a list of User",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page_number",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.User"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/user/update/{id}": {
             "put": {
                 "security": [
                     {
@@ -2473,6 +2282,40 @@ const docTemplate = `{
             "properties": {
                 "data": {
                     "type": "boolean"
+                },
+                "http_request_status": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "common.BaseApiResponse-model_OkxInfoResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/model.OkxInfoResponse"
+                },
+                "http_request_status": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "common.BaseApiResponse-string": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "string"
                 },
                 "http_request_status": {
                     "type": "integer"
@@ -2635,14 +2478,145 @@ const docTemplate = `{
                 }
             }
         },
-        "j-ai-trade_modules_okx_model_dto.SubscriptionAddRequest": {
-            "type": "object"
-        },
-        "j-ai-trade_modules_okx_model_dto.SubscriptionUpdateRequest": {
-            "type": "object"
-        },
         "j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest": {
             "type": "object"
+        },
+        "model.AccountDetail": {
+            "type": "object",
+            "properties": {
+                "accAvgPx": {
+                    "type": "string"
+                },
+                "availBal": {
+                    "type": "string"
+                },
+                "availEq": {
+                    "type": "string"
+                },
+                "borrowFroz": {
+                    "type": "string"
+                },
+                "cashBal": {
+                    "type": "string"
+                },
+                "ccy": {
+                    "type": "string"
+                },
+                "clSpotInUseAmt": {
+                    "type": "string"
+                },
+                "colBorrAutoConversion": {
+                    "type": "string"
+                },
+                "collateralEnabled": {
+                    "type": "boolean"
+                },
+                "collateralRestrict": {
+                    "type": "boolean"
+                },
+                "crossLiab": {
+                    "type": "string"
+                },
+                "disEq": {
+                    "type": "string"
+                },
+                "eq": {
+                    "type": "string"
+                },
+                "eqUsd": {
+                    "type": "string"
+                },
+                "fixedBal": {
+                    "type": "string"
+                },
+                "frozenBal": {
+                    "type": "string"
+                },
+                "imr": {
+                    "type": "string"
+                },
+                "interest": {
+                    "type": "string"
+                },
+                "isoEq": {
+                    "type": "string"
+                },
+                "isoLiab": {
+                    "type": "string"
+                },
+                "isoUpl": {
+                    "type": "string"
+                },
+                "liab": {
+                    "type": "string"
+                },
+                "maxLoan": {
+                    "type": "string"
+                },
+                "maxSpotInUse": {
+                    "type": "string"
+                },
+                "mgnRatio": {
+                    "type": "string"
+                },
+                "mmr": {
+                    "type": "string"
+                },
+                "notionalLever": {
+                    "type": "string"
+                },
+                "openAvgPx": {
+                    "type": "string"
+                },
+                "ordFrozen": {
+                    "type": "string"
+                },
+                "rewardBal": {
+                    "type": "string"
+                },
+                "smtSyncEq": {
+                    "type": "string"
+                },
+                "spotBal": {
+                    "type": "string"
+                },
+                "spotCopyTradingEq": {
+                    "type": "string"
+                },
+                "spotInUseAmt": {
+                    "type": "string"
+                },
+                "spotIsoBal": {
+                    "type": "string"
+                },
+                "spotUpl": {
+                    "type": "string"
+                },
+                "spotUplRatio": {
+                    "type": "string"
+                },
+                "stgyEq": {
+                    "type": "string"
+                },
+                "totalPnl": {
+                    "type": "string"
+                },
+                "totalPnlRatio": {
+                    "type": "string"
+                },
+                "twap": {
+                    "type": "string"
+                },
+                "uTime": {
+                    "type": "string"
+                },
+                "upl": {
+                    "type": "string"
+                },
+                "uplLiab": {
+                    "type": "string"
+                }
+            }
         },
         "model.AiExpert": {
             "type": "object",
@@ -2848,13 +2822,75 @@ const docTemplate = `{
         "model.JbotUpdateRequest": {
             "type": "object"
         },
-        "model.Okx": {
+        "model.OkxInfoResponse": {
             "type": "object",
             "properties": {
-                "ID": {
+                "code": {
                     "type": "string"
                 },
-                "createdAt": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "adjEq": {
+                                "type": "string"
+                            },
+                            "availEq": {
+                                "type": "string"
+                            },
+                            "borrowFroz": {
+                                "type": "string"
+                            },
+                            "details": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/model.AccountDetail"
+                                }
+                            },
+                            "imr": {
+                                "type": "string"
+                            },
+                            "isoEq": {
+                                "type": "string"
+                            },
+                            "mgnRatio": {
+                                "type": "string"
+                            },
+                            "mmr": {
+                                "type": "string"
+                            },
+                            "notionalUsd": {
+                                "type": "string"
+                            },
+                            "notionalUsdForBorrow": {
+                                "type": "string"
+                            },
+                            "notionalUsdForFutures": {
+                                "type": "string"
+                            },
+                            "notionalUsdForOption": {
+                                "type": "string"
+                            },
+                            "notionalUsdForSwap": {
+                                "type": "string"
+                            },
+                            "ordFroz": {
+                                "type": "string"
+                            },
+                            "totalEq": {
+                                "type": "string"
+                            },
+                            "uTime": {
+                                "type": "string"
+                            },
+                            "upl": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "msg": {
                     "type": "string"
                 }
             }

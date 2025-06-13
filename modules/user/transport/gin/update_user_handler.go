@@ -26,7 +26,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/update/user/{id} [put]
+// @Router /v1/user/update/{id} [put]
 func UpdateUser(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 

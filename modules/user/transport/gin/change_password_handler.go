@@ -26,7 +26,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/update/password/user/{id} [put]
+// @Router /v1/password/user/update/{id} [put]
 func UpdateUserPassword(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("UpdateUserPassword", c.GetString(middlewares.RequestIDKey))

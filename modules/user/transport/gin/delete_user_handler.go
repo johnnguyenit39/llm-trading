@@ -23,7 +23,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/delete/user/{id} [delete]
+// @Router /v1/user/dekete/{id} [delete]
 func DeleteUser(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("DeleteUser", c.GetString(middlewares.RequestIDKey))

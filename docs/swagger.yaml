@@ -21,6 +21,28 @@ definitions:
       success:
         type: boolean
     type: object
+  common.BaseApiResponse-model_OkxInfoResponse:
+    properties:
+      data:
+        $ref: '#/definitions/model.OkxInfoResponse'
+      http_request_status:
+        type: integer
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  common.BaseApiResponse-string:
+    properties:
+      data:
+        type: string
+      http_request_status:
+        type: integer
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
   common.Pagination:
     properties:
       count:
@@ -122,11 +144,98 @@ definitions:
     - code
     - email
     type: object
-  j-ai-trade_modules_okx_model_dto.SubscriptionAddRequest:
-    type: object
-  j-ai-trade_modules_okx_model_dto.SubscriptionUpdateRequest:
-    type: object
   j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest:
+    type: object
+  model.AccountDetail:
+    properties:
+      accAvgPx:
+        type: string
+      availBal:
+        type: string
+      availEq:
+        type: string
+      borrowFroz:
+        type: string
+      cashBal:
+        type: string
+      ccy:
+        type: string
+      clSpotInUseAmt:
+        type: string
+      colBorrAutoConversion:
+        type: string
+      collateralEnabled:
+        type: boolean
+      collateralRestrict:
+        type: boolean
+      crossLiab:
+        type: string
+      disEq:
+        type: string
+      eq:
+        type: string
+      eqUsd:
+        type: string
+      fixedBal:
+        type: string
+      frozenBal:
+        type: string
+      imr:
+        type: string
+      interest:
+        type: string
+      isoEq:
+        type: string
+      isoLiab:
+        type: string
+      isoUpl:
+        type: string
+      liab:
+        type: string
+      maxLoan:
+        type: string
+      maxSpotInUse:
+        type: string
+      mgnRatio:
+        type: string
+      mmr:
+        type: string
+      notionalLever:
+        type: string
+      openAvgPx:
+        type: string
+      ordFrozen:
+        type: string
+      rewardBal:
+        type: string
+      smtSyncEq:
+        type: string
+      spotBal:
+        type: string
+      spotCopyTradingEq:
+        type: string
+      spotInUseAmt:
+        type: string
+      spotIsoBal:
+        type: string
+      spotUpl:
+        type: string
+      spotUplRatio:
+        type: string
+      stgyEq:
+        type: string
+      totalPnl:
+        type: string
+      totalPnlRatio:
+        type: string
+      twap:
+        type: string
+      uTime:
+        type: string
+      upl:
+        type: string
+      uplLiab:
+        type: string
     type: object
   model.AiExpert:
     properties:
@@ -268,11 +377,52 @@ definitions:
     type: object
   model.JbotUpdateRequest:
     type: object
-  model.Okx:
+  model.OkxInfoResponse:
     properties:
-      ID:
+      code:
         type: string
-      createdAt:
+      data:
+        items:
+          properties:
+            adjEq:
+              type: string
+            availEq:
+              type: string
+            borrowFroz:
+              type: string
+            details:
+              items:
+                $ref: '#/definitions/model.AccountDetail'
+              type: array
+            imr:
+              type: string
+            isoEq:
+              type: string
+            mgnRatio:
+              type: string
+            mmr:
+              type: string
+            notionalUsd:
+              type: string
+            notionalUsdForBorrow:
+              type: string
+            notionalUsdForFutures:
+              type: string
+            notionalUsdForOption:
+              type: string
+            notionalUsdForSwap:
+              type: string
+            ordFroz:
+              type: string
+            totalEq:
+              type: string
+            uTime:
+              type: string
+            upl:
+              type: string
+          type: object
+        type: array
+      msg:
         type: string
     type: object
   model.Order:
@@ -902,30 +1052,6 @@ paths:
       summary: Verify reset password code
       tags:
       - Authentication
-  /v1/cancel/order:
-    post:
-      consumes:
-      - application/json
-      description: Cancel an order by its ID
-      parameters:
-      - description: Order cancellation parameters
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/model.CancelOrderRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/common.BaseApiResponse-any'
-      security:
-      - Bearer: []
-      summary: Cancel an existing order
-      tags:
-      - Okx
   /v1/create/api-key:
     post:
       description: Create a new ApiKey
@@ -948,74 +1074,6 @@ paths:
       summary: Create new ApiKey
       tags:
       - ApiKey
-  /v1/create/order:
-    post:
-      consumes:
-      - application/json
-      description: Create a new order with specified currency and USDT pair
-      parameters:
-      - description: Order creation parameters
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/model.CreateOrderRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/common.BaseApiResponse-any'
-      security:
-      - Bearer: []
-      summary: Create a new order
-      tags:
-      - Okx
-  /v1/create/subscription:
-    post:
-      description: Create a new Okx
-      parameters:
-      - description: Create Okx
-        in: body
-        name: Okx
-        required: true
-        schema:
-          $ref: '#/definitions/j-ai-trade_modules_okx_model_dto.SubscriptionAddRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Okx'
-      security:
-      - Bearer: []
-      summary: Create new Okx
-      tags:
-      - Okx
-  /v1/create/user:
-    post:
-      description: Create a new User
-      parameters:
-      - description: Create User
-        in: body
-        name: User
-        required: true
-        schema:
-          $ref: '#/definitions/model.UserAddRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.User'
-      security:
-      - Bearer: []
-      summary: Create new User
-      tags:
-      - User
   /v1/delete/api-key/{id}:
     delete:
       description: Delete a new ApiKey
@@ -1038,162 +1096,6 @@ paths:
       summary: Delete new ApiKey
       tags:
       - ApiKey
-  /v1/delete/okx/{id}:
-    delete:
-      description: Delete a new Okx
-      parameters:
-      - description: Okx ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Okx'
-      security:
-      - Bearer: []
-      summary: Delete new Okx
-      tags:
-      - Okx
-  /v1/delete/user/{id}:
-    delete:
-      description: Delete a new User
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.User'
-      security:
-      - Bearer: []
-      summary: Delete new User
-      tags:
-      - User
-  /v1/get/mocks:
-    get:
-      description: Retrieve a list of Subscriptions based on provided filters and
-        pagination
-      parameters:
-      - default: 1
-        description: Page number
-        in: query
-        name: page_number
-        type: integer
-      - default: 10
-        description: Page size
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/model.Okx'
-            type: array
-      security:
-      - Bearer: []
-      summary: Get a list of Okx
-      tags:
-      - Okx
-  /v1/get/okx-info:
-    get:
-      description: Return Okx
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Okx'
-      security:
-      - Bearer: []
-      summary: Get Okx
-      tags:
-      - Okx
-  /v1/get/okx/{id}:
-    get:
-      description: Return Okx
-      parameters:
-      - description: Okx ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Okx'
-      security:
-      - Bearer: []
-      summary: Get Okx
-      tags:
-      - Okx
-  /v1/get/user/{id}:
-    get:
-      description: Return User
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.User'
-      security:
-      - Bearer: []
-      summary: Get User
-      tags:
-      - User
-  /v1/get/users:
-    get:
-      description: Retrieve a list of Users based on provided filters and pagination
-      parameters:
-      - default: 1
-        description: Page number
-        in: query
-        name: page_number
-        type: integer
-      - default: 10
-        description: Page size
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/model.User'
-            type: array
-      security:
-      - Bearer: []
-      summary: Get a list of User
-      tags:
-      - User
   /v1/jbot/create:
     post:
       description: Create a new Jbot
@@ -1310,6 +1212,70 @@ paths:
       summary: Update Jbot
       tags:
       - Jbot
+  /v1/okx/account/get:
+    get:
+      description: Retrieve OKX account balance and details including available funds
+        and positions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OKX account information
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-model_OkxInfoResponse'
+      security:
+      - Bearer: []
+      summary: Get OKX account information
+      tags:
+      - Okx
+  /v1/okx/order/cancel:
+    post:
+      consumes:
+      - application/json
+      description: Cancel an existing order on OKX exchange by order ID
+      parameters:
+      - description: OKX order cancellation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CancelOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OKX order cancellation response
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-string'
+      security:
+      - Bearer: []
+      summary: Cancel an OKX order
+      tags:
+      - Okx
+  /v1/okx/order/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a new order on OKX exchange with specified parameters
+      parameters:
+      - description: OKX order creation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OKX order creation response
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-string'
+      security:
+      - Bearer: []
+      summary: Create a new OKX order
+      tags:
+      - Okx
   /v1/order/create:
     post:
       description: Create a new Order
@@ -1542,6 +1508,33 @@ paths:
       summary: Update Otp
       tags:
       - Otp
+  /v1/password/user/update/{id}:
+    put:
+      description: Update User Password
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: User
+        required: true
+        schema:
+          $ref: '#/definitions/model.UserUpdatePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+      security:
+      - Bearer: []
+      summary: Update User Password
+      tags:
+      - User
   /v1/permission/create:
     post:
       description: Create a new Permission
@@ -1921,48 +1914,16 @@ paths:
       summary: Send a message to Telegram channel
       tags:
       - Telegram
-  /v1/update/okx/{id}:
-    put:
-      description: Update Okx
+  /v1/user/create:
+    post:
+      description: Create a new User
       parameters:
-      - description: Okx ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update Okx
-        in: body
-        name: Okx
-        required: true
-        schema:
-          $ref: '#/definitions/j-ai-trade_modules_okx_model_dto.SubscriptionUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Okx'
-      security:
-      - Bearer: []
-      summary: Update Okx
-      tags:
-      - Okx
-  /v1/update/password/user/{id}:
-    put:
-      description: Update User Password
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
+      - description: Create User
         in: body
         name: User
         required: true
         schema:
-          $ref: '#/definitions/model.UserUpdatePasswordRequest'
+          $ref: '#/definitions/model.UserAddRequest'
       produces:
       - application/json
       responses:
@@ -1972,10 +1933,80 @@ paths:
             $ref: '#/definitions/model.User'
       security:
       - Bearer: []
-      summary: Update User Password
+      summary: Create new User
       tags:
       - User
-  /v1/update/user/{id}:
+  /v1/user/dekete/{id}:
+    delete:
+      description: Delete a new User
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+      security:
+      - Bearer: []
+      summary: Delete new User
+      tags:
+      - User
+  /v1/user/get/{id}:
+    get:
+      description: Return User
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+      security:
+      - Bearer: []
+      summary: Get User
+      tags:
+      - User
+  /v1/user/list:
+    get:
+      description: Retrieve a list of Users based on provided filters and pagination
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page_number
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.User'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of User
+      tags:
+      - User
+  /v1/user/update/{id}:
     put:
       description: Update User
       parameters:
