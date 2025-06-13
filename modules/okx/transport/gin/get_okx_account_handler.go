@@ -1,4 +1,4 @@
-package ginNovel
+package ginOkx
 
 import (
 	"j-ai-trade/brokers/okx"

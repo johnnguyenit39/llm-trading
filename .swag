@@ -1,0 +1,5 @@
+{
+    "dir": ".",
+    "mainFile": "main.go",
+    "output": "docs"
+} 

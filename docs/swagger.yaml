@@ -1,4 +1,4 @@
-basePath: /api/v1
+basePath: /api
 definitions:
   common.BaseApiResponse-any:
     properties:
