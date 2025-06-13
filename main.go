@@ -8,6 +8,7 @@ import (
 	storage "j-ai-trade/config/postgres"
 	"j-ai-trade/config/pubsub"
 	"j-ai-trade/config/redis"
+	cronjobsManager "j-ai-trade/cron_jobs"
 	_ "j-ai-trade/docs"
 	"j-ai-trade/logger"
 	"os"
@@ -73,9 +74,8 @@ func main() {
 	appConfig.InitializeApp(appContext)
 
 	// Initialize and start cron jobs
-	// cronJob := cronjobs.NewCronJob()
-	// cronJob.Start()
-	// defer cronJob.Stop() // Ensure cron job is stopped when the application exits
+	cronjobsManager.InitCronJobs()
+	defer cronjobsManager.StopCronJobs()
 
 	// Start the application on port 8080
 	if err := app.Run(":8080"); err != nil {
