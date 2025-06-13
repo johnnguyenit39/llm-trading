@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,9 +32,9 @@ type okxRepositoryImpl struct {
 
 func NewOKXRepository() OKXRepository {
 	return &okxRepositoryImpl{
-		apiKey:     os.Getenv("API_KEY"),
-		apiSecret:  os.Getenv("API_SECRET_KEY"),
-		passphrase: os.Getenv("API_PASSPHRASE"),
+		apiKey:     os.Getenv("OKX_API_KEY"),
+		apiSecret:  os.Getenv("OKX_API_SECRET_KEY"),
+		passphrase: os.Getenv("OKX_API_PASSPHRASE"),
 		client:     &http.Client{Timeout: 10 * time.Second},
 		baseURL:    "https://www.okx.com",
 	}
@@ -44,7 +45,7 @@ func (r *okxRepositoryImpl) GetAccount(currency string) (map[string]types.Accoun
 		return nil, nil, err
 	}
 
-	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.000Z")
+	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.999Z")
 	url := "https://www.okx.com/api/v5/account/balance"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -55,6 +56,7 @@ func (r *okxRepositoryImpl) GetAccount(currency string) (map[string]types.Accoun
 	req.Header.Set("OK-ACCESS-SIGN", r.GenerateSign(timestamp, "GET", "/api/v5/account/balance", ""))
 	req.Header.Set("OK-ACCESS-TIMESTAMP", timestamp)
 	req.Header.Set("OK-ACCESS-PASSPHRASE", r.passphrase)
+	req.Header.Set("x-simulated-trading", "1")
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := r.client.Do(req)
@@ -114,7 +116,7 @@ func (r *okxRepositoryImpl) CreateSpotOrder(pair types.CurrencyPair, amount, pri
 		return nil, err
 	}
 
-	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.000Z")
+	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.999Z")
 	orderData := map[string]interface{}{
 		"instId":  pair.Symbol,
 		"tdMode":  "cash",
@@ -174,7 +176,7 @@ func (r *okxRepositoryImpl) CancelSpotOrder(orderID string, instId string) ([]by
 		return nil, err
 	}
 
-	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.000Z")
+	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.999Z")
 	orderData := map[string]string{
 		"ordId":  orderID,
 		"instId": instId,
@@ -195,6 +197,7 @@ func (r *okxRepositoryImpl) CancelSpotOrder(orderID string, instId string) ([]by
 	req.Header.Set("OK-ACCESS-SIGN", r.GenerateSign(timestamp, "POST", "/api/v5/trade/cancel-order", string(body)))
 	req.Header.Set("OK-ACCESS-TIMESTAMP", timestamp)
 	req.Header.Set("OK-ACCESS-PASSPHRASE", r.passphrase)
+	req.Header.Set("x-simulated-trading", "1")
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := r.client.Do(req)
@@ -224,21 +227,25 @@ func (r *okxRepositoryImpl) CancelSpotOrder(orderID string, instId string) ([]by
 	return rawResponse, nil
 }
 
-func (r *okxRepositoryImpl) CreateFuturesOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType, leverage float64, posSide string) ([]byte, error) {
+func (r *okxRepositoryImpl) CreateFuturesOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType, leverage float64, posSide string, tpTriggerPx, tpOrdPx, slTriggerPx, slOrdPx float64) ([]byte, error) {
 	if err := r.SyncTimeWithOKX(); err != nil {
 		return nil, err
 	}
 
-	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.000Z")
+	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.999Z")
 	orderData := map[string]interface{}{
-		"instId":  pair.Symbol,
-		"tdMode":  "cross",
-		"side":    string(side),
-		"ordType": string(orderType),
-		"sz":      fmt.Sprintf("%f", amount),
-		"px":      fmt.Sprintf("%f", price),
-		"lever":   fmt.Sprintf("%f", leverage),
-		"posSide": posSide,
+		"instId":      fmt.Sprintf("%s-USDT-SWAP", pair.BaseSymbol),
+		"tdMode":      "cross",
+		"side":        string(side),
+		"ordType":     string(orderType),
+		"sz":          fmt.Sprintf("%f", amount),
+		"px":          fmt.Sprintf("%f", price),
+		"lever":       fmt.Sprintf("%f", leverage),
+		"posSide":     strings.ToLower(posSide),
+		"tpTriggerPx": fmt.Sprintf("%f", tpTriggerPx),
+		"tpOrdPx":     fmt.Sprintf("%f", tpOrdPx),
+		"slTriggerPx": fmt.Sprintf("%f", slTriggerPx),
+		"slOrdPx":     fmt.Sprintf("%f", slOrdPx),
 	}
 
 	body, err := json.Marshal(orderData)
@@ -256,6 +263,7 @@ func (r *okxRepositoryImpl) CreateFuturesOrder(pair types.CurrencyPair, amount, 
 	req.Header.Set("OK-ACCESS-SIGN", r.GenerateSign(timestamp, "POST", "/api/v5/trade/order", string(body)))
 	req.Header.Set("OK-ACCESS-TIMESTAMP", timestamp)
 	req.Header.Set("OK-ACCESS-PASSPHRASE", r.passphrase)
+	req.Header.Set("x-simulated-trading", "1")
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := r.client.Do(req)
@@ -290,7 +298,7 @@ func (r *okxRepositoryImpl) CancelFuturesOrder(orderID string, instId string) ([
 		return nil, err
 	}
 
-	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.000Z")
+	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.999Z")
 	orderData := map[string]string{
 		"ordId":  orderID,
 		"instId": instId,
@@ -311,6 +319,7 @@ func (r *okxRepositoryImpl) CancelFuturesOrder(orderID string, instId string) ([
 	req.Header.Set("OK-ACCESS-SIGN", r.GenerateSign(timestamp, "POST", "/api/v5/trade/cancel-order", string(body)))
 	req.Header.Set("OK-ACCESS-TIMESTAMP", timestamp)
 	req.Header.Set("OK-ACCESS-PASSPHRASE", r.passphrase)
+	req.Header.Set("x-simulated-trading", "1")
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := r.client.Do(req)

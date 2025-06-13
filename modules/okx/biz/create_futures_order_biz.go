@@ -29,6 +29,10 @@ func (biz *CreateFuturesOrderBiz) CreateFuturesOrder(ctx context.Context, req *d
 		side = okxTypes.Buy
 	case "sell":
 		side = okxTypes.Sell
+	case "long":
+		side = okxTypes.Long
+	case "short":
+		side = okxTypes.Short
 	default:
 		return nil, fmt.Errorf("invalid side: %s", req.Side)
 	}
@@ -44,8 +48,8 @@ func (biz *CreateFuturesOrderBiz) CreateFuturesOrder(ctx context.Context, req *d
 		return nil, fmt.Errorf("invalid order type: %s", req.Type)
 	}
 
-	// Create the futures order
-	response, err := biz.okxService.CreateFuturesOrder(pair, req.Amount, req.Price, side, orderType, req.Leverage, req.PosSide)
+	// Create the futures order with TP/SL values
+	response, err := biz.okxService.CreateFuturesOrder(pair, req.Amount, req.Price, side, orderType, req.Leverage, req.PosSide, req.TpTriggerPx, req.TpOrdPx, req.SlTriggerPx, req.SlOrdPx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create futures order: %v", err)
 	}

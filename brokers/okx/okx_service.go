@@ -50,8 +50,8 @@ func (s *OKXService) NewCurrencyPair(base, quote string) types.CurrencyPair {
 }
 
 // CreateFuturesOrder creates a new futures order
-func (s *OKXService) CreateFuturesOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType, leverage float64, posSide string) ([]byte, error) {
-	return s.repo.CreateFuturesOrder(pair, amount, price, side, orderType, leverage, posSide)
+func (s *OKXService) CreateFuturesOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType, leverage float64, posSide string, tpTriggerPx, tpOrdPx, slTriggerPx, slOrdPx float64) ([]byte, error) {
+	return s.repo.CreateFuturesOrder(pair, amount, price, side, orderType, leverage, posSide, tpTriggerPx, tpOrdPx, slTriggerPx, slOrdPx)
 }
 
 // CancelFuturesOrder cancels an existing futures order

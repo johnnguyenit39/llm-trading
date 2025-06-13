@@ -12,8 +12,10 @@ type Account struct {
 type OrderSide string
 
 const (
-	Buy  OrderSide = "buy"
-	Sell OrderSide = "sell"
+	Buy   OrderSide = "buy"
+	Sell  OrderSide = "sell"
+	Long  OrderSide = "long"
+	Short OrderSide = "short"
 )
 
 // OrderType represents the type of an order
