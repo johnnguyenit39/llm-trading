@@ -45,7 +45,7 @@ func CreateOkxOrder(db *gorm.DB) func(*gin.Context) {
 		okxService := okx.GetInstance()
 		business := biz.NewCreateOrderBiz(okxService)
 
-		response, err := business.CreateOrder(c.Request.Context(), &req)
+		response, err := business.CreateSpotOrder(c.Request.Context(), &req)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusInternalServerError,

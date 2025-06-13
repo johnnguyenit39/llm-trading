@@ -45,7 +45,7 @@ func CancelOkxOrder(db *gorm.DB) func(*gin.Context) {
 		okxService := okx.GetInstance()
 		business := biz.NewCancelOrderBiz(okxService)
 
-		response, err := business.CancelOrder(c.Request.Context(), &req)
+		response, err := business.CancelSpotOrder(c.Request.Context(), &req)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusInternalServerError,

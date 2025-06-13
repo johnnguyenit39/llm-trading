@@ -16,12 +16,12 @@ func NewCancelOrderBiz(okxService *okx.OKXService) *CancelOrderBiz {
 	}
 }
 
-func (biz *CancelOrderBiz) CancelOrder(ctx context.Context, req *dto.CancelOrderRequest) ([]byte, error) {
+func (biz *CancelOrderBiz) CancelSpotOrder(ctx context.Context, req *dto.CancelOrderRequest) ([]byte, error) {
 	// Create currency pair (always with USDT)
 	pair := biz.okxService.NewCurrencyPair(req.Currency, "USDT")
 
 	// Cancel the order
-	response, err := biz.okxService.CancelOrder(req.OrderID, pair.Symbol)
+	response, err := biz.okxService.CancelSpotOrder(req.OrderID, pair.Symbol)
 	if err != nil {
 		return nil, err
 	}

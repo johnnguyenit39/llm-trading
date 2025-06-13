@@ -31,9 +31,13 @@ func (s *OKXService) GetAccount(currency string) (map[string]types.Account, []by
 	return s.repo.GetAccount(currency)
 }
 
-// CreateOrder creates a new order
-func (s *OKXService) CreateOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType) ([]byte, error) {
-	return s.repo.CreateOrder(pair, amount, price, side, orderType)
+// CreateSpotOrder creates a new order
+func (s *OKXService) CreateSpotOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType) ([]byte, error) {
+	return s.repo.CreateSpotOrder(pair, amount, price, side, orderType)
+}
+
+func (s *OKXService) CancelSpotOrder(orderID string, instId string) ([]byte, error) {
+	return s.repo.CancelSpotOrder(orderID, instId)
 }
 
 // NewCurrencyPair creates a new currency pair
@@ -43,8 +47,4 @@ func (s *OKXService) NewCurrencyPair(base, quote string) types.CurrencyPair {
 		QuoteSymbol: quote,
 		Symbol:      base + "-" + quote,
 	}
-}
-
-func (s *OKXService) CancelOrder(orderID string, instId string) ([]byte, error) {
-	return s.repo.CancelOrder(orderID, instId)
 }

@@ -8,7 +8,7 @@ import (
 	dto "j-ai-trade/modules/okx/model/dto"
 )
 
-func (postgresStore *postgresStore) CreateOrder(ctx context.Context, req *dto.CreateOrderRequest) ([]byte, error) {
+func (postgresStore *postgresStore) CreateSpotOrder(ctx context.Context, req *dto.CreateOrderRequest) ([]byte, error) {
 	// Get the OKX service instance
 	okxService := okx.GetInstance()
 
@@ -38,7 +38,7 @@ func (postgresStore *postgresStore) CreateOrder(ctx context.Context, req *dto.Cr
 	}
 
 	// Create the order
-	response, err := okxService.CreateOrder(pair, req.Amount, req.Price, side, orderType)
+	response, err := okxService.CreateSpotOrder(pair, req.Amount, req.Price, side, orderType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create order: %v", err)
 	}

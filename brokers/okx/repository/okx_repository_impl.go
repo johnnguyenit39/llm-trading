@@ -109,7 +109,7 @@ func (r *okxRepositoryImpl) GetAccount(currency string) (map[string]types.Accoun
 	return accounts, rawResponse, nil
 }
 
-func (r *okxRepositoryImpl) CreateOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType) ([]byte, error) {
+func (r *okxRepositoryImpl) CreateSpotOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType) ([]byte, error) {
 	if err := r.SyncTimeWithOKX(); err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (r *okxRepositoryImpl) CreateOrder(pair types.CurrencyPair, amount, price f
 	return rawResponse, nil
 }
 
-func (r *okxRepositoryImpl) CancelOrder(orderID string, instId string) ([]byte, error) {
+func (r *okxRepositoryImpl) CancelSpotOrder(orderID string, instId string) ([]byte, error) {
 	if err := r.SyncTimeWithOKX(); err != nil {
 		return nil, err
 	}

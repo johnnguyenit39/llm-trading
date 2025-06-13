@@ -18,7 +18,7 @@ func NewCreateOrderBiz(okxService *okx.OKXService) *CreateOrderBiz {
 	}
 }
 
-func (biz *CreateOrderBiz) CreateOrder(ctx context.Context, req *dto.CreateOrderRequest) ([]byte, error) {
+func (biz *CreateOrderBiz) CreateSpotOrder(ctx context.Context, req *dto.CreateOrderRequest) ([]byte, error) {
 	// Create currency pair (always with USDT)
 	pair := biz.okxService.NewCurrencyPair(req.Currency, "USDT")
 
@@ -45,7 +45,7 @@ func (biz *CreateOrderBiz) CreateOrder(ctx context.Context, req *dto.CreateOrder
 	}
 
 	// Create the order
-	response, err := biz.okxService.CreateOrder(pair, req.Amount, req.Price, side, orderType)
+	response, err := biz.okxService.CreateSpotOrder(pair, req.Amount, req.Price, side, orderType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create order: %v", err)
 	}
