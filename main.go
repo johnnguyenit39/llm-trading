@@ -2,6 +2,7 @@ package main
 
 import (
 	"j-ai-trade/appi18n"
+	"j-ai-trade/brokers/okx"
 	appContext "j-ai-trade/components/app_context"
 	appConfig "j-ai-trade/config/app"
 	storage "j-ai-trade/config/postgres"
@@ -9,7 +10,6 @@ import (
 	"j-ai-trade/config/redis"
 	_ "j-ai-trade/docs"
 	"j-ai-trade/logger"
-	"j-ai-trade/okx"
 	"os"
 
 	"github.com/rs/zerolog/log"

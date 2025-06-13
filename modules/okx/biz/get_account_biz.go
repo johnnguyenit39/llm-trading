@@ -1,4 +1,4 @@
-package storage
+package biz
 
 import (
 	"context"
@@ -8,12 +8,19 @@ import (
 	dto "j-ai-trade/modules/okx/model/dto"
 )
 
-func (postgresStore *postgresStore) GetOkxInfo(ctx context.Context, cond map[string]interface{}) (*dto.OkxInfoResponse, error) {
-	// Get the OKX service instance
-	okxService := okx.GetInstance()
+type GetAccountBiz struct {
+	okxService *okx.OKXService
+}
 
+func NewGetAccountBiz(okxService *okx.OKXService) *GetAccountBiz {
+	return &GetAccountBiz{
+		okxService: okxService,
+	}
+}
+
+func (biz *GetAccountBiz) GetAccount(ctx context.Context) (*dto.OkxInfoResponse, error) {
 	// Get account information
-	_, rawResponse, err := okxService.GetAccount("USDT")
+	_, rawResponse, err := biz.okxService.GetAccount("USDT")
 	if err != nil {
 		return nil, err
 	}

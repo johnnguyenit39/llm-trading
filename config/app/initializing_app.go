@@ -111,8 +111,6 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.GET("/get/subscription/list", ginSubscription.GetSubscriptions(appContext.GetMainDBConnection()))
 			protected.PUT("/update/subscription/:id", ginSubscription.UpdateSubscription(appContext.GetMainDBConnection()))
 			protected.DELETE("/delete/subscription/:id", ginSubscription.DeleteSubscription(appContext.GetMainDBConnection()))
-			protected.PUT("/update/password/subscription/:id", ginSubscription.UpdateSubscription(appContext.GetMainDBConnection()))
-
 		}
 	}
 
@@ -124,8 +122,6 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.GET("/get/api-key/list", ginApiKey.GetApiKeys(appContext.GetMainDBConnection()))
 			protected.PUT("/update/api-key/:id", ginApiKey.UpdateApiKey(appContext.GetMainDBConnection()))
 			protected.DELETE("/delete/api-key/:id", ginApiKey.DeleteApiKey(appContext.GetMainDBConnection()))
-			protected.PUT("/update/password/api-key/:id", ginApiKey.UpdateApiKey(appContext.GetMainDBConnection()))
-
 		}
 	}
 
@@ -137,8 +133,6 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.GET("/get/permission/list", ginPermission.GetPermissions(appContext.GetMainDBConnection()))
 			protected.PUT("/update/permission/:id", ginPermission.UpdatePermission(appContext.GetMainDBConnection()))
 			protected.DELETE("/delete/permission/:id", ginPermission.DeletePermission(appContext.GetMainDBConnection()))
-			protected.PUT("/update/password/permission/:id", ginPermission.UpdatePermission(appContext.GetMainDBConnection()))
-
 		}
 	}
 
@@ -150,7 +144,6 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.GET("/get/ai-expert/list", ginAiExpert.GetAiExperts(appContext.GetMainDBConnection()))
 			protected.PUT("/update/ai-expert/:id", ginAiExpert.UpdateAiExpert(appContext.GetMainDBConnection()))
 			protected.DELETE("/delete/ai-expert/:id", ginAiExpert.DeleteAiExpert(appContext.GetMainDBConnection()))
-			protected.PUT("/update/password/ai-expert/:id", ginAiExpert.UpdateAiExpert(appContext.GetMainDBConnection()))
 
 		}
 	}
@@ -163,8 +156,6 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.GET("/get/order/list", ginOrder.GetOrders(appContext.GetMainDBConnection()))
 			protected.PUT("/update/order/:id", ginOrder.UpdateOrder(appContext.GetMainDBConnection()))
 			protected.DELETE("/delete/order/:id", ginOrder.DeleteOrder(appContext.GetMainDBConnection()))
-			protected.PUT("/update/password/ordery/:id", ginOrder.UpdateOrder(appContext.GetMainDBConnection()))
-
 		}
 	}
 
@@ -176,8 +167,6 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.GET("/get/signal/list", ginSignal.GetSignals(appContext.GetMainDBConnection()))
 			protected.PUT("/update/signal/:id", ginSignal.UpdateSignal(appContext.GetMainDBConnection()))
 			protected.DELETE("/delete/signal/:id", ginSignal.DeleteSignal(appContext.GetMainDBConnection()))
-			protected.PUT("/update/password/signal/:id", ginSignal.UpdateSignal(appContext.GetMainDBConnection()))
-
 		}
 	}
 
@@ -189,8 +178,6 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.GET("/get/otp/list", ginOtp.GetOtps(appContext.GetMainDBConnection()))
 			protected.PUT("/update/otp/:id", ginOtp.UpdateOtp(appContext.GetMainDBConnection()))
 			protected.DELETE("/delete/otp/:id", ginOtp.DeleteOtp(appContext.GetMainDBConnection()))
-			protected.PUT("/update/password/otp/:id", ginOtp.UpdateOtp(appContext.GetMainDBConnection()))
-
 		}
 	}
 
@@ -210,14 +197,9 @@ func InitializeApp(appContext appContext.AppContext) {
 	// Okx API
 	{
 		{
-			protected.POST("/create/mock", ginOkx.CreateSubscription(appContext.GetMainDBConnection()))
-			protected.GET("/get/okx/:id", ginOkx.GetSubscriptionById(appContext.GetMainDBConnection()))
-			protected.GET("/get/okx-info", ginOkx.GetOkxInfo(appContext.GetMainDBConnection()))
-			protected.GET("/get/mocks", ginOkx.GetSubscriptions(appContext.GetMainDBConnection()))
-			protected.PUT("/update/okx/:id", ginOkx.UpdateSubscription(appContext.GetMainDBConnection()))
-			protected.DELETE("/delete/okx/:id", ginOkx.DeleteSubscription(appContext.GetMainDBConnection()))
-			protected.POST("/create/order", ginOkx.CreateOrder(appContext.GetMainDBConnection()))
-			protected.POST("/cancel/order", ginOkx.CancelOrder(appContext.GetMainDBConnection()))
+			protected.POST("/okx/order/create", ginOkx.CreateOkxOrder(appContext.GetMainDBConnection()))
+			protected.GET("/okx/order/cancel", ginOkx.CancelOkxOrder(appContext.GetMainDBConnection()))
+			protected.GET("/okx/account/get", ginOkx.GetOkxAccount(appContext.GetMainDBConnection()))
 		}
 	}
 

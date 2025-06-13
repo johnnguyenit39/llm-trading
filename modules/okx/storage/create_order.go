@@ -3,8 +3,9 @@ package storage
 import (
 	"context"
 	"fmt"
+	"j-ai-trade/brokers/okx"
+	okxTypes "j-ai-trade/brokers/okx/types"
 	dto "j-ai-trade/modules/okx/model/dto"
-	"j-ai-trade/okx"
 )
 
 func (postgresStore *postgresStore) CreateOrder(ctx context.Context, req *dto.CreateOrderRequest) ([]byte, error) {
@@ -15,23 +16,23 @@ func (postgresStore *postgresStore) CreateOrder(ctx context.Context, req *dto.Cr
 	pair := okxService.NewCurrencyPair(req.Currency, "USDT")
 
 	// Convert side string to OrderSide
-	var side okx.OrderSide
+	var side okxTypes.OrderSide
 	switch req.Side {
 	case "buy":
-		side = okx.Buy
+		side = okxTypes.Buy
 	case "sell":
-		side = okx.Sell
+		side = okxTypes.Sell
 	default:
 		return nil, fmt.Errorf("invalid side: %s", req.Side)
 	}
 
 	// Convert type string to OrderType
-	var orderType okx.OrderType
+	var orderType okxTypes.OrderType
 	switch req.Type {
 	case "limit":
-		orderType = okx.Limit
+		orderType = okxTypes.Limit
 	case "market":
-		orderType = okx.Market
+		orderType = okxTypes.Market
 	default:
 		return nil, fmt.Errorf("invalid order type: %s", req.Type)
 	}
