@@ -15,195 +15,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/Permission/create": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Create a new Permission",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Create new Permission",
-                "parameters": [
-                    {
-                        "description": "Create Permission",
-                        "name": "Permission",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/Permission/delete": {
-            "delete": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Delete a new Permission",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Delete new Permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/Permission/get": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Return Permission",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Get Permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/Permission/list": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Retrieve a list of Permissions based on provided filters and pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Get a list of Permission",
-                "parameters": [
-                    {
-                        "description": "Get Permissions",
-                        "name": "Permission",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.PermissionGetListRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/model.Permission"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/Permission/update": {
-            "put": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Update Permission",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Permission"
-                ],
-                "summary": "Update Permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "User UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Update User",
-                        "name": "user",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/model.PermissionUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Permission"
-                        }
-                    }
-                }
-            }
-        },
         "/v1/ai-expert/create": {
             "post": {
                 "security": [
@@ -240,7 +51,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/ai-expert/delete": {
+        "/v1/ai-expert/delete/{id}": {
             "delete": {
                 "security": [
                     {
@@ -275,7 +86,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/ai-expert/get": {
+        "/v1/ai-expert/get/{id}": {
             "get": {
                 "security": [
                     {
@@ -349,7 +160,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/ai-expert/update": {
+        "/v1/ai-expert/update/{id}": {
             "put": {
                 "security": [
                     {
@@ -393,7 +204,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/api-key/get": {
+        "/v1/api-key/get/{id}": {
             "get": {
                 "security": [
                     {
@@ -467,7 +278,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/api-key/update": {
+        "/v1/api-key/update/{id}": {
             "put": {
                 "security": [
                     {
@@ -1065,7 +876,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/delete/api-key": {
+        "/v1/delete/api-key/{id}": {
             "delete": {
                 "security": [
                     {
@@ -1385,7 +1196,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/jbot/delete": {
+        "/v1/jbot/delete/{id}": {
             "delete": {
                 "security": [
                     {
@@ -1420,7 +1231,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/jbot/get": {
+        "/v1/jbot/get/{id}": {
             "get": {
                 "security": [
                     {
@@ -1491,7 +1302,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/jbot/update": {
+        "/v1/jbot/update/{id}": {
             "put": {
                 "security": [
                     {
@@ -1571,7 +1382,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/order/delete": {
+        "/v1/order/delete/{id}": {
             "delete": {
                 "security": [
                     {
@@ -1606,7 +1417,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/order/get": {
+        "/v1/order/get/{id}": {
             "get": {
                 "security": [
                     {
@@ -1677,7 +1488,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/order/update": {
+        "/v1/order/update/{id}": {
             "put": {
                 "security": [
                     {
@@ -1757,7 +1568,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/otp/delete": {
+        "/v1/otp/delete/{id}": {
             "delete": {
                 "security": [
                     {
@@ -1792,7 +1603,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/otp/get": {
+        "/v1/otp/get/{id}": {
             "get": {
                 "security": [
                     {
@@ -1863,7 +1674,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/otp/update": {
+        "/v1/otp/update/{id}": {
             "put": {
                 "security": [
                     {
@@ -1907,6 +1718,195 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/permission/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new Permission",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Create new Permission",
+                "parameters": [
+                    {
+                        "description": "Create Permission",
+                        "name": "Permission",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/permission/delete/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Delete a new Permission",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Delete new Permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/permission/get/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Return Permission",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Get Permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/permission/list": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Retrieve a list of Permissions based on provided filters and pagination",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Get a list of Permission",
+                "parameters": [
+                    {
+                        "description": "Get Permissions",
+                        "name": "Permission",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.PermissionGetListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.Permission"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/permission/update/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Update Permission",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Permission"
+                ],
+                "summary": "Update Permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update User",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.PermissionUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Permission"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/signal/create": {
             "post": {
                 "security": [
@@ -1943,7 +1943,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/signal/delete": {
+        "/v1/signal/delete/{id}": {
             "delete": {
                 "security": [
                     {
@@ -1978,7 +1978,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/signal/get": {
+        "/v1/signal/get/{id}": {
             "get": {
                 "security": [
                     {
@@ -2049,7 +2049,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/signal/update": {
+        "/v1/signal/update/{id}": {
             "put": {
                 "security": [
                     {
@@ -2129,7 +2129,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/subscription/delete": {
+        "/v1/subscription/delete/{id}": {
             "delete": {
                 "security": [
                     {
@@ -2164,7 +2164,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/subscription/get": {
+        "/v1/subscription/get/{id}": {
             "get": {
                 "security": [
                     {
@@ -2238,7 +2238,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/subscription/update": {
+        "/v1/subscription/update/{id}": {
             "put": {
                 "security": [
                     {

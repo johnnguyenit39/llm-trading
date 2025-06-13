@@ -470,124 +470,6 @@ info:
   title: WB Author API
   version: "1.0"
 paths:
-  /v1/Permission/create:
-    post:
-      description: Create a new Permission
-      parameters:
-      - description: Create Permission
-        in: body
-        name: Permission
-        required: true
-        schema:
-          $ref: '#/definitions/model.Permission'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Permission'
-      security:
-      - Bearer: []
-      summary: Create new Permission
-      tags:
-      - Permission
-  /v1/Permission/delete:
-    delete:
-      description: Delete a new Permission
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Permission'
-      security:
-      - Bearer: []
-      summary: Delete new Permission
-      tags:
-      - Permission
-  /v1/Permission/get:
-    get:
-      description: Return Permission
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Permission'
-      security:
-      - Bearer: []
-      summary: Get Permission
-      tags:
-      - Permission
-  /v1/Permission/list:
-    post:
-      description: Retrieve a list of Permissions based on provided filters and pagination
-      parameters:
-      - description: Get Permissions
-        in: body
-        name: Permission
-        required: true
-        schema:
-          $ref: '#/definitions/model.PermissionGetListRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/model.Permission'
-            type: array
-      security:
-      - Bearer: []
-      summary: Get a list of Permission
-      tags:
-      - Permission
-  /v1/Permission/update:
-    put:
-      description: Update Permission
-      parameters:
-      - description: User UUID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Update User
-        in: body
-        name: user
-        required: true
-        schema:
-          $ref: '#/definitions/model.PermissionUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Permission'
-      security:
-      - Bearer: []
-      summary: Update Permission
-      tags:
-      - Permission
   /v1/ai-expert/create:
     post:
       description: Create a new AiExpert
@@ -610,7 +492,7 @@ paths:
       summary: Create new AiExpert
       tags:
       - AiExpert
-  /v1/ai-expert/delete:
+  /v1/ai-expert/delete/{id}:
     delete:
       description: Delete a new AiExpert
       parameters:
@@ -632,7 +514,7 @@ paths:
       summary: Delete new AiExpert
       tags:
       - AiExpert
-  /v1/ai-expert/get:
+  /v1/ai-expert/get/{id}:
     get:
       description: Return AiExpert
       parameters:
@@ -678,7 +560,7 @@ paths:
       summary: Get a list of AiExpert
       tags:
       - AiExpert
-  /v1/ai-expert/update:
+  /v1/ai-expert/update/{id}:
     put:
       description: Update AiExpert
       parameters:
@@ -706,7 +588,7 @@ paths:
       summary: Update AiExpert
       tags:
       - AiExpert
-  /v1/api-key/get:
+  /v1/api-key/get/{id}:
     get:
       description: Return ApiKey
       parameters:
@@ -752,7 +634,7 @@ paths:
       summary: Get a list of ApiKey
       tags:
       - ApiKey
-  /v1/api-key/update:
+  /v1/api-key/update/{id}:
     put:
       description: Update ApiKey
       parameters:
@@ -1134,7 +1016,7 @@ paths:
       summary: Create new User
       tags:
       - User
-  /v1/delete/api-key:
+  /v1/delete/api-key/{id}:
     delete:
       description: Delete a new ApiKey
       parameters:
@@ -1334,7 +1216,7 @@ paths:
       summary: Create new Jbot
       tags:
       - Jbot
-  /v1/jbot/delete:
+  /v1/jbot/delete/{id}:
     delete:
       description: Delete a new Jbot
       parameters:
@@ -1356,7 +1238,7 @@ paths:
       summary: Delete new Jbot
       tags:
       - Jbot
-  /v1/jbot/get:
+  /v1/jbot/get/{id}:
     get:
       description: Return Jbot
       parameters:
@@ -1400,7 +1282,7 @@ paths:
       summary: Get a list of Jbot
       tags:
       - Jbot
-  /v1/jbot/update:
+  /v1/jbot/update/{id}:
     put:
       description: Update Jbot
       parameters:
@@ -1450,7 +1332,7 @@ paths:
       summary: Create new Order
       tags:
       - Order
-  /v1/order/delete:
+  /v1/order/delete/{id}:
     delete:
       description: Delete a new Order
       parameters:
@@ -1472,7 +1354,7 @@ paths:
       summary: Delete new Order
       tags:
       - Order
-  /v1/order/get:
+  /v1/order/get/{id}:
     get:
       description: Return Order
       parameters:
@@ -1516,7 +1398,7 @@ paths:
       summary: Get a list of Order
       tags:
       - Order
-  /v1/order/update:
+  /v1/order/update/{id}:
     put:
       description: Update Order
       parameters:
@@ -1566,7 +1448,7 @@ paths:
       summary: Create new Otp
       tags:
       - Otp
-  /v1/otp/delete:
+  /v1/otp/delete/{id}:
     delete:
       description: Delete a new Otp
       parameters:
@@ -1588,7 +1470,7 @@ paths:
       summary: Delete new Otp
       tags:
       - Otp
-  /v1/otp/get:
+  /v1/otp/get/{id}:
     get:
       description: Return Otp
       parameters:
@@ -1632,7 +1514,7 @@ paths:
       summary: Get a list of Otp
       tags:
       - Otp
-  /v1/otp/update:
+  /v1/otp/update/{id}:
     put:
       description: Update Otp
       parameters:
@@ -1660,6 +1542,124 @@ paths:
       summary: Update Otp
       tags:
       - Otp
+  /v1/permission/create:
+    post:
+      description: Create a new Permission
+      parameters:
+      - description: Create Permission
+        in: body
+        name: Permission
+        required: true
+        schema:
+          $ref: '#/definitions/model.Permission'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Create new Permission
+      tags:
+      - Permission
+  /v1/permission/delete/{id}:
+    delete:
+      description: Delete a new Permission
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Delete new Permission
+      tags:
+      - Permission
+  /v1/permission/get/{id}:
+    get:
+      description: Return Permission
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Get Permission
+      tags:
+      - Permission
+  /v1/permission/list:
+    post:
+      description: Retrieve a list of Permissions based on provided filters and pagination
+      parameters:
+      - description: Get Permissions
+        in: body
+        name: Permission
+        required: true
+        schema:
+          $ref: '#/definitions/model.PermissionGetListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Permission'
+            type: array
+      security:
+      - Bearer: []
+      summary: Get a list of Permission
+      tags:
+      - Permission
+  /v1/permission/update/{id}:
+    put:
+      description: Update Permission
+      parameters:
+      - description: User UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update User
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.PermissionUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Permission'
+      security:
+      - Bearer: []
+      summary: Update Permission
+      tags:
+      - Permission
   /v1/signal/create:
     post:
       description: Create a new Signal
@@ -1682,7 +1682,7 @@ paths:
       summary: Create new Signal
       tags:
       - Signal
-  /v1/signal/delete:
+  /v1/signal/delete/{id}:
     delete:
       description: Delete a new Signal
       parameters:
@@ -1704,7 +1704,7 @@ paths:
       summary: Delete new Signal
       tags:
       - Signal
-  /v1/signal/get:
+  /v1/signal/get/{id}:
     get:
       description: Return Signal
       parameters:
@@ -1748,7 +1748,7 @@ paths:
       summary: Get a list of Signal
       tags:
       - Signal
-  /v1/signal/update:
+  /v1/signal/update/{id}:
     put:
       description: Update Signal
       parameters:
@@ -1798,7 +1798,7 @@ paths:
       summary: Create new Subscription
       tags:
       - Subscription
-  /v1/subscription/delete:
+  /v1/subscription/delete/{id}:
     delete:
       description: Delete a new Subscription
       parameters:
@@ -1820,7 +1820,7 @@ paths:
       summary: Delete new Subscription
       tags:
       - Subscription
-  /v1/subscription/get:
+  /v1/subscription/get/{id}:
     get:
       description: Return Subscription
       parameters:
@@ -1867,7 +1867,7 @@ paths:
       summary: Get a list of Subscription
       tags:
       - Subscription
-  /v1/subscription/update:
+  /v1/subscription/update/{id}:
     put:
       description: Update Subscription
       parameters:

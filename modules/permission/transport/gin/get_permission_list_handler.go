@@ -22,7 +22,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Permission/list [post]
+// @Router /v1/permission/list [post]
 func GetPermissions(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var input model.PermissionGetListRequest

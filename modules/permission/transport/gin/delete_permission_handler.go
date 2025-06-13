@@ -21,7 +21,7 @@ import (
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/Permission/delete [delete]
+// @Router /v1/permission/delete/{id} [delete]
 func DeletePermission(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		id := c.Param("id")
