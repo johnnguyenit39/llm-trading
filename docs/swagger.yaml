@@ -1,4 +1,4 @@
-basePath: /api
+basePath: /api/v1
 definitions:
   common.BaseApiResponse-any:
     properties:
@@ -314,6 +314,18 @@ definitions:
     required:
     - broker
     type: object
+  model.CancelFuturesOrderRequest:
+    properties:
+      currency:
+        description: Base currency (e.g., "BTC")
+        type: string
+      orderId:
+        description: Order ID to cancel
+        type: string
+    required:
+    - currency
+    - orderId
+    type: object
   model.CancelOrderRequest:
     properties:
       currency:
@@ -325,6 +337,38 @@ definitions:
     required:
     - currency
     - order_id
+    type: object
+  model.CreateFuturesOrderRequest:
+    properties:
+      amount:
+        description: Order size
+        type: number
+      currency:
+        description: Base currency (e.g., "BTC")
+        type: string
+      leverage:
+        description: Leverage value
+        type: number
+      posSide:
+        description: '"long" or "short"'
+        type: string
+      price:
+        description: Order price
+        type: number
+      side:
+        description: '"buy" or "sell"'
+        type: string
+      type:
+        description: '"limit" or "market"'
+        type: string
+    required:
+    - amount
+    - currency
+    - leverage
+    - posSide
+    - price
+    - side
+    - type
     type: object
   model.CreateOrderRequest:
     properties:
@@ -615,9 +659,15 @@ definitions:
     type: object
 host: localhost:8080
 info:
-  contact: {}
-  description: Description of the API
-  title: WB Author API
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: J-AI-Trade API for cryptocurrency trading and management
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: J-AI-Trade API
   version: "1.0"
 paths:
   /v1/ai-expert/create:
@@ -1228,13 +1278,61 @@ paths:
       summary: Get OKX account information
       tags:
       - Okx
-  /v1/okx/order/cancel:
+  /v1/okx/futures/order/cancel:
     post:
       consumes:
       - application/json
-      description: Cancel an existing order on OKX exchange by order ID
+      description: Cancel an existing futures order on OKX exchange by order ID
       parameters:
-      - description: OKX order cancellation parameters
+      - description: OKX futures order cancellation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CancelFuturesOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OKX futures order cancellation response
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-string'
+      security:
+      - Bearer: []
+      summary: Cancel an OKX futures order
+      tags:
+      - Okx
+  /v1/okx/futures/order/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a new futures order on OKX exchange with specified parameters
+      parameters:
+      - description: OKX futures order creation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateFuturesOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OKX futures order creation response
+          schema:
+            $ref: '#/definitions/common.BaseApiResponse-string'
+      security:
+      - Bearer: []
+      summary: Create a new OKX futures order
+      tags:
+      - Okx
+  /v1/okx/spot/order/cancel:
+    post:
+      consumes:
+      - application/json
+      description: Cancel an existing spot order on OKX exchange by order ID
+      parameters:
+      - description: OKX spot order cancellation parameters
         in: body
         name: request
         required: true
@@ -1244,21 +1342,21 @@ paths:
       - application/json
       responses:
         "200":
-          description: OKX order cancellation response
+          description: OKX spot order cancellation response
           schema:
             $ref: '#/definitions/common.BaseApiResponse-string'
       security:
       - Bearer: []
-      summary: Cancel an OKX order
+      summary: Cancel an OKX spot order
       tags:
       - Okx
-  /v1/okx/order/create:
+  /v1/okx/spot/order/create:
     post:
       consumes:
       - application/json
-      description: Create a new order on OKX exchange with specified parameters
+      description: Create a new spot order on OKX exchange with specified parameters
       parameters:
-      - description: OKX order creation parameters
+      - description: OKX spot order creation parameters
         in: body
         name: request
         required: true
@@ -1268,12 +1366,12 @@ paths:
       - application/json
       responses:
         "200":
-          description: OKX order creation response
+          description: OKX spot order creation response
           schema:
             $ref: '#/definitions/common.BaseApiResponse-string'
       security:
       - Bearer: []
-      summary: Create a new OKX order
+      summary: Create a new OKX spot order
       tags:
       - Okx
   /v1/order/create:
@@ -2035,6 +2133,7 @@ paths:
       - User
 securityDefinitions:
   Bearer:
+    description: Type "Bearer" followed by a space and JWT token.
     in: header
     name: Authorization
     type: apiKey

@@ -12,6 +12,8 @@ type OKXRepository interface {
 	// Order operations
 	CreateSpotOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType) ([]byte, error)
 	CancelSpotOrder(orderID string, instId string) ([]byte, error)
+	CreateFuturesOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType, leverage float64, posSide string) ([]byte, error)
+	CancelFuturesOrder(orderID string, instId string) ([]byte, error)
 
 	// Time synchronization
 	SyncTimeWithOKX() error

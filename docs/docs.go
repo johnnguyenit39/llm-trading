@@ -9,7 +9,15 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {},
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -972,14 +980,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/okx/order/cancel": {
+        "/v1/okx/futures/order/cancel": {
             "post": {
                 "security": [
                     {
                         "Bearer": []
                     }
                 ],
-                "description": "Cancel an existing order on OKX exchange by order ID",
+                "description": "Cancel an existing futures order on OKX exchange by order ID",
                 "consumes": [
                     "application/json"
                 ],
@@ -989,10 +997,88 @@ const docTemplate = `{
                 "tags": [
                     "Okx"
                 ],
-                "summary": "Cancel an OKX order",
+                "summary": "Cancel an OKX futures order",
                 "parameters": [
                     {
-                        "description": "OKX order cancellation parameters",
+                        "description": "OKX futures order cancellation parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CancelFuturesOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OKX futures order cancellation response",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-string"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/okx/futures/order/create": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Create a new futures order on OKX exchange with specified parameters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okx"
+                ],
+                "summary": "Create a new OKX futures order",
+                "parameters": [
+                    {
+                        "description": "OKX futures order creation parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CreateFuturesOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OKX futures order creation response",
+                        "schema": {
+                            "$ref": "#/definitions/common.BaseApiResponse-string"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/okx/spot/order/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Cancel an existing spot order on OKX exchange by order ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okx"
+                ],
+                "summary": "Cancel an OKX spot order",
+                "parameters": [
+                    {
+                        "description": "OKX spot order cancellation parameters",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -1003,7 +1089,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OKX order cancellation response",
+                        "description": "OKX spot order cancellation response",
                         "schema": {
                             "$ref": "#/definitions/common.BaseApiResponse-string"
                         }
@@ -1011,14 +1097,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/okx/order/create": {
+        "/v1/okx/spot/order/create": {
             "post": {
                 "security": [
                     {
                         "Bearer": []
                     }
                 ],
-                "description": "Create a new order on OKX exchange with specified parameters",
+                "description": "Create a new spot order on OKX exchange with specified parameters",
                 "consumes": [
                     "application/json"
                 ],
@@ -1028,10 +1114,10 @@ const docTemplate = `{
                 "tags": [
                     "Okx"
                 ],
-                "summary": "Create a new OKX order",
+                "summary": "Create a new OKX spot order",
                 "parameters": [
                     {
-                        "description": "OKX order creation parameters",
+                        "description": "OKX spot order creation parameters",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -1042,7 +1128,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OKX order creation response",
+                        "description": "OKX spot order creation response",
                         "schema": {
                             "$ref": "#/definitions/common.BaseApiResponse-string"
                         }
@@ -2731,6 +2817,23 @@ const docTemplate = `{
                 }
             }
         },
+        "model.CancelFuturesOrderRequest": {
+            "type": "object",
+            "required": [
+                "currency",
+                "orderId"
+            ],
+            "properties": {
+                "currency": {
+                    "description": "Base currency (e.g., \"BTC\")",
+                    "type": "string"
+                },
+                "orderId": {
+                    "description": "Order ID to cancel",
+                    "type": "string"
+                }
+            }
+        },
         "model.CancelOrderRequest": {
             "type": "object",
             "required": [
@@ -2744,6 +2847,48 @@ const docTemplate = `{
                 },
                 "order_id": {
                     "description": "Order ID to cancel",
+                    "type": "string"
+                }
+            }
+        },
+        "model.CreateFuturesOrderRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "currency",
+                "leverage",
+                "posSide",
+                "price",
+                "side",
+                "type"
+            ],
+            "properties": {
+                "amount": {
+                    "description": "Order size",
+                    "type": "number"
+                },
+                "currency": {
+                    "description": "Base currency (e.g., \"BTC\")",
+                    "type": "string"
+                },
+                "leverage": {
+                    "description": "Leverage value",
+                    "type": "number"
+                },
+                "posSide": {
+                    "description": "\"long\" or \"short\"",
+                    "type": "string"
+                },
+                "price": {
+                    "description": "Order price",
+                    "type": "number"
+                },
+                "side": {
+                    "description": "\"buy\" or \"sell\"",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "\"limit\" or \"market\"",
                     "type": "string"
                 }
             }
@@ -3181,6 +3326,7 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "Bearer": {
+            "description": "Type \"Bearer\" followed by a space and JWT token.",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
@@ -3192,10 +3338,10 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:8080",
-	BasePath:         "/api",
+	BasePath:         "/api/v1",
 	Schemes:          []string{},
-	Title:            "WB Author API",
-	Description:      "Description of the API",
+	Title:            "J-AI-Trade API",
+	Description:      "J-AI-Trade API for cryptocurrency trading and management",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

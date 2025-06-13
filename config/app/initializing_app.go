@@ -189,12 +189,24 @@ func InitializeApp(appContext appContext.AppContext) {
 		}
 	}
 
-	// Okx API
+	// Register OKX routes
 	{
+		okxGroup := protected.Group("/okx")
 		{
-			protected.POST("/okx/order/create", ginOkx.CreateOkxOrder(appContext.GetMainDBConnection()))
-			protected.POST("/okx/order/cancel", ginOkx.CancelOkxOrder(appContext.GetMainDBConnection()))
-			protected.GET("/okx/account/get", ginOkx.GetOkxAccount(appContext.GetMainDBConnection()))
+			// Spot trading routes
+			spotGroup := okxGroup.Group("/spot")
+			{
+				spotGroup.POST("/order/create", ginOkx.CreateOkxSpotOrder(appContext.GetMainDBConnection()))
+				spotGroup.POST("/order/cancel", ginOkx.CancelOkxSpotOrder(appContext.GetMainDBConnection()))
+			}
+
+			// Futures trading routes
+			futuresGroup := okxGroup.Group("/futures")
+			{
+				futuresGroup.POST("/order/create", ginOkx.CreateOkxFuturesOrder(appContext.GetMainDBConnection()))
+				futuresGroup.POST("/order/cancel", ginOkx.CancelOkxFuturesOrder(appContext.GetMainDBConnection()))
+			}
 		}
 	}
+
 }

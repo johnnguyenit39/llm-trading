@@ -224,6 +224,122 @@ func (r *okxRepositoryImpl) CancelSpotOrder(orderID string, instId string) ([]by
 	return rawResponse, nil
 }
 
+func (r *okxRepositoryImpl) CreateFuturesOrder(pair types.CurrencyPair, amount, price float64, side types.OrderSide, orderType types.OrderType, leverage float64, posSide string) ([]byte, error) {
+	if err := r.SyncTimeWithOKX(); err != nil {
+		return nil, err
+	}
+
+	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.000Z")
+	orderData := map[string]interface{}{
+		"instId":  pair.Symbol,
+		"tdMode":  "cross",
+		"side":    string(side),
+		"ordType": string(orderType),
+		"sz":      fmt.Sprintf("%f", amount),
+		"px":      fmt.Sprintf("%f", price),
+		"lever":   fmt.Sprintf("%f", leverage),
+		"posSide": posSide,
+	}
+
+	body, err := json.Marshal(orderData)
+	if err != nil {
+		return nil, err
+	}
+
+	url := "https://www.okx.com/api/v5/trade/order"
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("OK-ACCESS-KEY", r.apiKey)
+	req.Header.Set("OK-ACCESS-SIGN", r.GenerateSign(timestamp, "POST", "/api/v5/trade/order", string(body)))
+	req.Header.Set("OK-ACCESS-TIMESTAMP", timestamp)
+	req.Header.Set("OK-ACCESS-PASSPHRASE", r.passphrase)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	rawResponse, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+
+	if err := json.Unmarshal(rawResponse, &result); err != nil {
+		return rawResponse, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	if result.Code != "0" {
+		return rawResponse, fmt.Errorf("API error: %s", result.Msg)
+	}
+
+	return rawResponse, nil
+}
+
+func (r *okxRepositoryImpl) CancelFuturesOrder(orderID string, instId string) ([]byte, error) {
+	if err := r.SyncTimeWithOKX(); err != nil {
+		return nil, err
+	}
+
+	timestamp := r.GetAdjustedTime().Format("2006-01-02T15:04:05.000Z")
+	orderData := map[string]string{
+		"ordId":  orderID,
+		"instId": instId,
+	}
+
+	body, err := json.Marshal(orderData)
+	if err != nil {
+		return nil, err
+	}
+
+	url := "https://www.okx.com/api/v5/trade/cancel-order"
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("OK-ACCESS-KEY", r.apiKey)
+	req.Header.Set("OK-ACCESS-SIGN", r.GenerateSign(timestamp, "POST", "/api/v5/trade/cancel-order", string(body)))
+	req.Header.Set("OK-ACCESS-TIMESTAMP", timestamp)
+	req.Header.Set("OK-ACCESS-PASSPHRASE", r.passphrase)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	rawResponse, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+
+	if err := json.Unmarshal(rawResponse, &result); err != nil {
+		return rawResponse, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	if result.Code != "0" {
+		return rawResponse, fmt.Errorf("API error: %s", result.Msg)
+	}
+
+	return rawResponse, nil
+}
+
 func (r *okxRepositoryImpl) SyncTimeWithOKX() error {
 	resp, err := http.Get("https://www.okx.com/api/v5/public/time")
 	if err != nil {

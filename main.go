@@ -19,16 +19,24 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// @title WB Author API
+// @title J-AI-Trade API
 // @version 1.0
-// @description Description of the API
+// @description J-AI-Trade API for cryptocurrency trading and management
 
-// @securityDefinitions.apiKey Bearer
-// @in header
-// @name Authorization
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
 // @host localhost:8080
-// @BasePath /api
+// @BasePath /api/v1
+
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 func main() {
 	appi18n.Init()
 

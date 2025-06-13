@@ -13,32 +13,32 @@ import (
 	"gorm.io/gorm"
 )
 
-// CancelOkxOrder godoc
-// @Summary Cancel an OKX order
-// @Description Cancel an existing order on OKX exchange by order ID
+// CancelOkxSpotOrder godoc
+// @Summary Cancel an OKX spot order
+// @Description Cancel an existing spot order on OKX exchange by order ID
 // @Accept json
 // @Produce json
 // @Tags Okx
-// @Param request body dto.CancelOrderRequest true "OKX order cancellation parameters"
-// @Success 200 {object} common.BaseApiResponse[string] "OKX order cancellation response"
+// @Param request body dto.CancelOrderRequest true "OKX spot order cancellation parameters"
+// @Success 200 {object} common.BaseApiResponse[string] "OKX spot order cancellation response"
 // @securityDefinitions.apiKey token
 // @in header
 // @name Authorization
 // @Security Bearer
-// @Router /v1/okx/order/cancel [post]
-func CancelOkxOrder(db *gorm.DB) func(*gin.Context) {
+// @Router /v1/okx/spot/order/cancel [post]
+func CancelOkxSpotOrder(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
-		log := logger.GetLogger("CancelOkxOrder", c.GetString(middlewares.RequestIDKey))
+		log := logger.GetLogger("CancelOkxSpotOrder", c.GetString(middlewares.RequestIDKey))
 
 		var req dto.CancelOrderRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusBadRequest,
 				Success:           false,
-				Message:           "Invalid OKX order cancellation request: " + err.Error(),
+				Message:           "Invalid OKX spot order cancellation request: " + err.Error(),
 				Data:              nil,
 			})
-			log.Error().Err(err).Msg("failed to bind OKX order cancellation request")
+			log.Error().Err(err).Msg("failed to bind OKX spot order cancellation request")
 			return
 		}
 
@@ -50,19 +50,19 @@ func CancelOkxOrder(db *gorm.DB) func(*gin.Context) {
 			c.JSON(http.StatusInternalServerError, common.BaseApiResponse[any]{
 				HttpRequestStatus: http.StatusInternalServerError,
 				Success:           false,
-				Message:           "Failed to cancel OKX order: " + err.Error(),
+				Message:           "Failed to cancel OKX spot order: " + err.Error(),
 				Data:              nil,
 			})
-			log.Error().Err(err).Msg("failed to cancel OKX order")
+			log.Error().Err(err).Msg("failed to cancel OKX spot order")
 			return
 		}
 
 		c.JSON(http.StatusOK, common.BaseApiResponse[string]{
 			Success:           true,
 			HttpRequestStatus: http.StatusOK,
-			Message:           "OKX order cancelled successfully",
+			Message:           "OKX spot order cancelled successfully",
 			Data:              string(response),
 		})
-		log.Info().Msg("OKX order cancelled successfully")
+		log.Info().Msg("OKX spot order cancelled successfully")
 	}
 }
