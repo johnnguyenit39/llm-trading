@@ -72,6 +72,11 @@ func main() {
 	// Initialize application config
 	appConfig.InitializeApp(appContext)
 
+	// Initialize and start cron jobs
+	// cronJob := cronjobs.NewCronJob()
+	// cronJob.Start()
+	// defer cronJob.Stop() // Ensure cron job is stopped when the application exits
+
 	// Start the application on port 8080
 	if err := app.Run(":8080"); err != nil {
 		log.Fatal().Err(err).Msg("failed to start the application")
