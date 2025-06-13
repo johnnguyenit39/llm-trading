@@ -1,6 +1,7 @@
 package strategies
 
 import (
+	"fmt"
 	"time"
 
 	"j-ai-trade/brokers/binance/repository"
@@ -76,29 +77,47 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 
 	// Buy Signal: MACD crosses above signal line + 1h trend confirmation
 	if prevMACD < latestSignal && latestMACD > latestSignal && latestMACD1h > latestSignal1h {
+		stopLoss := latestCandle.Low * 0.99     // 1% below the low
+		takeProfit := latestCandle.Close * 1.02 // 2% above entry
+
 		tradingSignal = &Signal{
-			Type:        "BUY",
-			Price:       latestCandle.Close,
-			StopLoss:    latestCandle.Low * 0.99,   // 1% below the low
-			TakeProfit:  latestCandle.Close * 1.02, // 2% above entry
-			Time:        time.Now(),
-			Strategy:    s.GetName(),
-			Confidence:  0.7,
-			Description: "MACD bullish crossover with 1h trend confirmation",
+			Type:     "BUY",
+			Price:    latestCandle.Close,
+			Time:     time.Now(),
+			Strategy: s.GetName(),
+			Description: fmt.Sprintf("🚀 MACD Strategy - BUY Signal\n\n"+
+				"Entry Price: %.2f\n"+
+				"Stop Loss: %.2f\n"+
+				"Take Profit: %.2f\n\n"+
+				"Signal Details:\n"+
+				"- MACD bullish crossover on 15m\n"+
+				"- 1h trend confirmation\n"+
+				"- Current MACD: %.2f\n"+
+				"- Current Signal: %.2f",
+				latestCandle.Close, stopLoss, takeProfit, latestMACD, latestSignal),
 		}
 	}
 
 	// Sell Signal: MACD crosses below signal line + 1h trend confirmation
 	if prevMACD > latestSignal && latestMACD < latestSignal && latestMACD1h < latestSignal1h {
+		stopLoss := latestCandle.High * 1.01    // 1% above the high
+		takeProfit := latestCandle.Close * 0.98 // 2% below entry
+
 		tradingSignal = &Signal{
-			Type:        "SELL",
-			Price:       latestCandle.Close,
-			StopLoss:    latestCandle.High * 1.01,  // 1% above the high
-			TakeProfit:  latestCandle.Close * 0.98, // 2% below entry
-			Time:        time.Now(),
-			Strategy:    s.GetName(),
-			Confidence:  0.7,
-			Description: "MACD bearish crossover with 1h trend confirmation",
+			Type:     "SELL",
+			Price:    latestCandle.Close,
+			Time:     time.Now(),
+			Strategy: s.GetName(),
+			Description: fmt.Sprintf("🔻 MACD Strategy - SELL Signal\n\n"+
+				"Entry Price: %.2f\n"+
+				"Stop Loss: %.2f\n"+
+				"Take Profit: %.2f\n\n"+
+				"Signal Details:\n"+
+				"- MACD bearish crossover on 15m\n"+
+				"- 1h trend confirmation\n"+
+				"- Current MACD: %.2f\n"+
+				"- Current Signal: %.2f",
+				latestCandle.Close, stopLoss, takeProfit, latestMACD, latestSignal),
 		}
 	}
 

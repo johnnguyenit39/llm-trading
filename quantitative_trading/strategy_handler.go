@@ -5,7 +5,6 @@ import (
 
 	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/quantitative_trading/strategies"
-	"j-ai-trade/telegram"
 )
 
 type Signal struct {
@@ -16,18 +15,18 @@ type Signal struct {
 }
 
 type StrategyHandler struct {
-	rsiStrategy     *strategies.RSI15m1hStrategy
-	telegramService *telegram.TelegramService
+	rsiStrategy  *strategies.RSI15m1hStrategy
+	macdStrategy *strategies.MACD15m1hStrategy
 }
 
 func NewStrategyHandler() *StrategyHandler {
 	return &StrategyHandler{
-		rsiStrategy:     strategies.NewRSI15m1hStrategy(),
-		telegramService: telegram.NewTelegramService(),
+		rsiStrategy:  strategies.NewRSI15m1hStrategy(),
+		macdStrategy: strategies.NewMACD15m1hStrategy(),
 	}
 }
 
-func (h *StrategyHandler) ProcessCandles(candles15m, candles1h []repository.Candle) (*Signal, error) {
+func (h *StrategyHandler) ProcessRsiWithCandles(candles15m, candles1h []repository.Candle) (*Signal, error) {
 	// Create candles map for strategy
 	candles := map[string][]repository.Candle{
 		"15m": candles15m,
@@ -36,6 +35,32 @@ func (h *StrategyHandler) ProcessCandles(candles15m, candles1h []repository.Cand
 
 	// Process candles through RSI strategy
 	strategySignal, err := h.rsiStrategy.Analyze(candles)
+	if err != nil {
+		return nil, err
+	}
+
+	if strategySignal == nil {
+		return nil, nil
+	}
+
+	// Convert strategy signal to handler signal
+	return &Signal{
+		Type:        strategySignal.Type,
+		Price:       strategySignal.Price,
+		Timestamp:   time.Now(),
+		Description: strategySignal.Description,
+	}, nil
+}
+
+func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []repository.Candle) (*Signal, error) {
+	// Create candles map for strategy
+	candles := map[string][]repository.Candle{
+		"15m": candles15m,
+		"1h":  candles1h,
+	}
+
+	// Process candles through MACD strategy
+	strategySignal, err := h.macdStrategy.Analyze(candles)
 	if err != nil {
 		return nil, err
 	}
