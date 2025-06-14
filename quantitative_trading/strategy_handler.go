@@ -60,51 +60,48 @@ func NewStrategyHandler() *StrategyHandler {
 		squeezeScalping:      scalping.NewSqueezeScalpingStrategy(),
 	}
 
-	// Initialize strategies slice
-	handler.strategies = []Strategy{}
+	// Initialize strategies slice and register all strategies
+	handler.strategies = []Strategy{
+		handler.macdScalping,
+		handler.rsiScalping,
+		handler.volatilityScalping,
+		handler.strongTrendScalping,
+		handler.accumulationScalping,
+		handler.squeezeScalping,
+	}
+
+	// Initialize market analyzer with all strategies
 	handler.marketAnalyzer = market_analyzer.NewMarketAnalyzer([]strategies.Strategy{})
 
 	return handler
 }
 
-// ProcessMarketCondition analyzes the market and executes suitable strategies
+// ProcessMarketCondition processes market conditions and executes suitable strategies
 func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1h []repository.Candle) ([]*Signal, error) {
-	// Analyze market condition
+	// Analyze market conditions
 	analysis, err := h.marketAnalyzer.AnalyzeMarket(candles5m, candles15m, candles1h)
 	if err != nil {
-		return nil, fmt.Errorf("failed to analyze market: %w", err)
+		return nil, fmt.Errorf("failed to analyze market: %v", err)
 	}
 
-	// Get suitable strategies for each market condition
-	var allStrategies []Strategy
-	seenStrategies := make(map[string]bool) // To avoid duplicate strategies
+	// Get suitable strategies based on primary condition
+	suitableStrategies := h.getSuitableStrategies(analysis.PrimaryCondition)
 
-	for _, condition := range analysis.Conditions {
-		// Only consider conditions with high confidence
-		if condition.Confidence < 0.6 {
-			continue
-		}
-
-		// Get strategies for this condition
-		strategies := h.getSuitableStrategies(condition.Condition)
-
-		// Add unique strategies
-		for _, strategy := range strategies {
-			strategyName := strategy.GetName()
-			if !seenStrategies[strategyName] {
-				allStrategies = append(allStrategies, strategy)
-				seenStrategies[strategyName] = true
+	// Filter strategies based on confidence levels
+	var filteredStrategies []Strategy
+	for _, strategy := range suitableStrategies {
+		// Check if strategy is suitable for any of the conditions with high confidence
+		for _, condition := range analysis.Conditions {
+			if condition.Confidence >= 0.6 && strategy.IsSuitableForCondition(condition.Condition) {
+				filteredStrategies = append(filteredStrategies, strategy)
+				break
 			}
 		}
 	}
 
-	if len(allStrategies) == 0 {
-		return nil, nil
-	}
-
 	// Process each suitable strategy
 	var signals []*Signal
-	for _, strategy := range allStrategies {
+	for _, strategy := range filteredStrategies {
 		// Create candles map for strategy
 		candles := map[string][]repository.Candle{
 			"5m":  candles5m,
@@ -115,9 +112,8 @@ func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1
 		// Get signal from strategy
 		strategySignal, err := strategy.AnalyzeShortTermMarket(candles)
 		if err != nil {
-			return nil, fmt.Errorf("failed to analyze strategy %s: %w", strategy.GetName(), err)
+			continue // Skip strategy if analysis fails
 		}
-
 		if strategySignal != nil {
 			// Convert strategy signal to handler signal
 			signal := &Signal{
@@ -137,53 +133,91 @@ func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1
 
 // getSuitableStrategies returns a list of strategies suitable for the given market condition
 func (h *StrategyHandler) getSuitableStrategies(condition common.MarketCondition) []Strategy {
-	var strategies []Strategy
+	var suitableStrategies []Strategy
 
 	switch condition {
-	// Strong trend conditions - use multiple strategies for confirmation
 	case common.MarketStrongTrendUp, common.MarketStrongTrendDown:
-		strategies = append(strategies, h.macdScalping, h.strongTrendScalping)
+		// Use MACD and strong trend strategies for strong trends
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "MACD Scalping" || strategy.GetName() == "Strong Trend Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
 
-	// Weak trend conditions - use MACD with RSI for confirmation
 	case common.MarketWeakTrendUp, common.MarketWeakTrendDown:
-		strategies = append(strategies, h.macdScalping, h.rsiScalping)
+		// Use MACD and RSI strategies for weak trends
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "MACD Scalping" || strategy.GetName() == "RSI Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
 
-	// Ranging conditions - use RSI and Accumulation strategies
 	case common.MarketRanging, common.MarketSideways:
-		strategies = append(strategies, h.rsiScalping, h.accumulationScalping)
+		// Use RSI and accumulation strategies for ranging and sideways markets
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "RSI Scalping" || strategy.GetName() == "Accumulation Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
 
-	// Accumulation/Distribution conditions
-	case common.MarketAccumulation:
-		strategies = append(strategies, h.accumulationScalping, h.rsiScalping)
-	case common.MarketDistribution:
-		strategies = append(strategies, h.accumulationScalping, h.volatilityScalping)
+	case common.MarketHighVolatility, common.MarketVolatile, common.MarketChoppy:
+		// Use volatility and RSI strategies for volatile markets
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "Volatility Scalping" || strategy.GetName() == "RSI Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
 
-	// Volatile conditions - use Volatility and RSI strategies
-	case common.MarketVolatile, common.MarketHighVolatility:
-		strategies = append(strategies, h.volatilityScalping, h.rsiScalping)
-
-	// Choppy market - use RSI and Volatility strategies
-	case common.MarketChoppy:
-		strategies = append(strategies, h.rsiScalping, h.volatilityScalping)
-
-	// Breakout conditions - use multiple strategies for confirmation
-	case common.MarketBreakout, common.MarketBreakoutUp, common.MarketBreakoutDown:
-		strategies = append(strategies, h.macdScalping, h.volatilityScalping, h.strongTrendScalping)
-
-	// Squeeze conditions - use Squeeze and Volatility strategies
-	case common.MarketSqueeze:
-		strategies = append(strategies, h.squeezeScalping, h.volatilityScalping)
-
-	// Reversal conditions - use multiple strategies for confirmation
-	case common.MarketReversal, common.MarketReversalUp, common.MarketReversalDown:
-		strategies = append(strategies, h.volatilityScalping, h.macdScalping, h.rsiScalping)
-
-	// Low volatility conditions - use RSI and Squeeze strategies
 	case common.MarketLowVolatility:
-		strategies = append(strategies, h.rsiScalping, h.squeezeScalping)
+		// Use RSI and accumulation strategies for low volatility markets
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "RSI Scalping" || strategy.GetName() == "Accumulation Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
+
+	case common.MarketBreakout, common.MarketBreakoutUp, common.MarketBreakoutDown:
+		// Use multiple strategies for breakout confirmation
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "MACD Scalping" || strategy.GetName() == "Volatility Scalping" || strategy.GetName() == "RSI Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
+
+	case common.MarketSqueeze:
+		// Use squeeze and volatility strategies
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "Squeeze Scalping" || strategy.GetName() == "Volatility Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
+
+	case common.MarketAccumulation, common.MarketDistribution:
+		// Use accumulation and RSI strategies
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "Accumulation Scalping" || strategy.GetName() == "RSI Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
+
+	case common.MarketReversal, common.MarketReversalUp, common.MarketReversalDown:
+		// Use RSI and MACD strategies for reversals
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "RSI Scalping" || strategy.GetName() == "MACD Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
+
+	default:
+		// Default to RSI strategy for unknown conditions
+		for _, strategy := range h.strategies {
+			if strategy.GetName() == "RSI Scalping" {
+				suitableStrategies = append(suitableStrategies, strategy)
+			}
+		}
 	}
 
-	return strategies
+	return suitableStrategies
 }
 
 // RegisterStrategy adds a new strategy to the handler
