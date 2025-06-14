@@ -32,7 +32,7 @@ func (b *BackTesting) ExecuteFuturesOrder(symbol string, amount, price float64, 
 	}
 
 	// Create currency pair
-	currencyPair := okxService.NewCurrencyPair("BTC", "USDT")
+	currencyPair := okxService.NewCurrencyPair("ADA", "USDT")
 
 	// Determine order side based on decision
 	var side types.OrderSide

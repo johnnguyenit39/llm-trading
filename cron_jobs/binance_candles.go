@@ -111,7 +111,7 @@ func (j *BinanceCandlesJob) startRsiStrategy() {
 			backTesting := backtesting.NewBackTesting(j.db)
 			err = backTesting.ExecuteFuturesOrder(
 				j.symbol,
-				0.01, // Fixed amount of 0.01 BTC
+				1000, // Fixed amount of 1000 ADA
 				signal.Price,
 				signal.Type, // This should be "BUY" or "SELL"
 				"RSI",
@@ -196,7 +196,7 @@ func (j *BinanceCandlesJob) startMacdStrategy() {
 			backTesting := backtesting.NewBackTesting(j.db)
 			err = backTesting.ExecuteFuturesOrder(
 				j.symbol,
-				0.01, // Fixed amount of 0.01 BTC
+				1000, // Fixed amount of 1000 ADA
 				signal.Price,
 				signal.Type, // This should be "BUY" or "SELL"
 				"MACD",
