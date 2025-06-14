@@ -60,7 +60,7 @@ func (j *BinanceCandlesJob) startRsiStrategy() {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
 	// Add job that runs every 5 seconds
-	_, err := j.cron.AddFunc("*/5 * * * * *", func() {
+	_, err := j.cron.AddFunc("*/5 * * * *", func() {
 		ctx := context.Background()
 
 		// Fetch 15-minute candles
@@ -144,7 +144,7 @@ func (j *BinanceCandlesJob) startMacdStrategy() {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
 	// Add job that runs every 5 seconds
-	_, err := j.cron.AddFunc("*/5 * * * * *", func() {
+	_, err := j.cron.AddFunc("*/5 * * * *", func() {
 		ctx := context.Background()
 
 		// Fetch 15-minute candles

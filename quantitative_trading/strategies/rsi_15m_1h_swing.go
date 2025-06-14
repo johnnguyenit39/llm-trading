@@ -156,9 +156,9 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 				"• 1h Price Change: %s\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📊 Trade Setup:\n"+
-				"• Entry: %.2f\n"+
-				"• Take Profit: %.2f (+%.1f%%)\n"+
-				"• Stop Loss: %.2f (-%.1f%%)\n"+
+				"• Entry: %.5f\n"+
+				"• Take Profit: %.5f (+%.1f%%)\n"+
+				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n\n"+
 				"💡 Additional Confirmation:%s",
 				signalConfidence.SetConfidenceIndicator(strength),

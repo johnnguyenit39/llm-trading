@@ -219,9 +219,9 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			Confidence: confidence,
 			Description: fmt.Sprintf("🔻 MACD Strategy - SELL Signal ADA/USDT %s\n\n"+
 				"📊 Trade Setup:\n"+
-				"• Entry Price: %.2f\n"+
-				"• Stop Loss: %.2f (+1.0%%)\n"+
-				"• Take Profit: %.2f (-2.0%%)\n"+
+				"• Entry Price: %.5f\n"+
+				"• Stop Loss: %.5f (+1.0%%)\n"+
+				"• Take Profit: %.5f (-2.0%%)\n"+
 				"• Risk/Reward: 1:2\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Signal Details:\n"+
