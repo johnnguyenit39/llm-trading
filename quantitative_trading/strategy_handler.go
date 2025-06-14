@@ -12,6 +12,8 @@ type Signal struct {
 	Price       float64
 	Timestamp   time.Time
 	Description string
+	TakeProfit  float64
+	StopLoss    float64
 }
 
 type StrategyHandler struct {
@@ -49,6 +51,8 @@ func (h *StrategyHandler) ProcessRsiWithCandles(candles15m, candles1h []reposito
 		Price:       strategySignal.Price,
 		Timestamp:   time.Now(),
 		Description: strategySignal.Description,
+		TakeProfit:  strategySignal.TakeProfit,
+		StopLoss:    strategySignal.StopLoss,
 	}, nil
 }
 
@@ -75,5 +79,7 @@ func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []reposit
 		Price:       strategySignal.Price,
 		Timestamp:   time.Now(),
 		Description: strategySignal.Description,
+		TakeProfit:  strategySignal.TakeProfit,
+		StopLoss:    strategySignal.StopLoss,
 	}, nil
 }

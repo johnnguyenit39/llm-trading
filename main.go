@@ -82,7 +82,7 @@ func main() {
 	appConfig.InitializeApp(appContext)
 
 	// Initialize and start cron jobs
-	cronjobsManager.InitCronJobs()
+	cronjobsManager.InitCronJobs(db)
 	defer cronjobsManager.StopCronJobs()
 
 	// Start the application on port 8080

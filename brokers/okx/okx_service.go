@@ -58,3 +58,8 @@ func (s *OKXService) CreateFuturesOrder(pair types.CurrencyPair, amount, price f
 func (s *OKXService) CancelFuturesOrder(orderID string, instId string) ([]byte, error) {
 	return s.repo.CancelFuturesOrder(orderID, instId)
 }
+
+// SyncTime synchronizes the local time with OKX server time
+func (s *OKXService) SyncTime() error {
+	return s.repo.SyncTimeWithOKX()
+}

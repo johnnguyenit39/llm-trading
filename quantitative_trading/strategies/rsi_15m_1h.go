@@ -88,6 +88,8 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 		stopLoss := entryPrice * (1 - s.slPercentage/100)
 
 		tradingSignal = &Signal{
+			StopLoss:   stopLoss,
+			TakeProfit: takeProfit,
 			Type:       "BUY",
 			Price:      entryPrice,
 			Time:       time.Now(),
@@ -124,6 +126,8 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 		stopLoss := entryPrice * (1 + s.slPercentage/100)
 
 		tradingSignal = &Signal{
+			StopLoss:   stopLoss,
+			TakeProfit: takeProfit,
 			Type:       "SELL",
 			Price:      entryPrice,
 			Time:       time.Now(),

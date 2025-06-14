@@ -81,10 +81,12 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 		takeProfit := latestCandle.Close * 1.02 // 2% above entry
 
 		tradingSignal = &Signal{
-			Type:     "BUY",
-			Price:    latestCandle.Close,
-			Time:     time.Now(),
-			Strategy: s.GetName(),
+			Type:       "BUY",
+			Price:      latestCandle.Close,
+			Time:       time.Now(),
+			Strategy:   s.GetName(),
+			StopLoss:   stopLoss,
+			TakeProfit: takeProfit,
 			Description: fmt.Sprintf("🚀 MACD Strategy - BUY Signal\n\n"+
 				"Entry Price: %.2f\n"+
 				"Stop Loss: %.2f\n"+
@@ -104,10 +106,12 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 		takeProfit := latestCandle.Close * 0.98 // 2% below entry
 
 		tradingSignal = &Signal{
-			Type:     "SELL",
-			Price:    latestCandle.Close,
-			Time:     time.Now(),
-			Strategy: s.GetName(),
+			Type:       "SELL",
+			Price:      latestCandle.Close,
+			Time:       time.Now(),
+			Strategy:   s.GetName(),
+			StopLoss:   stopLoss,
+			TakeProfit: takeProfit,
 			Description: fmt.Sprintf("🔻 MACD Strategy - SELL Signal\n\n"+
 				"Entry Price: %.2f\n"+
 				"Stop Loss: %.2f\n"+

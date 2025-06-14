@@ -6,10 +6,13 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
 
+	backtesting "j-ai-trade/back_testing"
 	"j-ai-trade/brokers/binance"
 	"j-ai-trade/brokers/binance/repository"
 	quantitativetrading "j-ai-trade/quantitative_trading"
 	"j-ai-trade/telegram"
+
+	"gorm.io/gorm"
 )
 
 var (
@@ -23,14 +26,15 @@ type BinanceCandlesJob struct {
 	symbol          string
 	strategyHandler *quantitativetrading.StrategyHandler
 	telegramService *telegram.TelegramService
+	db              *gorm.DB
 }
 
 // InitializeGlobalBinanceJob creates and initializes the global BinanceCandlesJob instance
-func InitializeGlobalBinanceJob(symbol string) {
-	GlobalBinanceCandlesJob = NewBinanceCandlesJob(symbol)
+func InitializeGlobalBinanceJob(symbol string, db *gorm.DB) {
+	GlobalBinanceCandlesJob = NewBinanceCandlesJob(symbol, db)
 }
 
-func NewBinanceCandlesJob(symbol string) *BinanceCandlesJob {
+func NewBinanceCandlesJob(symbol string, db *gorm.DB) *BinanceCandlesJob {
 	repo := repository.NewBinanceRepository()
 	service := binance.NewBinanceService(repo)
 	strategyHandler := quantitativetrading.NewStrategyHandler()
@@ -42,6 +46,7 @@ func NewBinanceCandlesJob(symbol string) *BinanceCandlesJob {
 		symbol:          symbol,
 		strategyHandler: strategyHandler,
 		telegramService: telegramService,
+		db:              db,
 	}
 }
 
@@ -54,8 +59,8 @@ func (j *BinanceCandlesJob) Start() {
 func (j *BinanceCandlesJob) startRsiStrategy() {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
-	// Add job that runs every 5 minutes
-	_, err := j.cron.AddFunc("0 */5 * * * *", func() {
+	// Add job that runs every 5 seconds
+	_, err := j.cron.AddFunc("*/5 * * * * *", func() {
 		ctx := context.Background()
 
 		// Fetch 15-minute candles
@@ -102,6 +107,22 @@ func (j *BinanceCandlesJob) startRsiStrategy() {
 				Time("timestamp", signal.Timestamp).
 				Msg("Trading signal generated")
 
+			// Initialize backtesting service and execute order
+			backTesting := backtesting.NewBackTesting(j.db)
+			err = backTesting.ExecuteFuturesOrder(
+				j.symbol,
+				0.01, // Fixed amount of 0.01 BTC
+				signal.Price,
+				signal.Type, // This should be "BUY" or "SELL"
+				"RSI",
+				signal.TakeProfit,
+				signal.StopLoss,
+			)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to execute futures order")
+				return
+			}
+
 			// Send signal to Telegram
 			err = j.telegramService.SendMessageV1(signal.Description)
 			if err != nil {
@@ -123,8 +144,8 @@ func (j *BinanceCandlesJob) startRsiStrategy() {
 func (j *BinanceCandlesJob) startMacdStrategy() {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
-	// Add job that runs every 5 minutes
-	_, err := j.cron.AddFunc("0 */5 * * * *", func() {
+	// Add job that runs every 5 seconds
+	_, err := j.cron.AddFunc("*/5 * * * * *", func() {
 		ctx := context.Background()
 
 		// Fetch 15-minute candles
@@ -170,6 +191,22 @@ func (j *BinanceCandlesJob) startMacdStrategy() {
 				Float64("price", signal.Price).
 				Time("timestamp", signal.Timestamp).
 				Msg("Trading signal generated")
+
+			// Initialize backtesting service and execute order
+			backTesting := backtesting.NewBackTesting(j.db)
+			err = backTesting.ExecuteFuturesOrder(
+				j.symbol,
+				0.01, // Fixed amount of 0.01 BTC
+				signal.Price,
+				signal.Type, // This should be "BUY" or "SELL"
+				"MACD",
+				signal.TakeProfit,
+				signal.StopLoss,
+			)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to execute futures order")
+				return
+			}
 
 			// Send signal to Telegram
 			err = j.telegramService.SendMessageV1(signal.Description)

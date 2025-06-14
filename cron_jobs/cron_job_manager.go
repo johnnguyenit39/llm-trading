@@ -1,9 +1,11 @@
 package cronjobs
 
+import "gorm.io/gorm"
+
 // InitCronJobs initializes and starts all cron jobs
-func InitCronJobs() {
+func InitCronJobs(db *gorm.DB) {
 	// Initialize the global Binance job
-	InitializeGlobalBinanceJob("BTCUSDT")
+	InitializeGlobalBinanceJob("BTCUSDT", db)
 
 	// Start the job
 	GlobalBinanceCandlesJob.Start()
