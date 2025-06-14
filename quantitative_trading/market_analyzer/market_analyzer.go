@@ -18,10 +18,11 @@ type MarketConditionWithConfidence struct {
 
 // MarketAnalysis represents the result of market analysis
 type MarketAnalysis struct {
-	Conditions []MarketConditionWithConfidence
-	Volatility float64
-	Trend      float64
-	Volume     float64
+	Conditions       []MarketConditionWithConfidence
+	PrimaryCondition common.MarketCondition
+	Volatility       float64
+	Trend            float64
+	Volume           float64
 }
 
 // MarketAnalyzer analyzes market conditions using various strategies
@@ -135,11 +136,15 @@ func (a *MarketAnalyzer) AnalyzeMarket(candles5m, candles15m, candles1h []reposi
 		})
 	}
 
+	// Determine primary market condition using the 15-minute timeframe
+	primaryCondition := a.determineMarketCondition(candles15m)
+
 	return &MarketAnalysis{
-		Conditions: conditions,
-		Volatility: volatility,
-		Trend:      trend,
-		Volume:     volume,
+		Conditions:       conditions,
+		PrimaryCondition: primaryCondition,
+		Volatility:       volatility,
+		Trend:            trend,
+		Volume:           volume,
 	}, nil
 }
 
