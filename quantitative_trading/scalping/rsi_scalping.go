@@ -1,6 +1,7 @@
 package scalping
 
 import (
+	"fmt"
 	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
@@ -8,15 +9,17 @@ import (
 	"github.com/markcheno/go-talib"
 )
 
-// RSIScalpingStrategy is designed for ranging and low volatility markets
-type RSIScalpingStrategy struct{}
-
-func NewRSIScalpingStrategy() *RSIScalpingStrategy {
-	return &RSIScalpingStrategy{}
+// RSIScalpingStrategy is designed for ranging and reversal markets
+type RSIScalpingStrategy struct {
+	strategies.BaseStrategy
 }
 
-func (s *RSIScalpingStrategy) GetName() string {
-	return "RSI Scalping"
+func NewRSIScalpingStrategy() *RSIScalpingStrategy {
+	return &RSIScalpingStrategy{
+		BaseStrategy: strategies.BaseStrategy{
+			Name: "RSI Scalping",
+		},
+	}
 }
 
 func (s *RSIScalpingStrategy) GetDescription() string {
@@ -73,22 +76,66 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 	if latestRSI < 30 && prevRSI >= 30 {
 		// Oversold condition
 		return &strategies.Signal{
-			Type:        "BUY",
-			Price:       latestPrice,
-			Time:        candles5m[len(candles5m)-1].OpenTime,
-			Description: "RSI oversold condition",
-			StopLoss:    latestPrice - (atrValue * 1.2),
-			TakeProfit:  latestPrice + (atrValue * 1.5),
+			Type:  "BUY",
+			Price: latestPrice,
+			Time:  candles5m[len(candles5m)-1].OpenTime,
+			Description: fmt.Sprintf("🚀 RSI Scalping - BUY Signal ADA/USDT\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.5f\n"+
+				"• Stop Loss: %.5f (-%.1f%%)\n"+
+				"• Take Profit: %.5f (+%.1f%%)\n"+
+				"• Risk/Reward: 1:1.25\n\n"+
+				"📈 Signal Details:\n"+
+				"• RSI oversold condition on 5m\n"+
+				"• Current RSI: %.2f\n"+
+				"• Previous RSI: %.2f\n"+
+				"• ATR: %.6f\n\n"+
+				"💡 Strategy Notes:\n"+
+				"• Mean reversion opportunity\n"+
+				"• Using ATR for dynamic stop loss\n"+
+				"• Suitable for ranging markets",
+				latestPrice,
+				latestPrice-(atrValue*1.2),
+				(atrValue*1.2/latestPrice)*100,
+				latestPrice+(atrValue*1.5),
+				(atrValue*1.5/latestPrice)*100,
+				latestRSI,
+				prevRSI,
+				atrValue),
+			StopLoss:   latestPrice - (atrValue * 1.2),
+			TakeProfit: latestPrice + (atrValue * 1.5),
 		}, nil
 	} else if latestRSI > 70 && prevRSI <= 70 {
 		// Overbought condition
 		return &strategies.Signal{
-			Type:        "SELL",
-			Price:       latestPrice,
-			Time:        candles5m[len(candles5m)-1].OpenTime,
-			Description: "RSI overbought condition",
-			StopLoss:    latestPrice + (atrValue * 1.2),
-			TakeProfit:  latestPrice - (atrValue * 1.5),
+			Type:  "SELL",
+			Price: latestPrice,
+			Time:  candles5m[len(candles5m)-1].OpenTime,
+			Description: fmt.Sprintf("🔻 RSI Scalping - SELL Signal ADA/USDT\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.5f\n"+
+				"• Stop Loss: %.5f (+%.1f%%)\n"+
+				"• Take Profit: %.5f (-%.1f%%)\n"+
+				"• Risk/Reward: 1:1.25\n\n"+
+				"📈 Signal Details:\n"+
+				"• RSI overbought condition on 5m\n"+
+				"• Current RSI: %.2f\n"+
+				"• Previous RSI: %.2f\n"+
+				"• ATR: %.6f\n\n"+
+				"💡 Strategy Notes:\n"+
+				"• Mean reversion opportunity\n"+
+				"• Using ATR for dynamic stop loss\n"+
+				"• Suitable for ranging markets",
+				latestPrice,
+				latestPrice+(atrValue*1.2),
+				(atrValue*1.2/latestPrice)*100,
+				latestPrice-(atrValue*1.5),
+				(atrValue*1.5/latestPrice)*100,
+				latestRSI,
+				prevRSI,
+				atrValue),
+			StopLoss:   latestPrice + (atrValue * 1.2),
+			TakeProfit: latestPrice - (atrValue * 1.5),
 		}, nil
 	}
 

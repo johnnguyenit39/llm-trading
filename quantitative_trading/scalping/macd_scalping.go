@@ -1,6 +1,7 @@
 package scalping
 
 import (
+	"fmt"
 	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
@@ -9,14 +10,16 @@ import (
 )
 
 // MACDScalpingStrategy is designed for trending markets
-type MACDScalpingStrategy struct{}
-
-func NewMACDScalpingStrategy() *MACDScalpingStrategy {
-	return &MACDScalpingStrategy{}
+type MACDScalpingStrategy struct {
+	strategies.BaseStrategy
 }
 
-func (s *MACDScalpingStrategy) GetName() string {
-	return "MACD Scalping"
+func NewMACDScalpingStrategy() *MACDScalpingStrategy {
+	return &MACDScalpingStrategy{
+		BaseStrategy: strategies.BaseStrategy{
+			Name: "MACD Scalping",
+		},
+	}
 }
 
 func (s *MACDScalpingStrategy) GetDescription() string {
@@ -75,22 +78,66 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 	if latestHist > 0 && prevHist <= 0 {
 		// Bullish crossover
 		return &strategies.Signal{
-			Type:        "BUY",
-			Price:       latestPrice,
-			Time:        candles5m[len(candles5m)-1].OpenTime,
-			Description: "MACD bullish crossover",
-			StopLoss:    latestPrice - (atrValue * 1.5),
-			TakeProfit:  latestPrice + (atrValue * 2),
+			Type:  "BUY",
+			Price: latestPrice,
+			Time:  candles5m[len(candles5m)-1].OpenTime,
+			Description: fmt.Sprintf("🚀 MACD Scalping - BUY Signal ADA/USDT\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.5f\n"+
+				"• Stop Loss: %.5f (-%.1f%%)\n"+
+				"• Take Profit: %.5f (+%.1f%%)\n"+
+				"• Risk/Reward: 1:1.33\n\n"+
+				"📈 Signal Details:\n"+
+				"• MACD bullish crossover on 5m\n"+
+				"• Current MACD Histogram: %.6f\n"+
+				"• Previous MACD Histogram: %.6f\n"+
+				"• ATR: %.6f\n\n"+
+				"💡 Strategy Notes:\n"+
+				"• Quick scalping opportunity\n"+
+				"• Using ATR for dynamic stop loss\n"+
+				"• Tight risk management for scalping",
+				latestPrice,
+				latestPrice-(atrValue*1.5),
+				(atrValue*1.5/latestPrice)*100,
+				latestPrice+(atrValue*2),
+				(atrValue*2/latestPrice)*100,
+				latestHist,
+				prevHist,
+				atrValue),
+			StopLoss:   latestPrice - (atrValue * 1.5),
+			TakeProfit: latestPrice + (atrValue * 2),
 		}, nil
 	} else if latestHist < 0 && prevHist >= 0 {
 		// Bearish crossover
 		return &strategies.Signal{
-			Type:        "SELL",
-			Price:       latestPrice,
-			Time:        candles5m[len(candles5m)-1].OpenTime,
-			Description: "MACD bearish crossover",
-			StopLoss:    latestPrice + (atrValue * 1.5),
-			TakeProfit:  latestPrice - (atrValue * 2),
+			Type:  "SELL",
+			Price: latestPrice,
+			Time:  candles5m[len(candles5m)-1].OpenTime,
+			Description: fmt.Sprintf("🔻 MACD Scalping - SELL Signal ADA/USDT\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.5f\n"+
+				"• Stop Loss: %.5f (+%.1f%%)\n"+
+				"• Take Profit: %.5f (-%.1f%%)\n"+
+				"• Risk/Reward: 1:1.33\n\n"+
+				"📈 Signal Details:\n"+
+				"• MACD bearish crossover on 5m\n"+
+				"• Current MACD Histogram: %.6f\n"+
+				"• Previous MACD Histogram: %.6f\n"+
+				"• ATR: %.6f\n\n"+
+				"💡 Strategy Notes:\n"+
+				"• Quick scalping opportunity\n"+
+				"• Using ATR for dynamic stop loss\n"+
+				"• Tight risk management for scalping",
+				latestPrice,
+				latestPrice+(atrValue*1.5),
+				(atrValue*1.5/latestPrice)*100,
+				latestPrice-(atrValue*2),
+				(atrValue*2/latestPrice)*100,
+				latestHist,
+				prevHist,
+				atrValue),
+			StopLoss:   latestPrice + (atrValue * 1.5),
+			TakeProfit: latestPrice - (atrValue * 2),
 		}, nil
 	}
 

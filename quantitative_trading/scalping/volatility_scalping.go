@@ -1,6 +1,7 @@
 package scalping
 
 import (
+	"fmt"
 	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
@@ -9,14 +10,16 @@ import (
 )
 
 // VolatilityScalpingStrategy is designed for volatile and reversal markets
-type VolatilityScalpingStrategy struct{}
-
-func NewVolatilityScalpingStrategy() *VolatilityScalpingStrategy {
-	return &VolatilityScalpingStrategy{}
+type VolatilityScalpingStrategy struct {
+	strategies.BaseStrategy
 }
 
-func (s *VolatilityScalpingStrategy) GetName() string {
-	return "Volatility Scalping"
+func NewVolatilityScalpingStrategy() *VolatilityScalpingStrategy {
+	return &VolatilityScalpingStrategy{
+		BaseStrategy: strategies.BaseStrategy{
+			Name: "Volatility Scalping",
+		},
+	}
 }
 
 func (s *VolatilityScalpingStrategy) GetDescription() string {
@@ -80,22 +83,70 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 	if latestPrice > latestUpper && latestROC > 0 {
 		// Price above upper band with positive momentum
 		return &strategies.Signal{
-			Type:        "SELL",
-			Price:       latestPrice,
-			Time:        candles5m[len(candles5m)-1].OpenTime,
-			Description: "Price above upper Bollinger Band with momentum",
-			StopLoss:    latestPrice + (latestATR * 1.5),
-			TakeProfit:  latestPrice - (latestATR * 2),
+			Type:  "SELL",
+			Price: latestPrice,
+			Time:  candles5m[len(candles5m)-1].OpenTime,
+			Description: fmt.Sprintf("🔻 Volatility Scalping - SELL Signal ADA/USDT\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.5f\n"+
+				"• Stop Loss: %.5f (+%.1f%%)\n"+
+				"• Take Profit: %.5f (-%.1f%%)\n"+
+				"• Risk/Reward: 1:1.33\n\n"+
+				"📈 Signal Details:\n"+
+				"• Price above upper Bollinger Band\n"+
+				"• Current ROC: %.2f%%\n"+
+				"• Upper Band: %.5f\n"+
+				"• Lower Band: %.5f\n"+
+				"• ATR: %.6f\n\n"+
+				"💡 Strategy Notes:\n"+
+				"• Volatility breakout opportunity\n"+
+				"• Using ATR for dynamic stop loss\n"+
+				"• Suitable for volatile markets",
+				latestPrice,
+				latestPrice+(latestATR*1.5),
+				(latestATR*1.5/latestPrice)*100,
+				latestPrice-(latestATR*2),
+				(latestATR*2/latestPrice)*100,
+				latestROC*100,
+				latestUpper,
+				latestLower,
+				latestATR),
+			StopLoss:   latestPrice + (latestATR * 1.5),
+			TakeProfit: latestPrice - (latestATR * 2),
 		}, nil
 	} else if latestPrice < latestLower && latestROC < 0 {
 		// Price below lower band with negative momentum
 		return &strategies.Signal{
-			Type:        "BUY",
-			Price:       latestPrice,
-			Time:        candles5m[len(candles5m)-1].OpenTime,
-			Description: "Price below lower Bollinger Band with momentum",
-			StopLoss:    latestPrice - (latestATR * 1.5),
-			TakeProfit:  latestPrice + (latestATR * 2),
+			Type:  "BUY",
+			Price: latestPrice,
+			Time:  candles5m[len(candles5m)-1].OpenTime,
+			Description: fmt.Sprintf("🚀 Volatility Scalping - BUY Signal ADA/USDT\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.5f\n"+
+				"• Stop Loss: %.5f (-%.1f%%)\n"+
+				"• Take Profit: %.5f (+%.1f%%)\n"+
+				"• Risk/Reward: 1:1.33\n\n"+
+				"📈 Signal Details:\n"+
+				"• Price below lower Bollinger Band\n"+
+				"• Current ROC: %.2f%%\n"+
+				"• Upper Band: %.5f\n"+
+				"• Lower Band: %.5f\n"+
+				"• ATR: %.6f\n\n"+
+				"💡 Strategy Notes:\n"+
+				"• Volatility breakout opportunity\n"+
+				"• Using ATR for dynamic stop loss\n"+
+				"• Suitable for volatile markets",
+				latestPrice,
+				latestPrice-(latestATR*1.5),
+				(latestATR*1.5/latestPrice)*100,
+				latestPrice+(latestATR*2),
+				(latestATR*2/latestPrice)*100,
+				latestROC*100,
+				latestUpper,
+				latestLower,
+				latestATR),
+			StopLoss:   latestPrice - (latestATR * 1.5),
+			TakeProfit: latestPrice + (latestATR * 2),
 		}, nil
 	}
 

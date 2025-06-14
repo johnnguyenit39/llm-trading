@@ -1,6 +1,7 @@
 package market_analyzer
 
 import (
+	"fmt"
 	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
@@ -9,67 +10,23 @@ import (
 	"github.com/markcheno/go-talib"
 )
 
-type MarketAnalyzer struct {
-	strategies []strategies.Strategy
+// MarketConditionWithConfidence represents a market condition with its confidence level
+type MarketConditionWithConfidence struct {
+	Condition  common.MarketCondition
+	Confidence float64 // 0.0 to 1.0
 }
 
-// MarketAnalysis represents the current market state
+// MarketAnalysis represents the result of market analysis
 type MarketAnalysis struct {
-	// Market Condition
-	Condition common.MarketCondition
+	Conditions []MarketConditionWithConfidence
+	Volatility float64
+	Trend      float64
+	Volume     float64
+}
 
-	// Trend Analysis
-	Trend struct {
-		Direction5m  string // "up", "down", "sideways"
-		Direction15m string
-		Direction1h  string
-		Strength     float64 // 0-1
-	}
-
-	// Volatility Analysis
-	Volatility struct {
-		ATR5m  float64
-		ATR15m float64
-		ATR1h  float64
-		Range  float64 // High-Low range
-	}
-
-	// Volume Analysis
-	Volume struct {
-		AverageVolume5m  float64
-		AverageVolume15m float64
-		AverageVolume1h  float64
-		VolumeTrend      string // "increasing", "decreasing", "stable"
-	}
-
-	// Indicators
-	Indicators struct {
-		RSI5m  float64
-		RSI15m float64
-		RSI1h  float64
-		MACD5m struct {
-			Value     float64
-			Signal    float64
-			Histogram float64
-		}
-		MACD15m struct {
-			Value     float64
-			Signal    float64
-			Histogram float64
-		}
-		MACD1h struct {
-			Value     float64
-			Signal    float64
-			Histogram float64
-		}
-	}
-
-	// Pattern Recognition
-	Patterns struct {
-		CandlestickPatterns []string
-		ChartPatterns       []string
-		SupportResistance   []float64
-	}
+// MarketAnalyzer analyzes market conditions using various strategies
+type MarketAnalyzer struct {
+	strategies []strategies.Strategy
 }
 
 func NewMarketAnalyzer(strategies []strategies.Strategy) *MarketAnalyzer {
@@ -78,29 +35,474 @@ func NewMarketAnalyzer(strategies []strategies.Strategy) *MarketAnalyzer {
 	}
 }
 
-// AnalyzeMarket analyzes the market data and returns market analysis
+// AnalyzeMarket analyzes the market and returns multiple conditions with confidence levels
 func (a *MarketAnalyzer) AnalyzeMarket(candles5m, candles15m, candles1h []repository.Candle) (*MarketAnalysis, error) {
-	analysis := &MarketAnalysis{}
+	if len(candles5m) < 20 || len(candles15m) < 20 || len(candles1h) < 20 {
+		return nil, fmt.Errorf("insufficient candle data")
+	}
 
-	// Analyze trend
-	analysis.Trend = a.analyzeTrend(candles5m, candles15m, candles1h)
+	// Calculate basic metrics
+	volatility := calculateVolatility(candles5m)
+	trend := calculateTrend(candles15m)
+	volume := calculateVolume(candles5m)
 
-	// Analyze volatility
-	analysis.Volatility = a.analyzeVolatility(candles5m, candles15m, candles1h)
+	// Initialize conditions slice
+	conditions := make([]MarketConditionWithConfidence, 0)
 
-	// Analyze volume
-	analysis.Volume = a.analyzeVolume(candles5m, candles15m, candles1h)
+	// Analyze trend conditions
+	if trend > 0.7 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketStrongTrendUp,
+			Confidence: trend,
+		})
+	} else if trend > 0.3 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketWeakTrendUp,
+			Confidence: trend,
+		})
+	} else if trend < -0.7 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketStrongTrendDown,
+			Confidence: -trend,
+		})
+	} else if trend < -0.3 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketWeakTrendDown,
+			Confidence: -trend,
+		})
+	}
 
-	// Calculate indicators
-	analysis.Indicators = a.calculateIndicators(candles5m, candles15m, candles1h)
+	// Analyze volatility conditions
+	if volatility > 0.7 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketHighVolatility,
+			Confidence: volatility,
+		})
+	} else if volatility < 0.3 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketLowVolatility,
+			Confidence: 1 - volatility,
+		})
+	}
 
-	// Identify patterns
-	analysis.Patterns = a.identifyPatterns(candles5m, candles15m, candles1h)
+	// Analyze range conditions
+	rangeConfidence := calculateRangeConfidence(candles15m)
+	if rangeConfidence > 0.7 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketRanging,
+			Confidence: rangeConfidence,
+		})
+	}
 
-	// Determine market condition
-	analysis.Condition = a.determineMarketCondition(analysis)
+	// Analyze accumulation/distribution
+	accDistConfidence := calculateAccumulationDistribution(candles1h)
+	if accDistConfidence > 0.6 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketAccumulation,
+			Confidence: accDistConfidence,
+		})
+	} else if accDistConfidence < -0.6 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketDistribution,
+			Confidence: -accDistConfidence,
+		})
+	}
 
-	return analysis, nil
+	// Analyze squeeze conditions
+	squeezeConfidence := calculateSqueezeConfidence(candles5m)
+	if squeezeConfidence > 0.7 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketSqueeze,
+			Confidence: squeezeConfidence,
+		})
+	}
+
+	// Analyze breakout conditions
+	breakoutConfidence := calculateBreakoutConfidence(candles15m)
+	if breakoutConfidence > 0.7 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketBreakout,
+			Confidence: breakoutConfidence,
+		})
+	}
+
+	// Analyze reversal conditions
+	reversalConfidence := calculateReversalConfidence(candles1h)
+	if reversalConfidence > 0.7 {
+		conditions = append(conditions, MarketConditionWithConfidence{
+			Condition:  common.MarketReversal,
+			Confidence: reversalConfidence,
+		})
+	}
+
+	return &MarketAnalysis{
+		Conditions: conditions,
+		Volatility: volatility,
+		Trend:      trend,
+		Volume:     volume,
+	}, nil
+}
+
+// Helper functions for calculating various metrics
+func calculateVolatility(candles []repository.Candle) float64 {
+	if len(candles) < 20 {
+		return 0.5
+	}
+
+	// Convert to float64 arrays
+	highs := make([]float64, len(candles))
+	lows := make([]float64, len(candles))
+	closes := make([]float64, len(candles))
+	for i, c := range candles {
+		highs[i] = c.High
+		lows[i] = c.Low
+		closes[i] = c.Close
+	}
+
+	// Calculate ATR
+	atr := talib.Atr(highs, lows, closes, 14)
+	if len(atr) < 2 {
+		return 0.5
+	}
+
+	// Calculate ATR percentage of price
+	latestATR := atr[len(atr)-1]
+	latestPrice := closes[len(closes)-1]
+	atrPercent := (latestATR / latestPrice) * 100
+
+	// Normalize to 0-1 range
+	// Consider ATR% > 3% as high volatility (1.0)
+	// Consider ATR% < 1% as low volatility (0.0)
+	volatility := math.Min(1.0, math.Max(0.0, (atrPercent-1.0)/2.0))
+	return volatility
+}
+
+func calculateTrend(candles []repository.Candle) float64 {
+	if len(candles) < 50 {
+		return 0.0
+	}
+
+	// Convert to float64 arrays
+	closes := make([]float64, len(candles))
+	for i, c := range candles {
+		closes[i] = c.Close
+	}
+
+	// Calculate EMAs
+	ema20 := talib.Ema(closes, 20)
+	ema50 := talib.Ema(closes, 50)
+	if len(ema20) < 2 || len(ema50) < 2 {
+		return 0.0
+	}
+
+	// Calculate trend strength
+	latestEMA20 := ema20[len(ema20)-1]
+	latestEMA50 := ema50[len(ema50)-1]
+	prevEMA20 := ema20[len(ema20)-2]
+	prevEMA50 := ema50[len(ema50)-2]
+
+	// Calculate price change
+	priceChange := (latestEMA20 - latestEMA50) / latestEMA50 * 100
+
+	// Calculate trend direction and strength
+	trend := 0.0
+	if latestEMA20 > latestEMA50 && prevEMA20 > prevEMA50 {
+		// Uptrend
+		trend = math.Min(1.0, priceChange/5.0) // 5% change = 1.0
+	} else if latestEMA20 < latestEMA50 && prevEMA20 < prevEMA50 {
+		// Downtrend
+		trend = math.Max(-1.0, -priceChange/5.0) // -5% change = -1.0
+	}
+
+	return trend
+}
+
+func calculateVolume(candles []repository.Candle) float64 {
+	if len(candles) < 20 {
+		return 0.5
+	}
+
+	// Calculate volume moving average
+	volumes := make([]float64, len(candles))
+	for i, c := range candles {
+		volumes[i] = c.Volume
+	}
+	volumeMA := talib.Sma(volumes, 20)
+
+	// Calculate volume trend
+	latestVolume := volumes[len(volumes)-1]
+	latestVolumeMA := volumeMA[len(volumeMA)-1]
+
+	// Normalize to 0-1 range
+	// Volume > 2x MA = 1.0
+	// Volume < 0.5x MA = 0.0
+	volumeRatio := latestVolume / latestVolumeMA
+	volume := math.Min(1.0, math.Max(0.0, (volumeRatio-0.5)/1.5))
+	return volume
+}
+
+func calculateRangeConfidence(candles []repository.Candle) float64 {
+	if len(candles) < 20 {
+		return 0.5
+	}
+
+	// Convert to float64 arrays
+	highs := make([]float64, len(candles))
+	lows := make([]float64, len(candles))
+	closes := make([]float64, len(candles))
+	for i, c := range candles {
+		highs[i] = c.High
+		lows[i] = c.Low
+		closes[i] = c.Close
+	}
+
+	// Calculate Bollinger Bands
+	bbUpper, bbMiddle, bbLower := talib.BBands(closes, 20, 2, 2, talib.SMA)
+	if len(bbUpper) < 2 {
+		return 0.5
+	}
+
+	// Calculate price position relative to BBands
+	latestPrice := closes[len(closes)-1]
+	latestBBUpper := bbUpper[len(bbUpper)-1]
+	latestBBLower := bbLower[len(bbLower)-1]
+	latestBBMiddle := bbMiddle[len(bbMiddle)-1]
+
+	// Calculate range confidence
+	bbWidth := (latestBBUpper - latestBBLower) / latestBBMiddle
+	pricePosition := (latestPrice - latestBBLower) / (latestBBUpper - latestBBLower)
+
+	// High confidence when:
+	// 1. BBands are narrow (low volatility)
+	// 2. Price is near the middle band
+	rangeConfidence := 0.0
+	if bbWidth < 0.03 { // 3% BB width
+		rangeConfidence += 0.5
+	}
+	if math.Abs(pricePosition-0.5) < 0.1 { // Price within 10% of middle
+		rangeConfidence += 0.5
+	}
+
+	return rangeConfidence
+}
+
+func calculateAccumulationDistribution(candles []repository.Candle) float64 {
+	if len(candles) < 20 {
+		return 0.5
+	}
+
+	// Convert to float64 arrays
+	highs := make([]float64, len(candles))
+	lows := make([]float64, len(candles))
+	closes := make([]float64, len(candles))
+	volumes := make([]float64, len(candles))
+	for i, c := range candles {
+		highs[i] = c.High
+		lows[i] = c.Low
+		closes[i] = c.Close
+		volumes[i] = c.Volume
+	}
+
+	// Calculate OBV (On-Balance Volume)
+	obv := talib.Obv(closes, volumes)
+	if len(obv) < 2 {
+		return 0.5
+	}
+
+	// Calculate OBV moving average
+	obvMA := talib.Sma(obv, 20)
+
+	// Calculate accumulation/distribution
+	latestOBV := obv[len(obv)-1]
+	latestOBVMA := obvMA[len(obvMA)-1]
+	prevOBV := obv[len(obv)-2]
+
+	// Determine if we're in accumulation or distribution
+	// Positive value = accumulation, negative = distribution
+	obvChange := (latestOBV - latestOBVMA) / latestOBVMA
+	obvTrend := (latestOBV - prevOBV) / prevOBV
+
+	// Normalize to -1 to 1 range
+	// -1 = strong distribution
+	// 0 = neutral
+	// 1 = strong accumulation
+	accumulation := math.Min(1.0, math.Max(-1.0, obvChange*10))
+	if obvTrend < 0 {
+		accumulation *= -1
+	}
+
+	return accumulation
+}
+
+func calculateSqueezeConfidence(candles []repository.Candle) float64 {
+	if len(candles) < 20 {
+		return 0.5
+	}
+
+	// Convert to float64 arrays
+	highs := make([]float64, len(candles))
+	lows := make([]float64, len(candles))
+	closes := make([]float64, len(candles))
+	for i, c := range candles {
+		highs[i] = c.High
+		lows[i] = c.Low
+		closes[i] = c.Close
+	}
+
+	// Calculate Bollinger Bands
+	bbUpper, bbMiddle, bbLower := talib.BBands(closes, 20, 2, 2, talib.SMA)
+	if len(bbUpper) < 2 {
+		return 0.5
+	}
+
+	// Calculate Keltner Channels
+	atr := talib.Atr(highs, lows, closes, 20)
+	kcUpper := talib.Sma(closes, 20)
+	kcLower := talib.Sma(closes, 20)
+	for i := range kcUpper {
+		kcUpper[i] += 2 * atr[i]
+		kcLower[i] -= 2 * atr[i]
+	}
+
+	// Calculate squeeze conditions
+	latestBBUpper := bbUpper[len(bbUpper)-1]
+	latestBBLower := bbLower[len(bbLower)-1]
+	latestBBMiddle := bbMiddle[len(bbMiddle)-1]
+	latestKCUpper := kcUpper[len(kcUpper)-1]
+	latestKCLower := kcLower[len(kcLower)-1]
+
+	// Check if BBands are inside Keltner Channels
+	isSqueeze := latestBBUpper < latestKCUpper && latestBBLower > latestKCLower
+
+	// Calculate squeeze confidence
+	squeezeConfidence := 0.0
+	if isSqueeze {
+		// Calculate how tight the squeeze is
+		bbWidth := (latestBBUpper - latestBBLower) / latestBBMiddle
+		kcWidth := (latestKCUpper - latestKCLower) / latestBBMiddle
+		widthRatio := bbWidth / kcWidth
+
+		// Higher confidence for tighter squeezes
+		squeezeConfidence = 1.0 - widthRatio
+	}
+
+	return squeezeConfidence
+}
+
+func calculateBreakoutConfidence(candles []repository.Candle) float64 {
+	if len(candles) < 20 {
+		return 0.5
+	}
+
+	// Convert to float64 arrays
+	highs := make([]float64, len(candles))
+	lows := make([]float64, len(candles))
+	closes := make([]float64, len(candles))
+	volumes := make([]float64, len(candles))
+	for i, c := range candles {
+		highs[i] = c.High
+		lows[i] = c.Low
+		closes[i] = c.Close
+		volumes[i] = c.Volume
+	}
+
+	// Calculate Bollinger Bands
+	bbUpper, _, bbLower := talib.BBands(closes, 20, 2, 2, talib.SMA)
+	if len(bbUpper) < 2 {
+		return 0.5
+	}
+
+	// Calculate volume moving average
+	volumeMA := talib.Sma(volumes, 20)
+
+	// Get latest values
+	latestPrice := closes[len(closes)-1]
+	latestBBUpper := bbUpper[len(bbUpper)-1]
+	latestBBLower := bbLower[len(bbLower)-1]
+	latestVolume := volumes[len(volumes)-1]
+	latestVolumeMA := volumeMA[len(volumeMA)-1]
+
+	// Check for breakout conditions
+	breakoutConfidence := 0.0
+
+	// Price breakout
+	if latestPrice > latestBBUpper {
+		// Calculate how far price is above upper band
+		priceDistance := (latestPrice - latestBBUpper) / latestBBUpper
+		breakoutConfidence += math.Min(1.0, priceDistance*10)
+	} else if latestPrice < latestBBLower {
+		// Calculate how far price is below lower band
+		priceDistance := (latestBBLower - latestPrice) / latestBBLower
+		breakoutConfidence += math.Min(1.0, priceDistance*10)
+	}
+
+	// Volume confirmation
+	volumeRatio := latestVolume / latestVolumeMA
+	if volumeRatio > 1.5 {
+		breakoutConfidence += math.Min(1.0, (volumeRatio-1.5)/2)
+	}
+
+	// Normalize final confidence
+	return math.Min(1.0, breakoutConfidence/2)
+}
+
+func calculateReversalConfidence(candles []repository.Candle) float64 {
+	if len(candles) < 50 {
+		return 0.5
+	}
+
+	// Convert to float64 arrays
+	highs := make([]float64, len(candles))
+	lows := make([]float64, len(candles))
+	closes := make([]float64, len(candles))
+	for i, c := range candles {
+		highs[i] = c.High
+		lows[i] = c.Low
+		closes[i] = c.Close
+	}
+
+	// Calculate RSI
+	rsi := talib.Rsi(closes, 14)
+	if len(rsi) < 2 {
+		return 0.5
+	}
+
+	// Calculate MACD
+	macd, signal, _ := talib.Macd(closes, 12, 26, 9)
+	if len(macd) < 2 {
+		return 0.5
+	}
+
+	// Get latest values
+	latestRSI := rsi[len(rsi)-1]
+	prevRSI := rsi[len(rsi)-2]
+	latestMACD := macd[len(macd)-1]
+	prevMACD := macd[len(macd)-2]
+	latestSignal := signal[len(signal)-1]
+	prevSignal := signal[len(signal)-2]
+
+	// Calculate reversal confidence
+	reversalConfidence := 0.0
+
+	// RSI divergence
+	if latestRSI > 70 && latestRSI < prevRSI {
+		// Bearish divergence
+		reversalConfidence += 0.5
+	} else if latestRSI < 30 && latestRSI > prevRSI {
+		// Bullish divergence
+		reversalConfidence += 0.5
+	}
+
+	// MACD crossover
+	if prevMACD < prevSignal && latestMACD > latestSignal {
+		// Bullish crossover
+		reversalConfidence += 0.5
+	} else if prevMACD > prevSignal && latestMACD < latestSignal {
+		// Bearish crossover
+		reversalConfidence += 0.5
+	}
+
+	return reversalConfidence
 }
 
 // GetSuitableStrategies returns a list of strategies suitable for current market condition
@@ -257,7 +659,7 @@ func (a *MarketAnalyzer) analyzeVolume(candles5m, candles15m, candles1h []reposi
 	AverageVolume5m  float64
 	AverageVolume15m float64
 	AverageVolume1h  float64
-	VolumeTrend      string
+	VolumeTrend      string // "increasing", "decreasing", "stable"
 } {
 	// Calculate average volumes
 	var sumVolume5m, sumVolume15m, sumVolume1h float64
@@ -450,44 +852,133 @@ func (a *MarketAnalyzer) identifyPatterns(candles5m, candles15m, candles1h []rep
 	return patterns
 }
 
-func (a *MarketAnalyzer) determineMarketCondition(analysis *MarketAnalysis) common.MarketCondition {
-	// Strong trend
-	if analysis.Trend.Strength > 0.7 {
-		if analysis.Trend.Direction5m == "up" && analysis.Trend.Direction15m == "up" && analysis.Trend.Direction1h == "up" {
-			return common.MarketTrendingUp
+// determineMarketCondition determines the primary market condition based on analysis metrics
+func (ma *MarketAnalyzer) determineMarketCondition(candles []repository.Candle) common.MarketCondition {
+	// Calculate all market metrics
+	volatility := calculateVolatility(candles)
+	trend := calculateTrend(candles)
+	volume := calculateVolume(candles)
+	rangeConfidence := calculateRangeConfidence(candles)
+	accumulation := calculateAccumulationDistribution(candles)
+	squeezeConfidence := calculateSqueezeConfidence(candles)
+	breakoutConfidence := calculateBreakoutConfidence(candles)
+	reversalConfidence := calculateReversalConfidence(candles)
+
+	// Determine market condition based on all metrics
+	// We'll use a scoring system to determine the most likely condition
+
+	// Initialize scores for each condition
+	scores := map[common.MarketCondition]float64{
+		common.MarketStrongTrendUp:   0,
+		common.MarketStrongTrendDown: 0,
+		common.MarketWeakTrendUp:     0,
+		common.MarketWeakTrendDown:   0,
+		common.MarketRanging:         0,
+		common.MarketVolatile:        0,
+		common.MarketAccumulation:    0,
+		common.MarketDistribution:    0,
+		common.MarketSqueeze:         0,
+		common.MarketBreakout:        0,
+		common.MarketReversal:        0,
+	}
+
+	// Score strong trend
+	if trend > 0.7 {
+		scores[common.MarketStrongTrendUp] += trend
+		if volume > 0.7 {
+			scores[common.MarketStrongTrendUp] += 0.3 // Volume confirmation
 		}
-		if analysis.Trend.Direction5m == "down" && analysis.Trend.Direction15m == "down" && analysis.Trend.Direction1h == "down" {
-			return common.MarketTrendingDown
+	} else if trend < -0.7 {
+		scores[common.MarketStrongTrendDown] += math.Abs(trend)
+		if volume > 0.7 {
+			scores[common.MarketStrongTrendDown] += 0.3 // Volume confirmation
 		}
 	}
 
-	// High volatility
-	if analysis.Volatility.Range > analysis.Volatility.ATR5m*2 {
-		return common.MarketVolatile
+	// Score weak trend
+	if trend > 0.3 && trend <= 0.7 {
+		scores[common.MarketWeakTrendUp] += trend
+	} else if trend < -0.3 && trend >= -0.7 {
+		scores[common.MarketWeakTrendDown] += math.Abs(trend)
 	}
 
-	// Low volatility
-	if analysis.Volatility.Range < analysis.Volatility.ATR5m*0.5 {
-		return common.MarketLowVolatility
+	// Score ranging
+	if rangeConfidence > 0.7 {
+		scores[common.MarketRanging] += rangeConfidence
+		if volatility < 0.3 {
+			scores[common.MarketRanging] += 0.3 // Low volatility confirmation
+		}
 	}
 
-	// Ranging market
-	return common.MarketRanging
+	// Score volatile
+	if volatility > 0.7 {
+		scores[common.MarketVolatile] += volatility
+		if volume > 0.7 {
+			scores[common.MarketVolatile] += 0.3 // High volume confirmation
+		}
+	}
+
+	// Score accumulation/distribution
+	if accumulation > 0.7 {
+		scores[common.MarketAccumulation] += accumulation
+		if volume > 0.6 {
+			scores[common.MarketAccumulation] += 0.3 // Volume confirmation
+		}
+	} else if accumulation < -0.7 {
+		scores[common.MarketDistribution] += math.Abs(accumulation)
+		if volume > 0.6 {
+			scores[common.MarketDistribution] += 0.3 // Volume confirmation
+		}
+	}
+
+	// Score squeeze
+	if squeezeConfidence > 0.7 {
+		scores[common.MarketSqueeze] += squeezeConfidence
+		if volatility < 0.3 {
+			scores[common.MarketSqueeze] += 0.3 // Low volatility confirmation
+		}
+	}
+
+	// Score breakout
+	if breakoutConfidence > 0.7 {
+		scores[common.MarketBreakout] += breakoutConfidence
+		if volume > 0.7 {
+			scores[common.MarketBreakout] += 0.3 // Volume confirmation
+		}
+	}
+
+	// Score reversal
+	if reversalConfidence > 0.7 {
+		scores[common.MarketReversal] += reversalConfidence
+		if volume > 0.6 {
+			scores[common.MarketReversal] += 0.3 // Volume confirmation
+		}
+	}
+
+	// Find the condition with the highest score
+	var maxScore float64
+	var maxCondition common.MarketCondition
+	for condition, score := range scores {
+		if score > maxScore {
+			maxScore = score
+			maxCondition = condition
+		}
+	}
+
+	// If no condition has a significant score, default to ranging
+	if maxScore < 0.5 {
+		return common.MarketRanging
+	}
+
+	return maxCondition
 }
 
 func (a *MarketAnalyzer) isStrategySuitable(strategy strategies.Strategy, analysis *MarketAnalysis) bool {
-	// Example logic for strategy suitability
-	switch strategy.GetName() {
-	case "MACD 15m-1h Strategy":
-		return analysis.Condition == common.MarketTrendingUp || analysis.Condition == common.MarketTrendingDown
-
-	case "RSI 15m-1h Strategy":
-		return analysis.Condition == common.MarketRanging || analysis.Condition == common.MarketLowVolatility
-
-	case "MACD + Trendline Strategy":
-		return analysis.Condition == common.MarketTrendingUp || analysis.Condition == common.MarketTrendingDown
-
-	default:
-		return false
+	// Check if any condition matches the strategy's suitability
+	for _, condition := range analysis.Conditions {
+		if condition.Confidence >= 0.6 && strategy.IsSuitableForCondition(condition.Condition) {
+			return true
+		}
 	}
+	return false
 }

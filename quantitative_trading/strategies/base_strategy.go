@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"j-ai-trade/brokers/binance/repository"
+	"j-ai-trade/common"
 )
 
 // Signal represents a trading signal
@@ -28,6 +29,9 @@ type Strategy interface {
 
 	// GetTimeframes returns the required timeframes for this strategy
 	GetTimeframes() []string
+
+	// IsSuitableForCondition checks if the strategy is suitable for the given market condition
+	IsSuitableForCondition(condition common.MarketCondition) bool
 }
 
 // BaseStrategy provides common functionality for all strategies
@@ -42,4 +46,10 @@ func (s *BaseStrategy) GetName() string {
 
 func (s *BaseStrategy) GetTimeframes() []string {
 	return s.Timeframes
+}
+
+func (s *BaseStrategy) IsSuitableForCondition(condition common.MarketCondition) bool {
+	// Default implementation returns false
+	// Each strategy should override this method with its own logic
+	return false
 }
