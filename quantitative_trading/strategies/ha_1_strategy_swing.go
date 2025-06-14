@@ -160,7 +160,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🚀 HA-1: MACD + Trendline Strategy - BUY Signal %s\n\n"+
+			Description: fmt.Sprintf("🚀 HA-1: MACD + Trendline Strategy (SWING) - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f\n"+
@@ -249,7 +249,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🔻HA-1: MACD + Trendline Strategy - SELL Signal %s\n\n"+
+			Description: fmt.Sprintf("🔻HA-1: MACD + Trendline Strategy (SWING) - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f\n"+

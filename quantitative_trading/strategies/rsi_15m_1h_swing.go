@@ -149,7 +149,7 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 			Time:       time.Now(),
 			Strategy:   s.GetName(),
 			Confidence: strength,
-			Description: fmt.Sprintf("🟢 RSI Strategy Strong Buy Signal Detected! ADA/USDT %s\n"+
+			Description: fmt.Sprintf("🟢 RSI Strategy (SWING) Strong Buy Signal Detected! ADA/USDT %s\n"+
 				"• 15m RSI(14): %.2f (Oversold)\n"+
 				"• 1h RSI(14): %.2f (Trend Support)\n"+
 				"• 15m Price Change: %s\n"+
@@ -240,7 +240,7 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 			Time:       time.Now(),
 			Strategy:   s.GetName(),
 			Confidence: strength,
-			Description: fmt.Sprintf("🔴 RSI Strategy Strong Sell Signal Detected! ADA/USDT %s\n"+
+			Description: fmt.Sprintf("🔴 RSI Strategy (SWING) Strong Sell Signal Detected! ADA/USDT %s\n"+
 				"• 15m RSI(14): %.2f (Overbought)\n"+
 				"• 1h RSI(14): %.2f (Trend Resistance)\n"+
 				"• 15m Price Change: %s\n"+

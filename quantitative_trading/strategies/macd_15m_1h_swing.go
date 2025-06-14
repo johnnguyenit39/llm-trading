@@ -149,7 +149,7 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🚀 MACD Strategy - BUY Signal ADA/USDT %s\n\n"+
+			Description: fmt.Sprintf("🚀 MACD Strategy (SWING) - BUY Signal ADA/USDT %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.2f\n"+
 				"• Stop Loss: %.2f (-1.0%%)\n"+
@@ -217,7 +217,7 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🔻 MACD Strategy - SELL Signal ADA/USDT %s\n\n"+
+			Description: fmt.Sprintf("🔻 MACD Strategy (SWING) - SELL Signal ADA/USDT %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+1.0%%)\n"+
