@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -46,8 +48,12 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 
 	// Convert to float64 arrays
 	closes := make([]float64, len(candles5m))
+	highs := make([]float64, len(candles5m))
+	lows := make([]float64, len(candles5m))
 	for i, c := range candles5m {
 		closes[i] = c.Close
+		highs[i] = c.High
+		lows[i] = c.Low
 	}
 
 	// Calculate RSI
@@ -64,13 +70,19 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 	latestPrice := candles5m[len(candles5m)-1].Close
 
 	// Calculate ATR for stop loss and take profit
-	atr := talib.Atr(
-		make([]float64, len(candles5m)),
-		make([]float64, len(candles5m)),
-		closes,
-		14,
-	)
+	atr := talib.Atr(highs, lows, closes, 14)
+	if len(atr) < 2 {
+		return nil, nil
+	}
 	atrValue := atr[len(atr)-1]
+
+	// Calculate maximum allowed stop loss (2% of price)
+	maxStopLossPercent := 0.02
+	maxStopLossDistance := latestPrice * maxStopLossPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(atrValue*1.2, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.25 // 1:1.25 risk-reward ratio
 
 	// Trading logic
 	if latestRSI < 30 && prevRSI >= 30 {
@@ -95,15 +107,15 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"• Using ATR for dynamic stop loss\n"+
 				"• Suitable for ranging markets",
 				latestPrice,
-				latestPrice-(atrValue*1.2),
-				(atrValue*1.2/latestPrice)*100,
-				latestPrice+(atrValue*1.5),
-				(atrValue*1.5/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice+takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestRSI,
 				prevRSI,
 				atrValue),
-			StopLoss:   latestPrice - (atrValue * 1.2),
-			TakeProfit: latestPrice + (atrValue * 1.5),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if latestRSI > 70 && prevRSI <= 70 {
 		// Overbought condition
@@ -127,15 +139,15 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"• Using ATR for dynamic stop loss\n"+
 				"• Suitable for ranging markets",
 				latestPrice,
-				latestPrice+(atrValue*1.2),
-				(atrValue*1.2/latestPrice)*100,
-				latestPrice-(atrValue*1.5),
-				(atrValue*1.5/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice-takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestRSI,
 				prevRSI,
 				atrValue),
-			StopLoss:   latestPrice + (atrValue * 1.2),
-			TakeProfit: latestPrice - (atrValue * 1.5),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 

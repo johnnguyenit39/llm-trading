@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -99,6 +101,14 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 	// Calculate volatility ratio
 	volatilityRatio := latestATR / latestEMA * 100
 
+	// Calculate maximum allowed stop loss (2% of price)
+	maxStopLossPercent := 0.02
+	maxStopLossDistance := latestPrice * maxStopLossPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(latestATR*2, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 2.5 // 1:2.5 risk-reward ratio for high volatility
+
 	// Trading logic
 	if latestPrice < latestKCLower && latestRSI < 30 && latestVolume > latestVolumeMA*1.5 && volatilityRatio > 2 {
 		// Price below lower Keltner, oversold, high volume, high volatility
@@ -111,7 +121,7 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:2\n\n"+
+				"• Risk/Reward: 1:2.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• Price below lower Keltner: %.5f\n"+
 				"• RSI: %.2f (Oversold)\n"+
@@ -123,18 +133,18 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Using ATR for dynamic stop loss\n"+
 				"• High volume confirms signal",
 				latestPrice,
-				latestPrice-(latestATR*2),
-				(latestATR*2/latestPrice)*100,
-				latestPrice+(latestATR*4),
-				(latestATR*4/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice+takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestKCLower,
 				latestRSI,
 				volatilityRatio,
 				latestVolume,
 				latestVolumeMA,
 				latestATR),
-			StopLoss:   latestPrice - (latestATR * 2),
-			TakeProfit: latestPrice + (latestATR * 4),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if latestPrice > latestKCUpper && latestRSI > 70 && latestVolume > latestVolumeMA*1.5 && volatilityRatio > 2 {
 		// Price above upper Keltner, overbought, high volume, high volatility
@@ -147,7 +157,7 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:2\n\n"+
+				"• Risk/Reward: 1:2.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• Price above upper Keltner: %.5f\n"+
 				"• RSI: %.2f (Overbought)\n"+
@@ -159,18 +169,18 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Using ATR for dynamic stop loss\n"+
 				"• High volume confirms signal",
 				latestPrice,
-				latestPrice+(latestATR*2),
-				(latestATR*2/latestPrice)*100,
-				latestPrice-(latestATR*4),
-				(latestATR*4/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice-takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestKCUpper,
 				latestRSI,
 				volatilityRatio,
 				latestVolume,
 				latestVolumeMA,
 				latestATR),
-			StopLoss:   latestPrice + (latestATR * 2),
-			TakeProfit: latestPrice - (latestATR * 4),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 

@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -48,8 +50,12 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 
 	// Convert to float64 arrays
 	closes := make([]float64, len(candles5m))
+	highs := make([]float64, len(candles5m))
+	lows := make([]float64, len(candles5m))
 	for i, c := range candles5m {
 		closes[i] = c.Close
+		highs[i] = c.High
+		lows[i] = c.Low
 	}
 
 	// Calculate MACD
@@ -66,13 +72,19 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 	latestPrice := candles5m[len(candles5m)-1].Close
 
 	// Calculate stop loss and take profit levels
-	atr := talib.Atr(
-		make([]float64, len(candles5m)),
-		make([]float64, len(candles5m)),
-		closes,
-		14,
-	)
+	atr := talib.Atr(highs, lows, closes, 14)
+	if len(atr) < 2 {
+		return nil, nil
+	}
 	atrValue := atr[len(atr)-1]
+
+	// Calculate maximum allowed stop loss (2% of price)
+	maxStopLossPercent := 0.02
+	maxStopLossDistance := latestPrice * maxStopLossPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(atrValue*1.5, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.33 // 1:1.33 risk-reward ratio
 
 	// Trading logic
 	if latestHist > 0 && prevHist <= 0 {
@@ -97,15 +109,15 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"• Using ATR for dynamic stop loss\n"+
 				"• Tight risk management for scalping",
 				latestPrice,
-				latestPrice-(atrValue*1.5),
-				(atrValue*1.5/latestPrice)*100,
-				latestPrice+(atrValue*2),
-				(atrValue*2/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice+takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestHist,
 				prevHist,
 				atrValue),
-			StopLoss:   latestPrice - (atrValue * 1.5),
-			TakeProfit: latestPrice + (atrValue * 2),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if latestHist < 0 && prevHist >= 0 {
 		// Bearish crossover
@@ -129,15 +141,15 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"• Using ATR for dynamic stop loss\n"+
 				"• Tight risk management for scalping",
 				latestPrice,
-				latestPrice+(atrValue*1.5),
-				(atrValue*1.5/latestPrice)*100,
-				latestPrice-(atrValue*2),
-				(atrValue*2/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice-takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestHist,
 				prevHist,
 				atrValue),
-			StopLoss:   latestPrice + (atrValue * 1.5),
-			TakeProfit: latestPrice - (atrValue * 2),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 

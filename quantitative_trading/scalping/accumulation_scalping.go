@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -80,6 +82,14 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	prevOBV := obv[len(obv)-2]
 	prevOBVMA := obvMA[len(obvMA)-2]
 
+	// Calculate maximum allowed stop loss (2% of price)
+	maxStopLossPercent := 0.02
+	maxStopLossDistance := latestPrice * maxStopLossPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(atrValue*1.2, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
 	// Trading logic
 	if latestOBV > latestOBVMA && prevOBV <= prevOBVMA {
 		// OBV crosses above its MA - accumulation pattern
@@ -103,15 +113,15 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Using ATR for dynamic stop loss\n"+
 				"• Suitable for accumulation phase",
 				latestPrice,
-				latestPrice-(atrValue*1.2),
-				(atrValue*1.2/latestPrice)*100,
-				latestPrice+(atrValue*1.8),
-				(atrValue*1.8/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice+takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestOBV,
 				latestOBVMA,
 				atrValue),
-			StopLoss:   latestPrice - (atrValue * 1.2),
-			TakeProfit: latestPrice + (atrValue * 1.8),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if latestOBV < latestOBVMA && prevOBV >= prevOBVMA {
 		// OBV crosses below its MA - distribution pattern
@@ -135,15 +145,15 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Using ATR for dynamic stop loss\n"+
 				"• Suitable for distribution phase",
 				latestPrice,
-				latestPrice+(atrValue*1.2),
-				(atrValue*1.2/latestPrice)*100,
-				latestPrice-(atrValue*1.8),
-				(atrValue*1.8/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice-takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestOBV,
 				latestOBVMA,
 				atrValue),
-			StopLoss:   latestPrice + (atrValue * 1.2),
-			TakeProfit: latestPrice - (atrValue * 1.8),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 

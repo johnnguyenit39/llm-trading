@@ -36,36 +36,42 @@ type Signal struct {
 }
 
 type StrategyHandler struct {
-	rsiStrategy          *strategies.RSI15m1hStrategy
-	macdStrategy         *strategies.MACD15m1hStrategy
-	strategies           []Strategy
-	marketAnalyzer       *market_analyzer.MarketAnalyzer
-	macdScalping         *scalping.MACDScalpingStrategy
-	rsiScalping          *scalping.RSIScalpingStrategy
-	volatilityScalping   *scalping.VolatilityScalpingStrategy
-	strongTrendScalping  *scalping.StrongTrendScalpingStrategy
-	accumulationScalping *scalping.AccumulationScalpingStrategy
-	squeezeScalping      *scalping.SqueezeScalpingStrategy
-	gridScalping         *scalping.GridScalpingStrategy
-	maCrossoverScalping  *scalping.MACrossoverScalpingStrategy
-	srBounceScalping     *scalping.SRBounceScalpingStrategy
-	tickVolumeScalping   *scalping.TickVolumeScalpingStrategy
+	rsiStrategy            *strategies.RSI15m1hStrategy
+	macdStrategy           *strategies.MACD15m1hStrategy
+	strategies             []Strategy
+	marketAnalyzer         *market_analyzer.MarketAnalyzer
+	macdScalping           *scalping.MACDScalpingStrategy
+	rsiScalping            *scalping.RSIScalpingStrategy
+	volatilityScalping     *scalping.VolatilityScalpingStrategy
+	strongTrendScalping    *scalping.StrongTrendScalpingStrategy
+	accumulationScalping   *scalping.AccumulationScalpingStrategy
+	squeezeScalping        *scalping.SqueezeScalpingStrategy
+	gridScalping           *scalping.GridScalpingStrategy
+	maCrossoverScalping    *scalping.MACrossoverScalpingStrategy
+	srBounceScalping       *scalping.SRBounceScalpingStrategy
+	tickVolumeScalping     *scalping.TickVolumeScalpingStrategy
+	highVolatilityScalping *scalping.HighVolatilityScalpingStrategy
+	breakoutScalping       *scalping.BreakoutScalpingStrategy
+	choppyMarketScalping   *scalping.ChoppyMarketScalpingStrategy
 }
 
 func NewStrategyHandler() *StrategyHandler {
 	handler := &StrategyHandler{
-		rsiStrategy:          strategies.NewRSI15m1hStrategy(),
-		macdStrategy:         strategies.NewMACD15m1hStrategy(),
-		macdScalping:         scalping.NewMACDScalpingStrategy(),
-		rsiScalping:          scalping.NewRSIScalpingStrategy(),
-		volatilityScalping:   scalping.NewVolatilityScalpingStrategy(),
-		strongTrendScalping:  scalping.NewStrongTrendScalpingStrategy(),
-		accumulationScalping: scalping.NewAccumulationScalpingStrategy(),
-		squeezeScalping:      scalping.NewSqueezeScalpingStrategy(),
-		gridScalping:         scalping.NewGridScalpingStrategy(),
-		maCrossoverScalping:  scalping.NewMACrossoverScalpingStrategy(),
-		srBounceScalping:     scalping.NewSRBounceScalpingStrategy(),
-		tickVolumeScalping:   scalping.NewTickVolumeScalpingStrategy(),
+		rsiStrategy:            strategies.NewRSI15m1hStrategy(),
+		macdStrategy:           strategies.NewMACD15m1hStrategy(),
+		macdScalping:           scalping.NewMACDScalpingStrategy(),
+		rsiScalping:            scalping.NewRSIScalpingStrategy(),
+		volatilityScalping:     scalping.NewVolatilityScalpingStrategy(),
+		strongTrendScalping:    scalping.NewStrongTrendScalpingStrategy(),
+		accumulationScalping:   scalping.NewAccumulationScalpingStrategy(),
+		squeezeScalping:        scalping.NewSqueezeScalpingStrategy(),
+		gridScalping:           scalping.NewGridScalpingStrategy(),
+		maCrossoverScalping:    scalping.NewMACrossoverScalpingStrategy(),
+		srBounceScalping:       scalping.NewSRBounceScalpingStrategy(),
+		tickVolumeScalping:     scalping.NewTickVolumeScalpingStrategy(),
+		highVolatilityScalping: scalping.NewHighVolatilityScalpingStrategy(),
+		breakoutScalping:       scalping.NewBreakoutScalpingStrategy(),
+		choppyMarketScalping:   scalping.NewChoppyMarketScalpingStrategy(),
 	}
 
 	// Initialize strategies slice and register all strategies
@@ -80,6 +86,9 @@ func NewStrategyHandler() *StrategyHandler {
 		handler.maCrossoverScalping,
 		handler.srBounceScalping,
 		handler.tickVolumeScalping,
+		handler.highVolatilityScalping,
+		handler.breakoutScalping,
+		handler.choppyMarketScalping,
 	}
 
 	// Initialize market analyzer with all strategies

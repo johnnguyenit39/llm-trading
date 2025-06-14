@@ -2,89 +2,42 @@ package scalping
 
 import (
 	"fmt"
-	"j-ai-trade/brokers/binance/repository"
-	"j-ai-trade/common"
-	"j-ai-trade/quantitative_trading/strategies"
 	"math"
+
+	"j-ai-trade/brokers/binance/repository"
+	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
 )
 
-// MACrossoverScalpingStrategy is designed for trending markets
-type MACrossoverScalpingStrategy struct {
-	strategies.BaseStrategy
-}
-
-func NewMACrossoverScalpingStrategy() *MACrossoverScalpingStrategy {
-	return &MACrossoverScalpingStrategy{
-		BaseStrategy: strategies.BaseStrategy{
-			Name: "MA Crossover Scalping",
-		},
-	}
-}
-
-func (s *MACrossoverScalpingStrategy) GetDescription() string {
-	return "Scalping strategy using EMA crossovers (9 & 21) for trending markets. Best for quick momentum trades."
-}
-
-func (s *MACrossoverScalpingStrategy) IsSuitableForCondition(condition common.MarketCondition) bool {
-	switch condition {
-	case common.MarketTrendingUp:
-		return true
-	case common.MarketTrendingDown:
-		return true
-	case common.MarketBreakout:
-		return true
-	default:
-		return false
-	}
-}
-
-func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.Candle) (*strategies.Signal, error) {
-	// Get 5m candles for quick signals
-	candles5m := candles["5m"]
-	if len(candles5m) < 21 {
-		return nil, nil
-	}
-
-	// Convert to float64 arrays
+// MomentumScalping implements a scalping strategy based on price momentum
+func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
+	// Convert candle data to float64 arrays
 	closes := make([]float64, len(candles5m))
 	volumes := make([]float64, len(candles5m))
 	highs := make([]float64, len(candles5m))
 	lows := make([]float64, len(candles5m))
-	for i, c := range candles5m {
-		closes[i] = c.Close
-		volumes[i] = c.Volume
-		highs[i] = c.High
-		lows[i] = c.Low
+	for i, candle := range candles5m {
+		closes[i] = candle.Close
+		volumes[i] = candle.Volume
+		highs[i] = candle.High
+		lows[i] = candle.Low
 	}
 
-	// Calculate EMAs
-	fastEMA := talib.Ema(closes, 9)
-	slowEMA := talib.Ema(closes, 21)
-	if len(fastEMA) < 2 || len(slowEMA) < 2 {
-		return nil, nil
-	}
+	// Calculate RSI
+	rsi := talib.Rsi(closes, 14)
 
-	// Calculate Volume MA
-	volumeMA := talib.Sma(volumes, 20)
-	if len(volumeMA) < 2 {
-		return nil, nil
-	}
+	// Calculate ROC (Rate of Change)
+	roc := talib.Roc(closes, 10)
 
 	// Calculate ATR for stop loss
 	atr := talib.Atr(highs, lows, closes, 14)
-	if len(atr) < 2 {
-		return nil, nil
-	}
 	atrValue := atr[len(atr)-1]
 
 	// Get latest values
 	latestPrice := closes[len(closes)-1]
-	latestFastEMA := fastEMA[len(fastEMA)-1]
-	latestSlowEMA := slowEMA[len(slowEMA)-1]
-	prevFastEMA := fastEMA[len(fastEMA)-2]
-	prevSlowEMA := slowEMA[len(slowEMA)-2]
+	latestRSI := rsi[len(rsi)-1]
+	latestROC := roc[len(roc)-1]
 	latestVolume := volumes[len(volumes)-1]
 
 	// Calculate maximum allowed stop loss (2% of price)
@@ -96,67 +49,67 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
 
 	// Trading logic
-	if prevFastEMA <= prevSlowEMA && latestFastEMA > latestSlowEMA && latestVolume > 0 {
-		// Bullish crossover with volume
+	if latestRSI < 30 && latestROC > 0 && latestVolume > 0 {
+		// Oversold with positive momentum and volume - potential bounce
 		return &strategies.Signal{
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 MA Crossover - BUY Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 Momentum Scalping - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
-				"• Fast EMA (9): %.5f\n"+
-				"• Slow EMA (21): %.5f\n"+
+				"• RSI: %.2f (Oversold)\n"+
+				"• ROC: %.2f%%\n"+
 				"• Volume: %.2f\n"+
 				"• ATR: %.6f\n\n"+
 				"💡 Strategy Notes:\n"+
-				"• Bullish EMA crossover\n"+
+				"• Oversold bounce setup\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for trend following",
+				"• Suitable for momentum trading",
 				latestPrice,
 				latestPrice-stopLossDistance,
 				(stopLossDistance/latestPrice)*100,
 				latestPrice+takeProfitDistance,
 				(takeProfitDistance/latestPrice)*100,
-				latestFastEMA,
-				latestSlowEMA,
+				latestRSI,
+				latestROC,
 				latestVolume,
 				atrValue),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
-	} else if prevFastEMA >= prevSlowEMA && latestFastEMA < latestSlowEMA && latestVolume > 0 {
-		// Bearish crossover with volume
+	} else if latestRSI > 70 && latestROC < 0 && latestVolume > 0 {
+		// Overbought with negative momentum and volume - potential reversal
 		return &strategies.Signal{
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 MA Crossover - SELL Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 Momentum Scalping - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
-				"• Fast EMA (9): %.5f\n"+
-				"• Slow EMA (21): %.5f\n"+
+				"• RSI: %.2f (Overbought)\n"+
+				"• ROC: %.2f%%\n"+
 				"• Volume: %.2f\n"+
 				"• ATR: %.6f\n\n"+
 				"💡 Strategy Notes:\n"+
-				"• Bearish EMA crossover\n"+
+				"• Overbought reversal setup\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for trend following",
+				"• Suitable for momentum trading",
 				latestPrice,
 				latestPrice+stopLossDistance,
 				(stopLossDistance/latestPrice)*100,
 				latestPrice-takeProfitDistance,
 				(takeProfitDistance/latestPrice)*100,
-				latestFastEMA,
-				latestSlowEMA,
+				latestRSI,
+				latestROC,
 				latestVolume,
 				atrValue),
 			StopLoss:   latestPrice + stopLossDistance,

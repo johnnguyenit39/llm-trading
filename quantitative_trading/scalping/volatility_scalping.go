@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -60,17 +62,20 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 		return nil, nil
 	}
 
-	// Calculate ATR for volatility
+	// Calculate ATR for stop loss
 	atr := talib.Atr(highs, lows, closes, 14)
 	if len(atr) < 2 {
 		return nil, nil
 	}
+	atrValue := atr[len(atr)-1]
 
-	// Get latest values
-	latestPrice := closes[len(closes)-1]
-	latestUpper := bbUpper[len(bbUpper)-1]
-	latestLower := bbLower[len(bbLower)-1]
-	latestATR := atr[len(atr)-1]
+	// Calculate maximum allowed stop loss (2% of price)
+	maxStopLossPercent := 0.02
+	maxStopLossDistance := closes[len(closes)-1] * maxStopLossPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(atrValue*1.5, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.33 // 1:1.33 risk-reward ratio
 
 	// Calculate price momentum
 	roc := talib.Roc(closes, 10)
@@ -78,6 +83,11 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 		return nil, nil
 	}
 	latestROC := roc[len(roc)-1]
+
+	// Get latest values
+	latestPrice := closes[len(closes)-1]
+	latestUpper := bbUpper[len(bbUpper)-1]
+	latestLower := bbLower[len(bbLower)-1]
 
 	// Trading logic
 	if latestPrice > latestUpper && latestROC > 0 {
@@ -103,16 +113,16 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 				"• Using ATR for dynamic stop loss\n"+
 				"• Suitable for volatile markets",
 				latestPrice,
-				latestPrice+(latestATR*1.5),
-				(latestATR*1.5/latestPrice)*100,
-				latestPrice-(latestATR*2),
-				(latestATR*2/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice-takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestROC*100,
 				latestUpper,
 				latestLower,
-				latestATR),
-			StopLoss:   latestPrice + (latestATR * 1.5),
-			TakeProfit: latestPrice - (latestATR * 2),
+				atrValue),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	} else if latestPrice < latestLower && latestROC < 0 {
 		// Price below lower band with negative momentum
@@ -137,16 +147,16 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 				"• Using ATR for dynamic stop loss\n"+
 				"• Suitable for volatile markets",
 				latestPrice,
-				latestPrice-(latestATR*1.5),
-				(latestATR*1.5/latestPrice)*100,
-				latestPrice+(latestATR*2),
-				(latestATR*2/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice+takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestROC*100,
 				latestUpper,
 				latestLower,
-				latestATR),
-			StopLoss:   latestPrice - (latestATR * 1.5),
-			TakeProfit: latestPrice + (latestATR * 2),
+				atrValue),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	}
 

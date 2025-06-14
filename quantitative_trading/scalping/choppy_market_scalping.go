@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -87,6 +89,14 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	latestVolumeMA := volumeMA[len(volumeMA)-1]
 	latestATR := atr[len(atr)-1]
 
+	// Calculate maximum allowed stop loss (2% of price)
+	maxStopLossPercent := 0.02
+	maxStopLossDistance := latestPrice * maxStopLossPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(latestATR*1.2, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio for choppy markets
+
 	// Trading logic
 	if latestADX < 25 && latestSlowK < 20 && latestSlowD < 20 && latestVolume > latestVolumeMA {
 		// Weak trend, oversold, and high volume
@@ -111,18 +121,18 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Using ATR for dynamic stop loss\n"+
 				"• High volume confirms signal",
 				latestPrice,
-				latestPrice-(latestATR*1.2),
-				(latestATR*1.2/latestPrice)*100,
-				latestPrice+(latestATR*1.8),
-				(latestATR*1.8/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice+takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestADX,
 				latestSlowK,
 				latestSlowD,
 				latestVolume,
 				latestVolumeMA,
 				latestATR),
-			StopLoss:   latestPrice - (latestATR * 1.2),
-			TakeProfit: latestPrice + (latestATR * 1.8),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if latestADX < 25 && latestSlowK > 80 && latestSlowD > 80 && latestVolume > latestVolumeMA {
 		// Weak trend, overbought, and high volume
@@ -147,18 +157,18 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Using ATR for dynamic stop loss\n"+
 				"• High volume confirms signal",
 				latestPrice,
-				latestPrice+(latestATR*1.2),
-				(latestATR*1.2/latestPrice)*100,
-				latestPrice-(latestATR*1.8),
-				(latestATR*1.8/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice-takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestADX,
 				latestSlowK,
 				latestSlowD,
 				latestVolume,
 				latestVolumeMA,
 				latestATR),
-			StopLoss:   latestPrice + (latestATR * 1.2),
-			TakeProfit: latestPrice - (latestATR * 1.8),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 

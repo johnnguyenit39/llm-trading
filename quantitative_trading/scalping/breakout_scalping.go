@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -115,6 +117,14 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 	latestROC5m := roc5m[len(roc5m)-1]
 	latestROC15m := roc15m[len(roc15m)-1]
 
+	// Calculate maximum allowed stop loss (2% of price)
+	maxStopLossPercent := 0.02
+	maxStopLossDistance := latestPrice * maxStopLossPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(latestATR*1.5, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 2 // 1:2 risk-reward ratio for breakouts
+
 	// Trading logic
 	if latestPrice > latestUpper5m && latestPrice > latestUpper15m &&
 		latestVolume5m > latestVolumeMA5m*1.5 && latestVolume15m > latestVolumeMA15m*1.2 &&
@@ -142,10 +152,10 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				"• Using ATR for dynamic stop loss\n"+
 				"• Volume confirms breakout",
 				latestPrice,
-				latestPrice-(latestATR*1.5),
-				(latestATR*1.5/latestPrice)*100,
-				latestPrice+(latestATR*3),
-				(latestATR*3/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice+takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestROC5m*100,
 				latestROC15m*100,
 				latestVolume5m,
@@ -153,8 +163,8 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				latestVolume15m,
 				latestVolumeMA15m,
 				latestATR),
-			StopLoss:   latestPrice - (latestATR * 1.5),
-			TakeProfit: latestPrice + (latestATR * 3),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if latestPrice < latestLower5m && latestPrice < latestLower15m &&
 		latestVolume5m > latestVolumeMA5m*1.5 && latestVolume15m > latestVolumeMA15m*1.2 &&
@@ -182,10 +192,10 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				"• Using ATR for dynamic stop loss\n"+
 				"• Volume confirms breakout",
 				latestPrice,
-				latestPrice+(latestATR*1.5),
-				(latestATR*1.5/latestPrice)*100,
-				latestPrice-(latestATR*3),
-				(latestATR*3/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				(stopLossDistance/latestPrice)*100,
+				latestPrice-takeProfitDistance,
+				(takeProfitDistance/latestPrice)*100,
 				latestROC5m*100,
 				latestROC15m*100,
 				latestVolume5m,
@@ -193,8 +203,8 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				latestVolume15m,
 				latestVolumeMA15m,
 				latestATR),
-			StopLoss:   latestPrice + (latestATR * 1.5),
-			TakeProfit: latestPrice - (latestATR * 3),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 
