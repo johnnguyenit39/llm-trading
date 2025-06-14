@@ -91,6 +91,7 @@ func (j *BinanceCandlesJob) Start() {
 	j.startRsiStrategy()
 	j.startMacdStrategy()
 	j.startHA1Strategy()
+	j.startShortTermStrategy()
 
 	// Start the cron scheduler
 	j.cron.Start()
@@ -100,7 +101,7 @@ func (j *BinanceCandlesJob) Start() {
 func (j *BinanceCandlesJob) startRsiStrategy() {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
-	// Add job that runs every 5 seconds
+	// Add job that runs every 5 minutes
 	_, err := j.cron.AddFunc("*/5 * * * *", func() {
 		ctx := context.Background()
 
@@ -154,7 +155,7 @@ func (j *BinanceCandlesJob) startRsiStrategy() {
 func (j *BinanceCandlesJob) startMacdStrategy() {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
-	// Add job that runs every 5 seconds
+	// Add job that runs every 5 minutes
 	_, err := j.cron.AddFunc("*/5 * * * *", func() {
 		ctx := context.Background()
 
@@ -209,7 +210,7 @@ func (j *BinanceCandlesJob) startHA1Strategy() {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
 	// Add job that runs every hour
-	_, err := j.cron.AddFunc("0 0 * * * *", func() {
+	_, err := j.cron.AddFunc("0 * * * *", func() {
 		ctx := context.Background()
 
 		// Fetch 1-day candles
@@ -267,6 +268,72 @@ func (j *BinanceCandlesJob) startHA1Strategy() {
 	}
 
 	log.Info().Msg("HA-1 strategy cron job added")
+}
+
+func (j *BinanceCandlesJob) startShortTermStrategy() {
+	log := log.With().Str("component", "BinanceCandlesJob").Logger()
+
+	// Add job that runs every 5 minutes
+	_, err := j.cron.AddFunc("*/5 * * * *", func() {
+		ctx := context.Background()
+
+		// Fetch 5-minute candles
+		candles5m, err := j.service.Fetch5mCandles(ctx, j.symbol, 100)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to fetch 5m candles")
+			return
+		}
+
+		// Fetch 15-minute candles
+		candles15m, err := j.service.Fetch15mCandles(ctx, j.symbol, 50)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to fetch 15m candles")
+			return
+		}
+
+		// Fetch 1-hour candles
+		candles1h, err := j.service.Fetch1hCandles(ctx, j.symbol, 50)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to fetch 1h candles")
+			return
+		}
+
+		// Log the latest candles
+		if len(candles5m) > 0 && len(candles15m) > 0 && len(candles1h) > 0 {
+			latest5m := candles5m[len(candles5m)-1]
+			latest15m := candles15m[len(candles15m)-1]
+			latest1h := candles1h[len(candles1h)-1]
+
+			log.Info().
+				Str("symbol", j.symbol).
+				Time("5m_open_time", latest5m.OpenTime).
+				Float64("5m_close", latest5m.Close).
+				Time("15m_open_time", latest15m.OpenTime).
+				Float64("15m_close", latest15m.Close).
+				Time("1h_open_time", latest1h.OpenTime).
+				Float64("1h_close", latest1h.Close).
+				Msg("Latest candles")
+		}
+
+		// Process candles through strategy handler to get market condition and signals
+		signals, err := j.strategyHandler.ProcessMarketCondition(candles5m, candles15m, candles1h)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to process market condition")
+			return
+		}
+
+		// Handle all signals
+		for _, signal := range signals {
+			j.handleSignal(signal, "ShortTerm")
+		}
+	})
+
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to add ShortTerm strategy cron job")
+		return
+	}
+
+	log.Info().Msg("ShortTerm strategy cron job added")
 }
 
 func (j *BinanceCandlesJob) Stop() {
