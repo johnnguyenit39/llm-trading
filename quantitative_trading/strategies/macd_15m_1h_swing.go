@@ -72,6 +72,34 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 	latestMACD1h := macd1h[len(macd1h)-1]
 	latestSignal1h := signal1h[len(signal1h)-1]
 
+	// Calculate volume MA20
+	volumes := make([]float64, len(candles15m))
+	for i, c := range candles15m {
+		volumes[i] = c.Volume
+	}
+	volumeMA := talib.Sma(volumes, 20)
+	latestVolume := volumes[len(volumes)-1]
+	latestVolumeMA := volumeMA[len(volumeMA)-1]
+
+	// Calculate volatility MA20
+	ranges := make([]float64, len(candles15m))
+	for i, c := range candles15m {
+		ranges[i] = c.High - c.Low
+	}
+	rangeMA := talib.Sma(ranges, 20)
+	latestRange := ranges[len(ranges)-1]
+	latestRangeMA := rangeMA[len(rangeMA)-1]
+
+	// Price action: check for bullish/bearish engulfing
+	isBullishEngulfing := false
+	isBearishEngulfing := false
+	if len(candles15m) >= 2 {
+		prev := candles15m[len(candles15m)-2]
+		curr := candles15m[len(candles15m)-1]
+		isBullishEngulfing = curr.Close > curr.Open && prev.Close < prev.Open && curr.Open < prev.Close && curr.Close > prev.Open
+		isBearishEngulfing = curr.Close < curr.Open && prev.Close > prev.Open && curr.Open > prev.Close && curr.Close < prev.Open
+	}
+
 	// Generate signals
 	var tradingSignal *Signal
 
@@ -80,6 +108,21 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 		stopLoss := latestCandle.Low * 0.99     // 1% below the low
 		takeProfit := latestCandle.Close * 1.02 // 2% above entry
 
+		confidence := 0.8 // default
+		descExtra := ""
+		if latestVolume > 1.2*latestVolumeMA {
+			confidence += 0.05
+			descExtra += "\n- High volume confirms the signal."
+		}
+		if latestRange > 1.2*latestRangeMA {
+			confidence += 0.05
+			descExtra += "\n- High volatility confirms the signal."
+		}
+		if isBullishEngulfing {
+			confidence += 0.05
+			descExtra += "\n- Bullish engulfing pattern confirms BUY signal."
+		}
+
 		tradingSignal = &Signal{
 			Type:       "BUY",
 			Price:      latestCandle.Close,
@@ -87,16 +130,20 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			Strategy:   s.GetName(),
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
+			Confidence: confidence,
 			Description: fmt.Sprintf("🚀 MACD Strategy - BUY Signal\n\n"+
 				"Entry Price: %.2f\n"+
 				"Stop Loss: %.2f\n"+
-				"Take Profit: %.2f\n\n"+
+				"Take Profit: %.2f\n"+
+				"Confidence: %.2f\n"+
 				"Signal Details:\n"+
 				"- MACD bullish crossover on 15m\n"+
 				"- 1h trend confirmation\n"+
 				"- Current MACD: %.2f\n"+
-				"- Current Signal: %.2f",
-				latestCandle.Close, stopLoss, takeProfit, latestMACD, latestSignal),
+				"- Current Signal: %.2f\n\n"+
+				"Additional Details:\n"+
+				"%s",
+				latestCandle.Close, stopLoss, takeProfit, confidence, latestMACD, latestSignal, descExtra),
 		}
 	}
 
@@ -105,6 +152,21 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 		stopLoss := latestCandle.High * 1.01    // 1% above the high
 		takeProfit := latestCandle.Close * 0.98 // 2% below entry
 
+		confidence := 0.8 // default
+		descExtra := ""
+		if latestVolume > 1.2*latestVolumeMA {
+			confidence += 0.05
+			descExtra += "\n- High volume confirms the signal."
+		}
+		if latestRange > 1.2*latestRangeMA {
+			confidence += 0.05
+			descExtra += "\n- High volatility confirms the signal."
+		}
+		if isBearishEngulfing {
+			confidence += 0.05
+			descExtra += "\n- Bearish engulfing pattern confirms SELL signal."
+		}
+
 		tradingSignal = &Signal{
 			Type:       "SELL",
 			Price:      latestCandle.Close,
@@ -112,16 +174,20 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			Strategy:   s.GetName(),
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
+			Confidence: confidence,
 			Description: fmt.Sprintf("🔻 MACD Strategy - SELL Signal\n\n"+
 				"Entry Price: %.2f\n"+
 				"Stop Loss: %.2f\n"+
-				"Take Profit: %.2f\n\n"+
+				"Take Profit: %.2f\n"+
+				"Confidence: %.2f\n"+
 				"Signal Details:\n"+
 				"- MACD bearish crossover on 15m\n"+
 				"- 1h trend confirmation\n"+
 				"- Current MACD: %.2f\n"+
-				"- Current Signal: %.2f",
-				latestCandle.Close, stopLoss, takeProfit, latestMACD, latestSignal),
+				"- Current Signal: %.2f\n\n"+
+				"Additional Details:\n"+
+				"%s",
+				latestCandle.Close, stopLoss, takeProfit, confidence, latestMACD, latestSignal, descExtra),
 		}
 	}
 
