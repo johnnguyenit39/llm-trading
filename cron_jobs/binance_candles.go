@@ -50,10 +50,51 @@ func NewBinanceCandlesJob(symbol string, db *gorm.DB) *BinanceCandlesJob {
 	}
 }
 
+// handleSignal is a generic function to handle trading signals
+func (j *BinanceCandlesJob) handleSignal(signal *quantitativetrading.Signal, strategyName string) {
+	if signal == nil {
+		return
+	}
+
+	// Log the signal
+	log.Info().
+		Str("symbol", j.symbol).
+		Str("signal", signal.Type).
+		Float64("price", signal.Price).
+		Time("timestamp", signal.Timestamp).
+		Msg("Trading signal generated")
+
+	// Send signal to Telegram
+	err := j.telegramService.SendMessageV1(signal.Description)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to send signal to Telegram")
+	}
+
+	// Initialize backtesting service and execute order
+	backTesting := backtesting.NewBackTesting(j.db)
+	err = backTesting.ExecuteFuturesOrder(
+		j.symbol,
+		1000, // Fixed amount of 1000 ADA
+		signal.Price,
+		signal.Type,
+		strategyName,
+		signal.TakeProfit,
+		signal.StopLoss,
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to execute futures order")
+	}
+}
+
 func (j *BinanceCandlesJob) Start() {
-	// Start both strategies
+	// Start all strategies
 	j.startRsiStrategy()
 	j.startMacdStrategy()
+	j.startHA1Strategy()
+
+	// Start the cron scheduler
+	j.cron.Start()
+	log.Info().Msg("All strategies started")
 }
 
 func (j *BinanceCandlesJob) startRsiStrategy() {
@@ -98,46 +139,16 @@ func (j *BinanceCandlesJob) startRsiStrategy() {
 			return
 		}
 
-		if signal != nil {
-			// Log the signal
-			log.Info().
-				Str("symbol", j.symbol).
-				Str("signal", signal.Type).
-				Float64("price", signal.Price).
-				Time("timestamp", signal.Timestamp).
-				Msg("Trading signal generated")
-			// Send signal to Telegram
-			err = j.telegramService.SendMessageV1(signal.Description)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to send signal to Telegram")
-			}
-			// Initialize backtesting service and execute order
-			backTesting := backtesting.NewBackTesting(j.db)
-			err = backTesting.ExecuteFuturesOrder(
-				j.symbol,
-				1000, // Fixed amount of 1000 ADA
-				signal.Price,
-				signal.Type, // This should be "BUY" or "SELL"
-				"RSI",
-				signal.TakeProfit,
-				signal.StopLoss,
-			)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to execute futures order")
-				return
-			}
-
-		}
+		// Handle the signal using the generic function
+		j.handleSignal(signal, "RSI")
 	})
 
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to add cron job")
+		log.Error().Err(err).Msg("Failed to add RSI cron job")
 		return
 	}
 
-	// Start the cron scheduler
-	j.cron.Start()
-	log.Info().Msg("Binance candles cron job started")
+	log.Info().Msg("RSI strategy cron job added")
 }
 
 func (j *BinanceCandlesJob) startMacdStrategy() {
@@ -182,46 +193,80 @@ func (j *BinanceCandlesJob) startMacdStrategy() {
 			return
 		}
 
-		if signal != nil {
-			// Log the signal
-			log.Info().
-				Str("symbol", j.symbol).
-				Str("signal", signal.Type).
-				Float64("price", signal.Price).
-				Time("timestamp", signal.Timestamp).
-				Msg("Trading signal generated")
-			// Send signal to Telegram
-			err = j.telegramService.SendMessageV1(signal.Description)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to send signal to Telegram")
-			}
-			// Initialize backtesting service and execute order
-			backTesting := backtesting.NewBackTesting(j.db)
-			err = backTesting.ExecuteFuturesOrder(
-				j.symbol,
-				1000, // Fixed amount of 1000 ADA
-				signal.Price,
-				signal.Type, // This should be "BUY" or "SELL"
-				"MACD",
-				signal.TakeProfit,
-				signal.StopLoss,
-			)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to execute futures order")
-				return
-			}
-
-		}
+		// Handle the signal using the generic function
+		j.handleSignal(signal, "MACD")
 	})
 
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to add cron job")
+		log.Error().Err(err).Msg("Failed to add MACD cron job")
 		return
 	}
 
-	// Start the cron scheduler
-	j.cron.Start()
-	log.Info().Msg("Binance candles cron job started")
+	log.Info().Msg("MACD strategy cron job added")
+}
+
+func (j *BinanceCandlesJob) startHA1Strategy() {
+	log := log.With().Str("component", "BinanceCandlesJob").Logger()
+
+	// Add job that runs every hour
+	_, err := j.cron.AddFunc("0 0 * * * *", func() {
+		ctx := context.Background()
+
+		// Fetch 1-day candles
+		candles1d, err := j.service.Fetch1dCandles(ctx, j.symbol, 100)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to fetch 1d candles")
+			return
+		}
+
+		// Fetch 4-hour candles
+		candles4h, err := j.service.Fetch4hCandles(ctx, j.symbol, 150)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to fetch 4h candles")
+			return
+		}
+
+		// Fetch 1-hour candles
+		candles1h, err := j.service.Fetch1hCandles(ctx, j.symbol, 200)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to fetch 1h candles")
+			return
+		}
+
+		// Log the latest candles
+		if len(candles1d) > 0 && len(candles4h) > 0 && len(candles1h) > 0 {
+			latest1d := candles1d[len(candles1d)-1]
+			latest4h := candles4h[len(candles4h)-1]
+			latest1h := candles1h[len(candles1h)-1]
+
+			log.Info().
+				Str("symbol", j.symbol).
+				Time("1d_open_time", latest1d.OpenTime).
+				Float64("1d_close", latest1d.Close).
+				Time("4h_open_time", latest4h.OpenTime).
+				Float64("4h_close", latest4h.Close).
+				Time("1h_open_time", latest1h.OpenTime).
+				Float64("1h_close", latest1h.Close).
+				Msg("Latest candles")
+		}
+
+		// Process candles through strategy handler
+		signal, err := j.strategyHandler.ProcessHA1WithCandles(candles1d, candles4h, candles1h)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to process candles through HA-1 strategy")
+			return
+		}
+
+		// Handle the signal using the generic function
+		j.handleSignal(signal, "HA-1")
+	})
+
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to add HA-1 cron job")
+		return
+	}
+
+	log.Info().Msg("HA-1 strategy cron job added")
 }
 
 func (j *BinanceCandlesJob) Stop() {

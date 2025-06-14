@@ -1,6 +1,7 @@
 package quantitativetrading
 
 import (
+	"fmt"
 	"time"
 
 	"j-ai-trade/brokers/binance/repository"
@@ -82,4 +83,39 @@ func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []reposit
 		TakeProfit:  strategySignal.TakeProfit,
 		StopLoss:    strategySignal.StopLoss,
 	}, nil
+}
+
+// ProcessHA1WithCandles processes candles through the HA-1 strategy
+func (h *StrategyHandler) ProcessHA1WithCandles(candles1d, candles4h, candles1h []repository.Candle) (*Signal, error) {
+	// Create strategy instance
+	strategy := strategies.NewHA1Strategy()
+
+	// Convert candles to map for strategy
+	candles := map[string][]repository.Candle{
+		"1d": candles1d,
+		"4h": candles4h,
+		"1h": candles1h,
+	}
+
+	// Analyze using the strategy
+	strategySignal, err := strategy.Analyze(candles)
+	if err != nil {
+		return nil, fmt.Errorf("failed to analyze HA-1 strategy: %w", err)
+	}
+
+	if strategySignal == nil {
+		return nil, nil
+	}
+
+	// Convert strategy signal to Signal type
+	signal := &Signal{
+		Type:        strategySignal.Type,
+		Price:       strategySignal.Price,
+		Timestamp:   strategySignal.Time,
+		StopLoss:    strategySignal.StopLoss,
+		TakeProfit:  strategySignal.TakeProfit,
+		Description: strategySignal.Description,
+	}
+
+	return signal, nil
 }
