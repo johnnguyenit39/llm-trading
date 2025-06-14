@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"j-ai-trade/brokers/binance/repository"
+	signalConfidence "j-ai-trade/utils/signal"
 
 	"github.com/markcheno/go-talib"
 )
@@ -108,19 +109,36 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 		stopLoss := latestCandle.Low * 0.99     // 1% below the low
 		takeProfit := latestCandle.Close * 1.02 // 2% above entry
 
-		confidence := 0.8 // default
+		confidence := 0.7 // base confidence
 		descExtra := ""
+
+		// MACD Strength (0.1)
+		if latestMACD > 0 && latestMACD1h > 0 {
+			confidence += 0.1
+			descExtra += "\n• Strong MACD momentum on both timeframes"
+		}
+
+		// Volume Confirmation (0.05)
 		if latestVolume > 1.2*latestVolumeMA {
 			confidence += 0.05
-			descExtra += "\n- High volume confirms the signal."
+			descExtra += "\n• High volume confirms the signal"
 		}
+
+		// Volatility Confirmation (0.05)
 		if latestRange > 1.2*latestRangeMA {
 			confidence += 0.05
-			descExtra += "\n- High volatility confirms the signal."
+			descExtra += "\n• High volatility confirms the signal"
 		}
+
+		// Pattern Confirmation (0.05)
 		if isBullishEngulfing {
 			confidence += 0.05
-			descExtra += "\n- Bullish engulfing pattern confirms BUY signal."
+			descExtra += "\n• Bullish engulfing pattern confirms BUY signal"
+		}
+
+		// Cap confidence at 0.95
+		if confidence > 0.95 {
+			confidence = 0.95
 		}
 
 		tradingSignal = &Signal{
@@ -131,19 +149,26 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🚀 MACD Strategy - BUY Signal\n\n"+
-				"Entry Price: %.2f\n"+
-				"Stop Loss: %.2f\n"+
-				"Take Profit: %.2f\n"+
-				"Confidence: %.2f\n"+
-				"Signal Details:\n"+
-				"- MACD bullish crossover on 15m\n"+
-				"- 1h trend confirmation\n"+
-				"- Current MACD: %.2f\n"+
-				"- Current Signal: %.2f\n\n"+
-				"Additional Details:\n"+
-				"%s",
-				latestCandle.Close, stopLoss, takeProfit, confidence, latestMACD, latestSignal, descExtra),
+			Description: fmt.Sprintf("🚀 MACD Strategy - BUY Signal ADA/USDT %s\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.2f\n"+
+				"• Stop Loss: %.2f (-1.0%%)\n"+
+				"• Take Profit: %.2f (+2.0%%)\n"+
+				"• Risk/Reward: 1:2\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
+				"📈 Signal Details:\n"+
+				"• MACD bullish crossover on 15m\n"+
+				"• 1h trend confirmation\n"+
+				"• Current MACD: %.6f\n"+
+				"• Current Signal: %.6f\n"+
+				"• MACD Histogram: %.6f\n\n"+
+				"💡 Additional Confirmation:%s",
+				signalConfidence.SetConfidenceIndicator(confidence),
+				latestCandle.Close, stopLoss, takeProfit,
+				confidence*100,
+				latestMACD, latestSignal,
+				latestMACD-latestSignal,
+				descExtra),
 		}
 	}
 
@@ -152,19 +177,36 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 		stopLoss := latestCandle.High * 1.01    // 1% above the high
 		takeProfit := latestCandle.Close * 0.98 // 2% below entry
 
-		confidence := 0.8 // default
+		confidence := 0.7 // base confidence
 		descExtra := ""
+
+		// MACD Strength (0.1)
+		if latestMACD < 0 && latestMACD1h < 0 {
+			confidence += 0.1
+			descExtra += "\n• Strong MACD momentum on both timeframes"
+		}
+
+		// Volume Confirmation (0.05)
 		if latestVolume > 1.2*latestVolumeMA {
 			confidence += 0.05
-			descExtra += "\n- High volume confirms the signal."
+			descExtra += "\n• High volume confirms the signal"
 		}
+
+		// Volatility Confirmation (0.05)
 		if latestRange > 1.2*latestRangeMA {
 			confidence += 0.05
-			descExtra += "\n- High volatility confirms the signal."
+			descExtra += "\n• High volatility confirms the signal"
 		}
+
+		// Pattern Confirmation (0.05)
 		if isBearishEngulfing {
 			confidence += 0.05
-			descExtra += "\n- Bearish engulfing pattern confirms SELL signal."
+			descExtra += "\n• Bearish engulfing pattern confirms SELL signal"
+		}
+
+		// Cap confidence at 0.95
+		if confidence > 0.95 {
+			confidence = 0.95
 		}
 
 		tradingSignal = &Signal{
@@ -175,19 +217,26 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🔻 MACD Strategy - SELL Signal\n\n"+
-				"Entry Price: %.2f\n"+
-				"Stop Loss: %.2f\n"+
-				"Take Profit: %.2f\n"+
-				"Confidence: %.2f\n"+
-				"Signal Details:\n"+
-				"- MACD bearish crossover on 15m\n"+
-				"- 1h trend confirmation\n"+
-				"- Current MACD: %.2f\n"+
-				"- Current Signal: %.2f\n\n"+
-				"Additional Details:\n"+
-				"%s",
-				latestCandle.Close, stopLoss, takeProfit, confidence, latestMACD, latestSignal, descExtra),
+			Description: fmt.Sprintf("🔻 MACD Strategy - SELL Signal ADA/USDT %s\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.2f\n"+
+				"• Stop Loss: %.2f (+1.0%%)\n"+
+				"• Take Profit: %.2f (-2.0%%)\n"+
+				"• Risk/Reward: 1:2\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
+				"📈 Signal Details:\n"+
+				"• MACD bearish crossover on 15m\n"+
+				"• 1h trend confirmation\n"+
+				"• Current MACD: %.4f\n"+
+				"• Current Signal: %.4f\n"+
+				"• MACD Histogram: %.4f\n\n"+
+				"💡 Additional Confirmation:%s",
+				signalConfidence.SetConfidenceIndicator(confidence),
+				latestCandle.Close, stopLoss, takeProfit,
+				confidence*100,
+				latestMACD, latestSignal,
+				latestMACD-latestSignal,
+				descExtra),
 		}
 	}
 

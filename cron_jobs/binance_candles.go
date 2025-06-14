@@ -106,7 +106,11 @@ func (j *BinanceCandlesJob) startRsiStrategy() {
 				Float64("price", signal.Price).
 				Time("timestamp", signal.Timestamp).
 				Msg("Trading signal generated")
-
+			// Send signal to Telegram
+			err = j.telegramService.SendMessageV1(signal.Description)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to send signal to Telegram")
+			}
 			// Initialize backtesting service and execute order
 			backTesting := backtesting.NewBackTesting(j.db)
 			err = backTesting.ExecuteFuturesOrder(
@@ -123,11 +127,6 @@ func (j *BinanceCandlesJob) startRsiStrategy() {
 				return
 			}
 
-			// Send signal to Telegram
-			err = j.telegramService.SendMessageV1(signal.Description)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to send signal to Telegram")
-			}
 		}
 	})
 
@@ -191,7 +190,11 @@ func (j *BinanceCandlesJob) startMacdStrategy() {
 				Float64("price", signal.Price).
 				Time("timestamp", signal.Timestamp).
 				Msg("Trading signal generated")
-
+			// Send signal to Telegram
+			err = j.telegramService.SendMessageV1(signal.Description)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to send signal to Telegram")
+			}
 			// Initialize backtesting service and execute order
 			backTesting := backtesting.NewBackTesting(j.db)
 			err = backTesting.ExecuteFuturesOrder(
@@ -208,11 +211,6 @@ func (j *BinanceCandlesJob) startMacdStrategy() {
 				return
 			}
 
-			// Send signal to Telegram
-			err = j.telegramService.SendMessageV1(signal.Description)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to send signal to Telegram")
-			}
 		}
 	})
 

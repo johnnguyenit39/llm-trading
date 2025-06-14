@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"j-ai-trade/brokers/binance/repository"
+	signalConfidence "j-ai-trade/utils/signal"
 
 	"github.com/markcheno/go-talib"
 )
@@ -16,6 +17,7 @@ type RSI15m1hStrategy struct {
 	period              int
 	tpPercentage        float64 // Take profit percentage
 	slPercentage        float64 // Stop loss percentage
+	volumeThreshold     float64 // Volume confirmation threshold
 }
 
 func NewRSI15m1hStrategy() *RSI15m1hStrategy {
@@ -29,6 +31,7 @@ func NewRSI15m1hStrategy() *RSI15m1hStrategy {
 		period:              14,
 		tpPercentage:        2.0, // 2% take profit
 		slPercentage:        1.0, // 1% stop loss
+		volumeThreshold:     1.5, // 1.5x average volume for confirmation
 	}
 }
 
@@ -82,7 +85,58 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 
 	// Buy Signal: RSI oversold + 1h trend confirmation
 	if latestRSI < s.oversoldThreshold && latestRSI1h < 50 {
-		strength := calculateSignalStrength(latestRSI, latestRSI1h, priceChange15m, priceChange1h)
+		strength := 0.7 // base confidence
+		descExtra := ""
+
+		// RSI Extremes (0.1)
+		if latestRSI < 25 {
+			strength += 0.1
+			descExtra += "\n• Strong oversold condition (RSI < 25)"
+		}
+
+		// Volume Confirmation (0.05)
+		volumes := make([]float64, len(candles15m))
+		for i, c := range candles15m {
+			volumes[i] = c.Volume
+		}
+		volumeMA := talib.Sma(volumes, 20)
+		latestVolume := volumes[len(volumes)-1]
+		latestVolumeMA := volumeMA[len(volumeMA)-1]
+		if latestVolume > 1.2*latestVolumeMA {
+			strength += 0.05
+			descExtra += "\n• High volume confirms the signal"
+		}
+
+		// Volatility Confirmation (0.05)
+		ranges := make([]float64, len(candles15m))
+		for i, c := range candles15m {
+			ranges[i] = c.High - c.Low
+		}
+		rangeMA := talib.Sma(ranges, 20)
+		latestRange := ranges[len(ranges)-1]
+		latestRangeMA := rangeMA[len(rangeMA)-1]
+		if latestRange > 1.2*latestRangeMA {
+			strength += 0.05
+			descExtra += "\n• High volatility confirms the signal"
+		}
+
+		// Pattern Confirmation (0.05)
+		isBullishEngulfing := false
+		if len(candles15m) >= 2 {
+			prev := candles15m[len(candles15m)-2]
+			curr := candles15m[len(candles15m)-1]
+			isBullishEngulfing = curr.Close > curr.Open && prev.Close < prev.Open && curr.Open < prev.Close && curr.Close > prev.Open
+		}
+		if isBullishEngulfing {
+			strength += 0.05
+			descExtra += "\n• Bullish engulfing pattern confirms BUY signal"
+		}
+
+		// Cap confidence at 0.95
+		if strength > 0.95 {
+			strength = 0.95
+		}
+
 		entryPrice := latestCandle.Close
 		takeProfit := entryPrice * (1 + s.tpPercentage/100)
 		stopLoss := entryPrice * (1 - s.slPercentage/100)
@@ -95,32 +149,85 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 			Time:       time.Now(),
 			Strategy:   s.GetName(),
 			Confidence: strength,
-			Description: fmt.Sprintf("🟢 Strong Buy Signal Detected!\n"+
-				"• 15m RSI(14): %s (Oversold)\n"+
-				"• 1h RSI(14): %s (Trend Support)\n"+
+			Description: fmt.Sprintf("🟢 RSI Strategy Strong Buy Signal Detected! ADA/USDT %s\n"+
+				"• 15m RSI(14): %.2f (Oversold)\n"+
+				"• 1h RSI(14): %.2f (Trend Support)\n"+
 				"• 15m Price Change: %s\n"+
-				"• 1h Price Change: %s\n\n"+
+				"• 1h Price Change: %s\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry: %.2f\n"+
 				"• Take Profit: %.2f (+%.1f%%)\n"+
 				"• Stop Loss: %.2f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n\n"+
-				"💡 Suggestion: Enter long position at %.2f with stop loss at %.2f. "+
-				"Look for price action confirmation on lower timeframes before entry.",
-				formatRSI(latestRSI),
-				formatRSI(latestRSI1h),
+				"💡 Additional Confirmation:%s",
+				signalConfidence.SetConfidenceIndicator(strength),
+				latestRSI,
+				latestRSI1h,
 				formatPercentage(priceChange15m),
 				formatPercentage(priceChange1h),
+				strength*100,
 				entryPrice,
 				takeProfit, s.tpPercentage,
 				stopLoss, s.slPercentage,
-				entryPrice, stopLoss),
+				descExtra),
 		}
 	}
 
 	// Sell Signal: RSI overbought + 1h trend confirmation
 	if latestRSI > s.overboughtThreshold && latestRSI1h > 50 {
-		strength := calculateSignalStrength(latestRSI, latestRSI1h, priceChange15m, priceChange1h)
+		strength := 0.7 // base confidence
+		descExtra := ""
+
+		// RSI Extremes (0.1)
+		if latestRSI > 75 {
+			strength += 0.1
+			descExtra += "\n• Strong overbought condition (RSI > 75)"
+		}
+
+		// Volume Confirmation (0.05)
+		volumes := make([]float64, len(candles15m))
+		for i, c := range candles15m {
+			volumes[i] = c.Volume
+		}
+		volumeMA := talib.Sma(volumes, 20)
+		latestVolume := volumes[len(volumes)-1]
+		latestVolumeMA := volumeMA[len(volumeMA)-1]
+		if latestVolume > 1.2*latestVolumeMA {
+			strength += 0.05
+			descExtra += "\n• High volume confirms the signal"
+		}
+
+		// Volatility Confirmation (0.05)
+		ranges := make([]float64, len(candles15m))
+		for i, c := range candles15m {
+			ranges[i] = c.High - c.Low
+		}
+		rangeMA := talib.Sma(ranges, 20)
+		latestRange := ranges[len(ranges)-1]
+		latestRangeMA := rangeMA[len(rangeMA)-1]
+		if latestRange > 1.2*latestRangeMA {
+			strength += 0.05
+			descExtra += "\n• High volatility confirms the signal"
+		}
+
+		// Pattern Confirmation (0.05)
+		isBearishEngulfing := false
+		if len(candles15m) >= 2 {
+			prev := candles15m[len(candles15m)-2]
+			curr := candles15m[len(candles15m)-1]
+			isBearishEngulfing = curr.Close < curr.Open && prev.Close > prev.Open && curr.Open > prev.Close && curr.Close < prev.Open
+		}
+		if isBearishEngulfing {
+			strength += 0.05
+			descExtra += "\n• Bearish engulfing pattern confirms SELL signal"
+		}
+
+		// Cap confidence at 0.95
+		if strength > 0.95 {
+			strength = 0.95
+		}
+
 		entryPrice := latestCandle.Close
 		takeProfit := entryPrice * (1 - s.tpPercentage/100)
 		stopLoss := entryPrice * (1 + s.slPercentage/100)
@@ -133,26 +240,28 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 			Time:       time.Now(),
 			Strategy:   s.GetName(),
 			Confidence: strength,
-			Description: fmt.Sprintf("🔴 Strong Sell Signal Detected!\n"+
-				"• 15m RSI(14): %s (Overbought)\n"+
-				"• 1h RSI(14): %s (Trend Resistance)\n"+
+			Description: fmt.Sprintf("🔴 RSI Strategy Strong Sell Signal Detected! ADA/USDT %s\n"+
+				"• 15m RSI(14): %.2f (Overbought)\n"+
+				"• 1h RSI(14): %.2f (Trend Resistance)\n"+
 				"• 15m Price Change: %s\n"+
-				"• 1h Price Change: %s\n\n"+
+				"• 1h Price Change: %s\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry: %.2f\n"+
 				"• Take Profit: %.2f (-%.1f%%)\n"+
 				"• Stop Loss: %.2f (+%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n\n"+
-				"💡 Suggestion: Enter short position at %.2f with stop loss at %.2f. "+
-				"Watch for reversal patterns on lower timeframes before entry.",
-				formatRSI(latestRSI),
-				formatRSI(latestRSI1h),
+				"💡 Additional Confirmation:%s",
+				signalConfidence.SetConfidenceIndicator(strength),
+				latestRSI,
+				latestRSI1h,
 				formatPercentage(priceChange15m),
 				formatPercentage(priceChange1h),
+				strength*100,
 				entryPrice,
 				takeProfit, s.tpPercentage,
 				stopLoss, s.slPercentage,
-				entryPrice, stopLoss),
+				descExtra),
 		}
 	}
 
@@ -183,23 +292,32 @@ func calculatePriceChange(candles []repository.Candle) float64 {
 }
 
 // calculateSignalStrength calculates the confidence level of the signal
-func calculateSignalStrength(rsi15m, rsi1h, priceChange15m, priceChange1h float64) float64 {
+func calculateSignalStrength(rsi15m, rsi1h, priceChange15m, priceChange1h float64, candles []repository.Candle) float64 {
 	// Base confidence
-	confidence := 0.8
+	confidence := 0.7
 
-	// Adjust based on RSI extremes
+	// RSI Extremes (0.1)
 	if rsi15m < 25 || rsi15m > 75 {
 		confidence += 0.1
 	}
 
-	// Adjust based on trend alignment
+	// Trend Alignment (0.1)
 	if (rsi15m < 30 && rsi1h < 40) || (rsi15m > 70 && rsi1h > 60) {
+		confidence += 0.1
+	}
+
+	// Price Momentum (0.05)
+	if (rsi15m < 30 && priceChange15m < -1) || (rsi15m > 70 && priceChange15m > 1) {
 		confidence += 0.05
 	}
 
-	// Adjust based on price momentum
-	if (rsi15m < 30 && priceChange15m < -1) || (rsi15m > 70 && priceChange15m > 1) {
-		confidence += 0.05
+	// Volume Confirmation (0.05)
+	if len(candles) >= 20 {
+		avgVolume := calculateAverageVolume(candles[:len(candles)-1])
+		lastVolume := candles[len(candles)-1].Volume
+		if lastVolume > avgVolume*1.5 {
+			confidence += 0.05
+		}
 	}
 
 	// Cap confidence at 0.95
@@ -208,4 +326,16 @@ func calculateSignalStrength(rsi15m, rsi1h, priceChange15m, priceChange1h float6
 	}
 
 	return confidence
+}
+
+// calculateAverageVolume calculates the average volume over the last n candles
+func calculateAverageVolume(candles []repository.Candle) float64 {
+	if len(candles) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, c := range candles {
+		sum += c.Volume
+	}
+	return sum / float64(len(candles))
 }
