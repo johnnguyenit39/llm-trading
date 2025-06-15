@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"j-ai-trade/brokers/binance/repository"
 	strategies "j-ai-trade/quantitative_trading/strategies"
-	signalConfidence "j-ai-trade/utils/signal"
 	"time"
 
 	"github.com/markcheno/go-talib"
@@ -164,7 +163,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*strategi
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🚀 HA-1: MACD + Trendline Strategy (SWING) - BUY Signal %s\n\n"+
+			Description: fmt.Sprintf("🚀 HA-1: MACD + Trendline Strategy (SWING) - BUY Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
@@ -183,7 +182,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*strategi
 				"• Current MACD 4H: %.6f\n"+
 				"• Current MACD 1H: %.6f\n\n"+
 				"💡 Additional Confirmation:%s",
-				signalConfidence.SetConfidenceIndicator(confidence),
+				s.GetName(),
 				latestCandle.Close, stopLoss, riskPercent,
 				takeProfit, rewardPercent,
 				confidence*100,
@@ -265,7 +264,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*strategi
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🔻HA-1: MACD + Trendline Strategy (SWING) - SELL Signal %s\n\n"+
+			Description: fmt.Sprintf("🔻HA-1: MACD + Trendline Strategy (SWING) - SELL Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
@@ -284,7 +283,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*strategi
 				"• Current MACD 4H: %.6f\n"+
 				"• Current MACD 1H: %.6f\n\n"+
 				"💡 Additional Confirmation:%s",
-				signalConfidence.SetConfidenceIndicator(confidence),
+				s.GetName(),
 				latestCandle.Close, stopLoss, riskPercent,
 				takeProfit, rewardPercent,
 				confidence*100,
