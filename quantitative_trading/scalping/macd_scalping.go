@@ -71,70 +71,65 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 	// Get latest price
 	latestPrice := candles5m[len(candles5m)-1].Close
 
-	// Calculate stop loss and take profit levels
+	// Calculate ATR for volatility
 	atr := talib.Atr(highs, lows, closes, 14)
 	if len(atr) < 2 {
 		return nil, nil
 	}
 	atrValue := atr[len(atr)-1]
 
-	// Calculate volatility percentage
-	volatilityPercent := (atrValue / latestPrice) * 100
-
-	// Calculate suggested leverage based on volatility
-	leverage := 10.0 // Default leverage
-	if volatilityPercent < 0.5 {
-		leverage = 20.0 // High leverage for low volatility
-	} else if volatilityPercent < 1.0 {
-		leverage = 15.0 // Medium leverage for medium volatility
-	} else if volatilityPercent < 2.0 {
-		leverage = 10.0 // Conservative leverage for high volatility
-	} else {
-		leverage = 5.0 // Very conservative for extreme volatility
+	// Calculate stop loss and take profit based on fixed percentages
+	var stopLossDistance, takeProfitDistance float64
+	if latestHist > 0 && prevHist <= 0 {
+		// BUY signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
+	} else if latestHist < 0 && prevHist >= 0 {
+		// SELL signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	}
 
-	// Adjust leverage based on market condition
-	if math.Abs(latestHist) < 0.0001 {
-		leverage *= 0.8 // Decrease leverage in weak trend
+	// Calculate leverage based on MACD strength
+	leverage := 1.0 // Base leverage
+
+	// Calculate expected price movement based on MACD signals
+	var expectedMove float64
+
+	// MACD strength
+	macdStrength := math.Abs(latestHist) / latestPrice * 100
+	if macdStrength > 0.5 {
+		expectedMove = 0.7 // Strong MACD, expect 0.7% move
+	} else if macdStrength > 0.3 {
+		expectedMove = 0.5 // Moderate MACD, expect 0.5% move
+	} else {
+		expectedMove = 0.3 // Weak MACD, expect 0.3% move
+	}
+
+	// Volume confirmation
+	volumeStrength := (latestHist / latestPrice) * 100
+	if volumeStrength > 150.0 {
+		expectedMove *= 1.5 // Strong volume confirms move
+	} else if volumeStrength > 120.0 {
+		expectedMove *= 1.2 // Above average volume confirms move
+	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	volatilityPercent := (atrValue / latestPrice) * 100
+	if volatilityPercent > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if volatilityPercent > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
 	}
 
 	// Cap maximum leverage
 	if leverage > 20.0 {
 		leverage = 20.0
-	}
-
-	// --- TECHNICAL ANALYSIS BASED TP/SL ---
-	// Find nearest support and resistance levels
-	recentHighs := highs[len(highs)-20:]
-	recentLows := lows[len(lows)-20:]
-
-	// Find nearest resistance and support
-	nearestResistance := findNearestResistance(latestPrice, recentHighs)
-	nearestSupport := findNearestSupport(latestPrice, recentLows)
-
-	// Calculate actual price distances
-	resistanceDistance := math.Abs(nearestResistance - latestPrice)
-	supportDistance := math.Abs(latestPrice - nearestSupport)
-
-	// Calculate stop loss and take profit based on technical levels
-	var stopLossDistance, takeProfitDistance float64
-	if latestHist > 0 {
-		// BUY signal
-		stopLossDistance = supportDistance * 0.8      // Place SL below support
-		takeProfitDistance = resistanceDistance * 0.8 // Place TP below resistance
-	} else {
-		// SELL signal
-		stopLossDistance = resistanceDistance * 0.8 // Place SL above resistance
-		takeProfitDistance = supportDistance * 0.8  // Place TP above support
-	}
-
-	// Ensure minimum distances based on ATR
-	minDistance := atrValue * 0.5
-	if stopLossDistance < minDistance {
-		stopLossDistance = minDistance
-	}
-	if takeProfitDistance < minDistance {
-		takeProfitDistance = minDistance
 	}
 
 	// Calculate risk and reward percentages
@@ -149,42 +144,9 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 	accountRisk := 0.02   // 2% risk per trade
 	riskAmount := accountSize * accountRisk
 	positionSize := riskAmount / (riskPercent / 100.0)
-	rewardAmount := riskAmount * riskRewardRatio
 
-	// Calculate signal confidence based on multiple factors
-	signalConfidence := 0.0
-
-	// MACD histogram strength (0-40%)
-	macdStrength := math.Abs(latestHist) / latestPrice * 100
-	if macdStrength > 0.5 {
-		signalConfidence += 40.0
-	} else if macdStrength > 0.3 {
-		signalConfidence += 30.0
-	} else if macdStrength > 0.1 {
-		signalConfidence += 20.0
-	}
-
-	// MACD trend confirmation (0-30%)
-	if latestHist > 0 && prevHist > 0 {
-		signalConfidence += 30.0
-	} else if latestHist < 0 && prevHist < 0 {
-		signalConfidence += 30.0
-	}
-
-	// Volume confirmation (0-30%)
-	volumeStrength := (latestHist / latestPrice) * 100
-	if volumeStrength > 150.0 {
-		signalConfidence += 30.0
-	} else if volumeStrength > 120.0 {
-		signalConfidence += 20.0
-	} else if volumeStrength > 100.0 {
-		signalConfidence += 10.0
-	}
-
-	// Cap confidence at 100%
-	if signalConfidence > 100.0 {
-		signalConfidence = 100.0
-	}
+	// Calculate signal confidence
+	signalConfidence := 100.0 - riskPercent
 
 	// Trading logic
 	if latestHist > 0 && prevHist <= 0 {
@@ -203,21 +165,18 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• Support Level: %.5f\n"+
-				"• Resistance Level: %.5f\n"+
 				"• MACD: %.6f\n"+
 				"• Signal: %.6f\n"+
+				"• Histogram: %.6f\n"+
+				"• MACD Strength: %.2f%%\n"+
+				"• Volume Strength: %.2f%%\n"+
 				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Trade Notes:\n"+
 				"• Bullish MACD crossover\n"+
-				"• SL placed below support\n"+
-				"• TP placed below resistance\n"+
-				"• Based on actual price levels\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -227,16 +186,16 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				leverage,
 				positionSize*100/accountSize,
 				signalConfidence,
-				nearestSupport,
-				nearestResistance,
 				latestHist,
 				prevHist,
+				latestHist-prevHist,
+				macdStrength,
+				volumeStrength,
 				atrValue,
 				volatilityPercent,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
@@ -258,21 +217,18 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• Support Level: %.5f\n"+
-				"• Resistance Level: %.5f\n"+
 				"• MACD: %.6f\n"+
 				"• Signal: %.6f\n"+
+				"• Histogram: %.6f\n"+
+				"• MACD Strength: %.2f%%\n"+
+				"• Volume Strength: %.2f%%\n"+
 				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Trade Notes:\n"+
 				"• Bearish MACD crossover\n"+
-				"• SL placed above resistance\n"+
-				"• TP placed above support\n"+
-				"• Based on actual price levels\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,
@@ -282,16 +238,16 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				leverage,
 				positionSize*100/accountSize,
 				signalConfidence,
-				nearestSupport,
-				nearestResistance,
 				latestHist,
 				prevHist,
+				latestHist-prevHist,
+				macdStrength,
+				volumeStrength,
 				atrValue,
 				volatilityPercent,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,

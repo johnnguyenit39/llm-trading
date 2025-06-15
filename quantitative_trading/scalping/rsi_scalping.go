@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -79,6 +81,11 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 	latestVolume := volumes[len(volumes)-1]
 	latestVolumeMA := volumeMA[len(volumeMA)-1]
 
+	// Calculate market metrics
+	volumeStrength := (latestVolume / latestVolumeMA) * 100
+	rsiStrength := math.Abs(latestRSI-50) / 50 * 100
+	volatilityPercent := (atrValue / latestPrice) * 100
+
 	// Calculate stop loss and take profit based on fixed percentages
 	var stopLossDistance, takeProfitDistance float64
 	if latestRSI < 30 {
@@ -107,7 +114,6 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 	}
 
 	// Volume confirmation
-	volumeStrength := (latestVolume / latestVolumeMA) * 100
 	if volumeStrength > 150.0 {
 		expectedMove *= 1.5 // Strong volume confirms move
 	} else if volumeStrength > 120.0 {
@@ -120,7 +126,6 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 	}
 
 	// Adjust leverage based on volatility
-	volatilityPercent := (atrValue / latestPrice) * 100
 	if volatilityPercent > 2.0 {
 		leverage *= 0.5 // Reduce leverage in high volatility
 	} else if volatilityPercent > 1.0 {
@@ -167,6 +172,7 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"📈 Technical Analysis:\n"+
 				"• RSI: %.2f (Oversold)\n"+
 				"• Previous RSI: %.2f\n"+
+				"• RSI Strength: %.2f%%\n"+
 				"• Volume Strength: %.2f%%\n"+
 				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Trade Notes:\n"+
@@ -186,6 +192,7 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				signalConfidence,
 				latestRSI,
 				prevRSI,
+				rsiStrength,
 				volumeStrength,
 				atrValue,
 				volatilityPercent,
@@ -215,6 +222,7 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"📈 Technical Analysis:\n"+
 				"• RSI: %.2f (Overbought)\n"+
 				"• Previous RSI: %.2f\n"+
+				"• RSI Strength: %.2f%%\n"+
 				"• Volume Strength: %.2f%%\n"+
 				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Trade Notes:\n"+
@@ -234,6 +242,7 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				signalConfidence,
 				latestRSI,
 				prevRSI,
+				rsiStrength,
 				volumeStrength,
 				atrValue,
 				volatilityPercent,

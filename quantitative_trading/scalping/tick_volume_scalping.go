@@ -85,23 +85,85 @@ func (s *TickVolumeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 	}
 	latestROC := roc[len(roc)-1]
 
+	// Calculate Volume Profile
+	volumeMA := talib.Sma(volumes, 20)
+
 	// Get latest values
 	latestPrice := closes[len(closes)-1]
 	latestVolume := volumes[len(volumes)-1]
-	volumeMA := talib.Sma(volumes, 20)
 	latestVolumeMA := volumeMA[len(volumeMA)-1]
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxRiskPercent := 0.02
-	maxStopLossDistance := latestPrice * maxRiskPercent
+	// Calculate market metrics
+	volumeStrength := (latestVolume / latestVolumeMA) * 100
+	vwapDistance := math.Abs((latestPrice - latestVWAP) / latestVWAP * 100)
+	volatilityPercent := (atrValue / latestPrice) * 100
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+	// Calculate stop loss and take profit based on fixed percentages
+	var stopLossDistance, takeProfitDistance float64
+	if latestPrice < latestVWAP && latestROC > 0 {
+		// BUY signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
+	} else if latestPrice > latestVWAP && latestROC < 0 {
+		// SELL signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
+	}
+
+	// Calculate leverage based on volume spike
+	leverage := 1.0 // Base leverage
+
+	// Calculate expected price movement based on volume spike
+	var expectedMove float64
+
+	// Volume spike strength
+	if volumeStrength > 200.0 {
+		expectedMove = 0.7 // Strong volume spike, expect 0.7% move
+	} else if volumeStrength > 150.0 {
+		expectedMove = 0.5 // Moderate volume spike, expect 0.5% move
+	} else {
+		expectedMove = 0.3 // Weak volume spike, expect 0.3% move
+	}
+
+	// ROC confirmation
+	if math.Abs(latestROC) > 0.5 {
+		expectedMove *= 1.2 // Strong momentum confirms move
+	} else if math.Abs(latestROC) > 0.3 {
+		expectedMove *= 1.1 // Moderate momentum confirms move
+	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	if volatilityPercent > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if volatilityPercent > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
+	}
+
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
+	}
 
 	// Calculate risk and reward percentages
 	riskPercent := (stopLossDistance / latestPrice) * 100
 	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
+	// Calculate actual risk:reward ratio
+	riskRewardRatio := takeProfitDistance / stopLossDistance
+
+	// Calculate position size based on risk
+	accountSize := 1000.0 // $1000 account
+	accountRisk := 0.02   // 2% risk per trade
+	riskAmount := accountSize * accountRisk
+	positionSize := riskAmount / (riskPercent / 100.0)
+
+	// Calculate signal confidence
+	signalConfidence := 100.0 - riskPercent
 
 	// Trading logic
 	if latestVolume > latestVolumeMA*s.volumeThreshold {
@@ -114,42 +176,46 @@ func (s *TickVolumeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 				Description: fmt.Sprintf("🚀 Tick/Volume Bar Scalping - BUY Signal ADA/USDT\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
-					"• Stop Loss: %.5f (-%.1f%%)\n"+
-					"• Take Profit: %.5f (+%.1f%%)\n"+
-					"• Risk/Reward: 1:1.5\n"+
-					"• Leverage: 10x\n"+
+					"• Stop Loss: %.5f (-%.2f%%)\n"+
+					"• Take Profit: %.5f (+%.2f%%)\n"+
+					"• Risk/Reward: 1:%.2f\n"+
+					"• Leverage: %.1fx\n"+
+					"• Position Size: %.2f%% of account\n"+
 					"• Signal Confidence: %.1f%%\n\n"+
-					"📈 P&L Projection:\n"+
-					"• Risk: -%.2f%%\n"+
-					"• Reward: +%.2f%%\n"+
-					"• Risk/Reward: 1:1.5\n\n"+
-					"📊 Signal Details:\n"+
-					"• Volume: %.2f (MA: %.2f)\n"+
+					"📈 Technical Analysis:\n"+
 					"• VWAP: %.5f\n"+
+					"• Distance to VWAP: %.2f%%\n"+
+					"• Volume Strength: %.2f%%\n"+
 					"• ROC: %.2f%%\n"+
-					"• ATR: %.6f\n\n"+
-					"💡 Strategy Notes:\n"+
-					"• High volume spike detected\n"+
-					"• Price below VWAP with positive momentum\n"+
-					"• Using ATR for dynamic stop loss\n"+
+					"• ATR: %.6f (%.2f%% volatility)\n\n"+
+					"💡 Trade Notes:\n"+
+					"• Volume spike setup\n"+
 					"• Max risk per trade: 2%%\n"+
-					"• SL: ATR * 1.0 (max 2%%)\n"+
-					"• TP: SL * 1.5",
+					"• Account Size: $%.2f\n"+
+					"• Risk Amount: $%.2f\n"+
+					"• Expected Move: %.2f%%",
 					latestPrice,
 					latestPrice-stopLossDistance,
 					riskPercent,
 					latestPrice+takeProfitDistance,
 					rewardPercent,
-					riskPercent,
-					rewardPercent,
-					latestVolume,
-					latestVolumeMA,
+					riskRewardRatio,
+					leverage,
+					positionSize*100/accountSize,
+					signalConfidence,
 					latestVWAP,
-					latestROC,
+					vwapDistance,
+					volumeStrength,
+					latestROC*100,
 					atrValue,
-					riskPercent),
+					volatilityPercent,
+					accountSize,
+					riskAmount,
+					expectedMove,
+				),
 				StopLoss:   latestPrice - stopLossDistance,
 				TakeProfit: latestPrice + takeProfitDistance,
+				Leverage:   leverage,
 			}, nil
 		} else if latestPrice > latestVWAP && latestROC < 0 {
 			// Volume spike with price above VWAP and negative momentum
@@ -160,39 +226,46 @@ func (s *TickVolumeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 				Description: fmt.Sprintf("🔻 Tick/Volume Bar Scalping - SELL Signal ADA/USDT\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
-					"• Stop Loss: %.5f (+%.1f%%)\n"+
-					"• Take Profit: %.5f (-%.1f%%)\n"+
-					"• Risk/Reward: 1:1.5\n\n"+
-					"📈 P&L Projection:\n"+
-					"• Risk: -%.2f%%\n"+
-					"• Reward: +%.2f%%\n"+
-					"• Risk/Reward: 1:1.5\n\n"+
-					"📊 Signal Details:\n"+
-					"• Volume: %.2f (MA: %.2f)\n"+
+					"• Stop Loss: %.5f (+%.2f%%)\n"+
+					"• Take Profit: %.5f (-%.2f%%)\n"+
+					"• Risk/Reward: 1:%.2f\n"+
+					"• Leverage: %.1fx\n"+
+					"• Position Size: %.2f%% of account\n"+
+					"• Signal Confidence: %.1f%%\n\n"+
+					"📈 Technical Analysis:\n"+
 					"• VWAP: %.5f\n"+
+					"• Distance to VWAP: %.2f%%\n"+
+					"• Volume Strength: %.2f%%\n"+
 					"• ROC: %.2f%%\n"+
-					"• ATR: %.6f\n\n"+
-					"💡 Strategy Notes:\n"+
-					"• High volume spike detected\n"+
-					"• Price above VWAP with negative momentum\n"+
-					"• Using ATR for dynamic stop loss\n"+
+					"• ATR: %.6f (%.2f%% volatility)\n\n"+
+					"💡 Trade Notes:\n"+
+					"• Volume spike setup\n"+
 					"• Max risk per trade: 2%%\n"+
-					"• SL: ATR * 1.0 (max 2%%)\n"+
-					"• TP: SL * 1.5",
+					"• Account Size: $%.2f\n"+
+					"• Risk Amount: $%.2f\n"+
+					"• Expected Move: %.2f%%",
 					latestPrice,
 					latestPrice+stopLossDistance,
 					riskPercent,
 					latestPrice-takeProfitDistance,
 					rewardPercent,
-					riskPercent,
-					rewardPercent,
-					latestVolume,
-					latestVolumeMA,
+					riskRewardRatio,
+					leverage,
+					positionSize*100/accountSize,
+					signalConfidence,
 					latestVWAP,
-					latestROC,
-					atrValue),
+					vwapDistance,
+					volumeStrength,
+					latestROC*100,
+					atrValue,
+					volatilityPercent,
+					accountSize,
+					riskAmount,
+					expectedMove,
+				),
 				StopLoss:   latestPrice + stopLossDistance,
 				TakeProfit: latestPrice - takeProfitDistance,
+				Leverage:   leverage,
 			}, nil
 		}
 	}

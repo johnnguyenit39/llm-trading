@@ -6,8 +6,6 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
-	"math"
-
 	"github.com/markcheno/go-talib"
 )
 
@@ -94,67 +92,54 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 
 	// Get latest values
 	latestPrice := closes[len(closes)-1]
-	latestADX := adx[len(adx)-1]
-	latestSlowK := slowK[len(slowK)-1]
-	latestSlowD := slowD[len(slowD)-1]
-	latestRSI := rsi[len(rsi)-1]
-	latestBBUpper := bbUpper[len(bbUpper)-1]
-	latestBBMiddle := bbMiddle[len(bbMiddle)-1]
-	latestBBLower := bbLower[len(bbLower)-1]
 	latestVolume := volumes[len(volumes)-1]
-	latestVolumeEMA := volumeEMA[len(volumeEMA)-1]
 	latestATR := atr[len(atr)-1]
-
-	// Calculate market structure
-	prevHigh := highs[len(highs)-2]
-	prevLow := lows[len(lows)-2]
-	prevClose := closes[len(closes)-2]
-
-	// Detect price action patterns
-	isInsideBar := latestPrice < prevHigh && latestPrice > prevLow
-	isOutsideBar := latestPrice > prevHigh && latestPrice < prevLow
-	isDoji := math.Abs(latestPrice-prevClose) < (latestATR * 0.1)
+	latestBBUpper := bbUpper[len(bbUpper)-1]
+	latestBBLower := bbLower[len(bbLower)-1]
+	latestBBMiddle := bbMiddle[len(bbMiddle)-1]
+	latestRSI := rsi[len(rsi)-1]
+	latestVolumeMA := volumeEMA[len(volumeEMA)-1]
 
 	// Calculate volatility ratio
-	volatilityRatio := latestATR / latestBBMiddle * 100
+	volatilityRatio := (latestATR / latestPrice) * 100
 
 	// Calculate volume strength
-	volumeStrength := (latestVolume / latestVolumeEMA) * 100
-
-	// Calculate price momentum
-	priceMomentum := (latestPrice - prevClose) / prevClose * 100
+	volumeStrength := (latestVolume / latestVolumeMA) * 100
 
 	// Calculate stop loss and take profit based on fixed percentages
 	var stopLossDistance, takeProfitDistance float64
-	if priceMomentum < 0 { // Negative momentum
+	if latestPrice < latestBBLower && latestRSI < 30 {
 		// BUY signal
 		stopLossDistance = latestPrice * 0.01   // 1% SL
 		takeProfitDistance = latestPrice * 0.02 // 2% TP
-	} else {
+	} else if latestPrice > latestBBUpper && latestRSI > 70 {
 		// SELL signal
 		stopLossDistance = latestPrice * 0.01   // 1% SL
 		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	}
 
-	// Calculate leverage based on choppy market conditions
+	// Calculate leverage based on volatility and range
 	leverage := 1.0 // Base leverage
 
 	// Calculate expected price movement based on market conditions
 	var expectedMove float64
 
-	// Bollinger Band squeeze strength
-	bbWidth := (latestBBUpper - latestBBLower) / latestBBMiddle * 100
-	if bbWidth < 1.0 {
-		expectedMove = 0.7 // Strong squeeze, expect 0.7% move
-	} else if bbWidth < 2.0 {
-		expectedMove = 0.5 // Moderate squeeze, expect 0.5% move
+	// Range width
+	rangeWidth := latestBBUpper - latestBBLower
+	rangePercent := (rangeWidth / latestBBMiddle) * 100
+	if rangePercent < 1.0 {
+		expectedMove = 0.7 // Tight range, expect 0.7% move
+	} else if rangePercent < 2.0 {
+		expectedMove = 0.5 // Normal range, expect 0.5% move
 	} else {
-		expectedMove = 0.3 // Weak squeeze, expect 0.3% move
+		expectedMove = 0.3 // Wide range, expect 0.3% move
 	}
 
-	// Price momentum confirmation
-	if math.Abs(priceMomentum) > 0.5 {
-		expectedMove *= 1.5 // Strong momentum confirms move
+	// Volume confirmation
+	if volumeStrength > 150.0 {
+		expectedMove *= 1.5 // Strong volume confirms move
+	} else if volumeStrength > 120.0 {
+		expectedMove *= 1.2 // Above average volume confirms move
 	}
 
 	// Calculate required leverage to achieve 2% profit
@@ -185,20 +170,14 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	accountSize := 1000.0
 	accountRisk := 0.02
 	riskAmount := accountSize * accountRisk
-	positionSize := riskAmount / (stopLossDistance / latestPrice)
+	positionSize := riskAmount / (riskPercent / 100.0)
 
 	// Calculate signal confidence
 	signalConfidence := 100.0 - riskPercent
 
-	// Trading logic with improved technical analysis
-	if latestADX < 25 && // Weak trend
-		latestSlowK < 20 && latestSlowD < 20 && // Oversold
-		latestRSI < 30 && // RSI oversold
-		latestPrice < latestBBLower && // Price below lower BB
-		volumeStrength > 120 && // Above average volume
-		!isDoji && // Not a doji
-		priceMomentum < 0 { // Negative momentum
-
+	// Trading logic
+	if latestPrice < latestBBLower && latestRSI < 30 && latestVolume > latestVolumeMA {
+		// Price below lower band, oversold, high volume
 		return &strategies.Signal{
 			Type:  "BUY",
 			Price: latestPrice,
@@ -213,22 +192,15 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• ADX: %.2f (Weak Trend)\n"+
-				"• Stochastic K: %.2f (Oversold)\n"+
-				"• Stochastic D: %.2f (Oversold)\n"+
-				"• RSI: %.2f (Oversold)\n"+
+				"• BB Upper: %.5f\n"+
 				"• BB Lower: %.5f\n"+
 				"• BB Middle: %.5f\n"+
-				"• ATR: %.6f (%.2f%% volatility)\n"+
+				"• Range Width: %.2f%%\n"+
+				"• RSI: %.2f (Oversold)\n"+
 				"• Volume Strength: %.2f%%\n"+
-				"• Price Momentum: %.2f%%\n"+
-				"• Inside Bar: %v\n"+
-				"• Outside Bar: %v\n"+
-				"• Doji: %v\n\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Multiple oversold indicators\n"+
-				"• Price below lower BB\n"+
-				"• Strong volume confirmation\n"+
+				"• Choppy market bounce setup\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
@@ -242,19 +214,14 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				leverage,
 				positionSize*100/accountSize,
 				signalConfidence,
-				latestADX,
-				latestSlowK,
-				latestSlowD,
-				latestRSI,
+				latestBBUpper,
 				latestBBLower,
 				latestBBMiddle,
+				rangePercent,
+				latestRSI,
+				volumeStrength,
 				latestATR,
 				volatilityRatio,
-				volumeStrength,
-				priceMomentum,
-				isInsideBar,
-				isOutsideBar,
-				isDoji,
 				accountSize,
 				riskAmount,
 				expectedMove,
@@ -263,46 +230,8 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			TakeProfit: latestPrice + takeProfitDistance,
 			Leverage:   leverage,
 		}, nil
-	} else if latestADX < 25 && // Weak trend
-		latestSlowK > 80 && latestSlowD > 80 && // Overbought
-		latestRSI > 70 && // RSI overbought
-		latestPrice > latestBBUpper && // Price above upper BB
-		volumeStrength > 120 && // Above average volume
-		!isDoji && // Not a doji
-		priceMomentum > 0 { // Positive momentum
-
-		// Calculate stop loss and take profit based on technical levels
-		stopLossDistance := math.Max(latestATR*1.5, (latestBBUpper-latestPrice)*1.2)
-		takeProfitDistance := math.Max(latestATR*2.5, (latestPrice-latestBBMiddle)*1.5)
-
-		// Calculate position size based on risk
-		accountSize := 1000.0
-		accountRisk := 0.02
-		riskAmount := accountSize * accountRisk
-		positionSize := riskAmount / (stopLossDistance / latestPrice)
-
-		// Calculate leverage based on volatility
-		leverage := 10.0
-		if volatilityRatio < 1.0 {
-			leverage = 20.0
-		} else if volatilityRatio < 2.0 {
-			leverage = 15.0
-		} else if volatilityRatio < 3.0 {
-			leverage = 10.0
-		} else {
-			leverage = 5.0
-		}
-
-		// Adjust leverage based on market structure
-		if isInsideBar {
-			leverage *= 0.8 // Reduce leverage for inside bars
-		}
-
-		// Cap maximum leverage
-		if leverage > 20.0 {
-			leverage = 20.0
-		}
-
+	} else if latestPrice > latestBBUpper && latestRSI > 70 && latestVolume > latestVolumeMA {
+		// Price above upper band, overbought, high volume
 		return &strategies.Signal{
 			Type:  "SELL",
 			Price: latestPrice,
@@ -314,49 +243,39 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Take Profit: %.5f (-%.2f%%)\n"+
 				"• Risk/Reward: 1:%.2f\n"+
 				"• Leverage: %.1fx\n"+
-				"• Position Size: %.2f%% of account\n\n"+
+				"• Position Size: %.2f%% of account\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• ADX: %.2f (Weak Trend)\n"+
-				"• Stochastic K: %.2f (Overbought)\n"+
-				"• Stochastic D: %.2f (Overbought)\n"+
-				"• RSI: %.2f (Overbought)\n"+
 				"• BB Upper: %.5f\n"+
+				"• BB Lower: %.5f\n"+
 				"• BB Middle: %.5f\n"+
-				"• ATR: %.6f (%.2f%% volatility)\n"+
+				"• Range Width: %.2f%%\n"+
+				"• RSI: %.2f (Overbought)\n"+
 				"• Volume Strength: %.2f%%\n"+
-				"• Price Momentum: %.2f%%\n"+
-				"• Inside Bar: %v\n"+
-				"• Outside Bar: %v\n"+
-				"• Doji: %v\n\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Multiple overbought indicators\n"+
-				"• Price above upper BB\n"+
-				"• Strong volume confirmation\n"+
+				"• Choppy market reversal setup\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
-				takeProfitDistance/stopLossDistance,
+				rewardPercent,
+				riskRewardRatio,
 				leverage,
 				positionSize*100/accountSize,
-				latestADX,
-				latestSlowK,
-				latestSlowD,
-				latestRSI,
+				signalConfidence,
 				latestBBUpper,
+				latestBBLower,
 				latestBBMiddle,
+				rangePercent,
+				latestRSI,
+				volumeStrength,
 				latestATR,
 				volatilityRatio,
-				volumeStrength,
-				priceMomentum,
-				isInsideBar,
-				isOutsideBar,
-				isDoji,
 				accountSize,
 				riskAmount,
 				expectedMove,

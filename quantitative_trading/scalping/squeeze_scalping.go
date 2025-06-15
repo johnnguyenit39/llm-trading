@@ -5,7 +5,6 @@ import (
 	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
-	"math"
 
 	"github.com/markcheno/go-talib"
 )
@@ -88,17 +87,67 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 	latestKCLower := kcLower[len(kcLower)-1]
 	latestATR := atr[len(atr)-1]
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxRiskPercent := 0.02
-	maxStopLossDistance := latestPrice * maxRiskPercent
+	// Calculate stop loss and take profit based on fixed percentages
+	var stopLossDistance, takeProfitDistance float64
+	if latestPrice > latestBBMiddle {
+		// BUY signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
+	} else {
+		// SELL signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
+	}
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(latestATR*1.0, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+	// Calculate leverage based on squeeze intensity
+	leverage := 1.0 // Base leverage
+
+	// Calculate expected price movement based on squeeze conditions
+	var expectedMove float64
+
+	// Squeeze intensity
+	squeezeIntensity := (latestBBUpper - latestBBLower) / latestBBMiddle * 100
+	if squeezeIntensity < 0.5 {
+		expectedMove = 0.7 // Strong squeeze, expect 0.7% move
+	} else if squeezeIntensity < 1.0 {
+		expectedMove = 0.5 // Moderate squeeze, expect 0.5% move
+	} else {
+		expectedMove = 0.3 // Weak squeeze, expect 0.3% move
+	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	volatilityPercent := (latestATR / latestPrice) * 100
+	if volatilityPercent > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if volatilityPercent > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
+	}
+
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
+	}
 
 	// Calculate risk and reward percentages
 	riskPercent := (stopLossDistance / latestPrice) * 100
 	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
+	// Calculate actual risk:reward ratio
+	riskRewardRatio := takeProfitDistance / stopLossDistance
+
+	// Calculate position size based on risk
+	accountSize := 1000.0 // $1000 account
+	accountRisk := 0.02   // 2% risk per trade
+	riskAmount := accountSize * accountRisk
+	positionSize := riskAmount / (riskPercent / 100.0)
+
+	// Calculate signal confidence
+	signalConfidence := 100.0 - riskPercent
 
 	// Check for squeeze condition (BBands inside Keltner)
 	isSqueeze := latestBBUpper < latestKCUpper && latestBBLower > latestKCLower
@@ -113,43 +162,48 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 			Description: fmt.Sprintf("🚀 Squeeze Scalping - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (-%.1f%%)\n"+
-				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 5x\n"+
+				"• Stop Loss: %.5f (-%.2f%%)\n"+
+				"• Take Profit: %.5f (+%.2f%%)\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📊 Signal Details:\n"+
-				"• Bollinger Bands inside Keltner Channels\n"+
+				"📈 Technical Analysis:\n"+
 				"• BB Upper: %.5f\n"+
 				"• BB Lower: %.5f\n"+
 				"• KC Upper: %.5f\n"+
 				"• KC Lower: %.5f\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
+				"• Squeeze Intensity: %.2f%%\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
+				"💡 Trade Notes:\n"+
 				"• Potential bullish breakout from squeeze\n"+
-				"• Using ATR for dynamic stop loss\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL: ATR * 1.0 (max 2%%)\n"+
-				"• TP: SL * 1.5",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
 				latestPrice+takeProfitDistance,
 				rewardPercent,
-				riskPercent,
-				riskPercent,
-				rewardPercent,
+				riskRewardRatio,
+				leverage,
+				positionSize*100/accountSize,
+				signalConfidence,
 				latestBBUpper,
 				latestBBLower,
 				latestKCUpper,
 				latestKCLower,
-				latestATR),
+				squeezeIntensity,
+				latestATR,
+				volatilityPercent,
+				accountSize,
+				riskAmount,
+				expectedMove,
+			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	} else if isSqueeze && latestPrice < latestBBMiddle {
 		// Potential bearish breakout from squeeze
@@ -160,43 +214,48 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 			Description: fmt.Sprintf("🔻 Squeeze Scalping - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (+%.1f%%)\n"+
-				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 5x\n"+
+				"• Stop Loss: %.5f (+%.2f%%)\n"+
+				"• Take Profit: %.5f (-%.2f%%)\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📊 Signal Details:\n"+
-				"• Bollinger Bands inside Keltner Channels\n"+
+				"📈 Technical Analysis:\n"+
 				"• BB Upper: %.5f\n"+
 				"• BB Lower: %.5f\n"+
 				"• KC Upper: %.5f\n"+
 				"• KC Lower: %.5f\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
+				"• Squeeze Intensity: %.2f%%\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
+				"💡 Trade Notes:\n"+
 				"• Potential bearish breakout from squeeze\n"+
-				"• Using ATR for dynamic stop loss\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL: ATR * 1.0 (max 2%%)\n"+
-				"• TP: SL * 1.5",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,
 				latestPrice-takeProfitDistance,
 				rewardPercent,
-				riskPercent,
-				riskPercent,
-				rewardPercent,
+				riskRewardRatio,
+				leverage,
+				positionSize*100/accountSize,
+				signalConfidence,
 				latestBBUpper,
 				latestBBLower,
 				latestKCUpper,
 				latestKCLower,
-				latestATR),
+				squeezeIntensity,
+				latestATR,
+				volatilityPercent,
+				accountSize,
+				riskAmount,
+				expectedMove,
+			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	}
 

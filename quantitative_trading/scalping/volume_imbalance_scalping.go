@@ -66,78 +66,95 @@ func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal,
 	if len(atr) < 2 {
 		return nil, nil
 	}
-	atrValue := atr[len(atr)-1]
-
-	// Calculate EMAs for trend
-	ema20 := talib.Ema(closes, 20)
-	ema50 := talib.Ema(closes, 50)
 
 	// Calculate Volume Profile
 	volumeMA := talib.Sma(volumes, 20)
-	volumeEMA := talib.Ema(volumes, 20)
-
-	// Calculate RSI for additional confirmation
-	rsi := talib.Rsi(closes, 14)
 
 	// Get latest values
 	latestPrice := closes[len(closes)-1]
 	latestVolume := volumes[len(volumes)-1]
 	latestVolumeMA := volumeMA[len(volumeMA)-1]
-	latestVolumeEMA := volumeEMA[len(volumeEMA)-1]
-	latestEMA20 := ema20[len(ema20)-1]
-	latestEMA50 := ema50[len(ema50)-1]
-	latestRSI := rsi[len(rsi)-1]
-
-	// Calculate market metrics
-	volumeStrength := (latestVolume / latestVolumeMA) * 100
-	volumeTrend := (latestVolumeEMA / latestVolumeMA) * 100
-	priceVsEMA20 := ((latestPrice - latestEMA20) / latestEMA20) * 100
-	volatilityRatio := atrValue / latestPrice * 100
+	latestATR := atr[len(atr)-1]
 
 	// Calculate volume imbalance
 	volumeImbalance := calculateVolumeImbalance(closes, volumes, 5)
 
-	// Calculate leverage based on volatility and volume imbalance
-	leverage := 3.0 // Default for volume imbalance trading
-	if volatilityRatio > 3.0 {
-		leverage = 2.0
-	} else if volatilityRatio > 2.0 {
-		leverage = 2.5
-	} else if volatilityRatio > 1.0 {
-		leverage = 3.0
-	} else {
-		leverage = 4.0
+	// Calculate volume strength
+	volumeStrength := (latestVolume / latestVolumeMA) * 100
+
+	// Calculate volatility percentage
+	volatilityPercent := (latestATR / latestPrice) * 100
+
+	// Calculate stop loss and take profit based on fixed percentages
+	var stopLossDistance, takeProfitDistance float64
+	if volumeImbalance > 1.5 {
+		// BUY signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
+	} else if volumeImbalance < -1.5 {
+		// SELL signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	}
 
-	// Adjust leverage based on volume imbalance
+	// Calculate leverage based on volume imbalance
+	leverage := 1.0 // Base leverage
+
+	// Calculate expected price movement based on volume imbalance
+	var expectedMove float64
+
+	// Volume imbalance strength
 	if math.Abs(volumeImbalance) > 2.0 {
-		leverage *= 0.8 // Reduce leverage on extreme volume imbalance
+		expectedMove = 0.7 // Strong imbalance, expect 0.7% move
+	} else if math.Abs(volumeImbalance) > 1.5 {
+		expectedMove = 0.5 // Moderate imbalance, expect 0.5% move
+	} else {
+		expectedMove = 0.3 // Weak imbalance, expect 0.3% move
+	}
+
+	// Volume confirmation
+	if volumeMA[len(volumeMA)-1] > 150.0 {
+		expectedMove *= 1.5 // Strong volume confirms move
+	} else if volumeMA[len(volumeMA)-1] > 120.0 {
+		expectedMove *= 1.2 // Above average volume confirms move
+	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	if latestATR > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if latestATR > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
 	}
 
 	// Cap maximum leverage
-	if leverage > 5.0 {
-		leverage = 5.0
+	if leverage > 20.0 {
+		leverage = 20.0
 	}
 
-	// Calculate stop loss and take profit based on volume imbalance
-	stopLossDistance := math.Max(atrValue*1.2, latestPrice*0.01) // Minimum 1% stop loss
-	takeProfitDistance := math.Max(atrValue*2.0, stopLossDistance*1.5)
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
+	// Calculate actual risk:reward ratio
+	riskRewardRatio := takeProfitDistance / stopLossDistance
 
 	// Calculate position size based on risk
-	accountSize := 1000.0
-	accountRisk := 0.02
+	accountSize := 1000.0 // $1000 account
+	accountRisk := 0.02   // 2% risk per trade
 	riskAmount := accountSize * accountRisk
-	positionSize := riskAmount / (stopLossDistance / latestPrice)
-	rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
+	positionSize := riskAmount / (riskPercent / 100.0)
 
-	// Trading logic with improved volume imbalance analysis
-	if volumeImbalance > 1.5 && // Strong buying pressure
-		volumeStrength > 150 && // Above average volume
-		volumeTrend > 110 && // Increasing volume trend
-		latestRSI < 60 && // Not overbought
-		priceVsEMA20 > -1.0 && // Price near or above EMA20
-		latestEMA20 > latestEMA50 { // Uptrend confirmation
+	// Calculate signal confidence
+	signalConfidence := 100.0 - riskPercent
 
+	// Trading logic
+	if volumeImbalance > 1.5 && volumeMA[len(volumeMA)-1] > 150 {
+		// Strong buying pressure
 		return &strategies.Signal{
 			Type:  "BUY",
 			Price: latestPrice,
@@ -149,58 +166,42 @@ func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal,
 				"• Take Profit: %.5f (+%.2f%%)\n"+
 				"• Risk/Reward: 1:%.2f\n"+
 				"• Leverage: %.1fx\n"+
-				"• Position Size: %.2f%% of account\n\n"+
+				"• Position Size: %.2f%% of account\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
 				"• Volume Imbalance: %.2f\n"+
 				"• Volume Strength: %.2f%%\n"+
-				"• Volume Trend: %.2f%%\n"+
-				"• RSI: %.2f\n"+
-				"• EMA20: %.5f\n"+
-				"• EMA50: %.5f\n"+
-				"• Price vs EMA20: %.2f%%\n"+
-				"• Volatility Ratio: %.2f%%\n"+
-				"• ATR: %.6f\n\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Volume imbalance breakout setup\n"+
 				"• Strong buying pressure\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
-				takeProfitDistance/stopLossDistance,
+				rewardPercent,
+				riskRewardRatio,
 				leverage,
 				positionSize*100/accountSize,
+				signalConfidence,
 				volumeImbalance,
-				volumeStrength,
-				volumeTrend,
-				latestRSI,
-				latestEMA20,
-				latestEMA50,
-				priceVsEMA20,
-				volatilityRatio,
-				atrValue,
+				volumeMA[len(volumeMA)-1],
+				latestATR,
+				latestATR/latestPrice*100,
+				volatilityPercent,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 			Leverage:   leverage,
 		}, nil
-	} else if volumeImbalance < -1.5 && // Strong selling pressure
-		volumeStrength > 150 && // Above average volume
-		volumeTrend > 110 && // Increasing volume trend
-		latestRSI > 40 && // Not oversold
-		priceVsEMA20 < 1.0 && // Price near or below EMA20
-		latestEMA20 < latestEMA50 { // Downtrend confirmation
-
+	} else if volumeImbalance < -1.5 && volumeStrength > 150 {
+		// Strong selling pressure
 		return &strategies.Signal{
 			Type:  "SELL",
 			Price: latestPrice,
@@ -212,46 +213,34 @@ func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal,
 				"• Take Profit: %.5f (-%.2f%%)\n"+
 				"• Risk/Reward: 1:%.2f\n"+
 				"• Leverage: %.1fx\n"+
-				"• Position Size: %.2f%% of account\n\n"+
+				"• Position Size: %.2f%% of account\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
 				"• Volume Imbalance: %.2f\n"+
 				"• Volume Strength: %.2f%%\n"+
-				"• Volume Trend: %.2f%%\n"+
-				"• RSI: %.2f\n"+
-				"• EMA20: %.5f\n"+
-				"• EMA50: %.5f\n"+
-				"• Price vs EMA20: %.2f%%\n"+
-				"• Volatility Ratio: %.2f%%\n"+
-				"• ATR: %.6f\n\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Volume imbalance breakdown setup\n"+
 				"• Strong selling pressure\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
-				takeProfitDistance/stopLossDistance,
+				rewardPercent,
+				riskRewardRatio,
 				leverage,
 				positionSize*100/accountSize,
+				signalConfidence,
 				volumeImbalance,
 				volumeStrength,
-				volumeTrend,
-				latestRSI,
-				latestEMA20,
-				latestEMA50,
-				priceVsEMA20,
-				volatilityRatio,
-				atrValue,
+				latestATR,
+				volatilityPercent,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,

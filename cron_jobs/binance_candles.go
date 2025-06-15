@@ -15,6 +15,23 @@ import (
 	"gorm.io/gorm"
 )
 
+var symbols = []string{
+	"ADAUSDT",
+	"SOLUSDT",
+	"XRPUSDT",
+	"DOTUSDT",
+	"LINKUSDT",
+	"BTCUSDT",
+	"ETHUSDT",
+	"BNBUSDT",
+	"XLMUSDT",
+	"XMRUSDT",
+	"XRPUSDT",
+	"XLMUSDT",
+	"XMRUSDT",
+	"XRPUSDT",
+	"XLMUSDT",
+	"XMRUSDT"}
 var (
 	// Global instance of BinanceCandlesJob
 	GlobalBinanceCandlesJob *BinanceCandlesJob
