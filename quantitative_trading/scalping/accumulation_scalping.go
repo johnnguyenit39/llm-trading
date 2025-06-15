@@ -172,6 +172,49 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	// Calculate actual risk:reward ratio
 	riskRewardRatio := takeProfitDistance / stopLossDistance
 
+	// Calculate signal confidence based on multiple factors
+	signalConfidence := 0.0
+
+	// OBV trend strength (0-40%)
+	obvTrendStrength := math.Abs((latestOBV - latestOBVMA) / latestOBVMA * 100)
+	if obvTrendStrength > 5.0 {
+		signalConfidence += 40.0
+	} else {
+		signalConfidence += obvTrendStrength * 8.0
+	}
+
+	// Volume confirmation (0-30%)
+	volumeMA := talib.Sma(volumes, 20)
+	latestVolumeMA := volumeMA[len(volumeMA)-1]
+	volumeStrength := (volumes[len(volumes)-1] / latestVolumeMA) * 100
+	if volumeStrength > 150.0 {
+		signalConfidence += 30.0
+	} else if volumeStrength > 120.0 {
+		signalConfidence += 20.0
+	} else if volumeStrength > 100.0 {
+		signalConfidence += 10.0
+	}
+
+	// Price action confirmation (0-30%)
+	priceActionStrength := 0.0
+	if marketCondition == common.MarketAccumulation {
+		// For accumulation, check if price is making higher lows
+		priceActionStrength = 30.0
+	} else {
+		// For distribution, check if price is making lower highs
+		priceActionStrength = 30.0
+	}
+	signalConfidence += priceActionStrength
+
+	// Cap confidence at 100%
+	if signalConfidence > 100.0 {
+		signalConfidence = 100.0
+	}
+
+	// Calculate position size based on risk
+	accountRisk := 0.02 // 2% risk per trade
+	positionSize := accountRisk / (riskPercent / 100.0)
+
 	// Trading logic
 	if latestOBV > latestOBVMA && prevOBV <= prevOBVMA {
 		// OBV crosses above its MA - accumulation pattern
@@ -186,7 +229,9 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 					"• Stop Loss: %.5f (-%.2f%%)\n"+
 					"• Take Profit: %.5f (+%.2f%%)\n"+
 					"• Risk/Reward: 1:%.2f\n"+
-					"• Leverage: %.1fx\n\n"+
+					"• Leverage: %.1fx\n"+
+					"• Position Size: %.2f%% of account\n"+
+					"• Signal Confidence: %.1f%%\n\n"+
 					"📈 Technical Analysis:\n"+
 					"• Support Level: %.5f\n"+
 					"• Resistance Level: %.5f\n"+
@@ -198,7 +243,9 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 					"• SL placed below support\n"+
 					"• TP placed below resistance\n"+
 					"• Based on actual price levels\n"+
-					"• Max risk per trade: 2%%",
+					"• Max risk per trade: 2%%\n"+
+					"• Risk: $%.2f\n"+
+					"• Reward: $%.2f",
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -206,12 +253,16 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				rewardPercent,
 				riskRewardRatio,
 				leverage,
+				positionSize*100,
+				signalConfidence,
 				nearestSupport,
 				nearestResistance,
 				latestOBV,
 				latestOBVMA,
 				atrValue,
 				volatilityPercent,
+				positionSize*accountRisk*100,
+				positionSize*accountRisk*100*riskRewardRatio,
 			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
