@@ -6,6 +6,7 @@ import (
 )
 
 type Candle struct {
+	Symbol    string
 	OpenTime  time.Time
 	Open      float64
 	High      float64

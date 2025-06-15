@@ -7,7 +7,7 @@ var GlobalChartObserver *ChartObserver
 // InitCronJobs initializes and starts all cron jobs
 func InitCronJobs(db *gorm.DB) {
 	// Initialize the global Binance job
-	InitializeGlobalBinanceJob("ADAUSDT", db)
+	InitializeGlobalBinanceJob(db)
 	// Start the job
 	GlobalBinanceCandlesJob.Start()
 
