@@ -157,7 +157,7 @@ func (s *VWAPBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 VWAP Bounce - BUY Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 VWAP Bounce - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -206,7 +206,7 @@ func (s *VWAPBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 VWAP Bounce - SELL Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 VWAP Bounce - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+

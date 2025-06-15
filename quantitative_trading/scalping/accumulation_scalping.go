@@ -228,7 +228,7 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
 			Description: fmt.Sprintf(
-				"🚀 Accumulation Scalping - BUY Signal %s/USDT\n\n"+
+				"🚀 Accumulation Scalping - BUY Signal %s\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
 					"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -281,7 +281,7 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
 			Description: fmt.Sprintf(
-				"🔻 Accumulation Scalping - SELL Signal %s/USDT\n\n"+
+				"🔻 Accumulation Scalping - SELL Signal %s\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
 					"• Stop Loss: %.5f (+%.2f%%)\n"+

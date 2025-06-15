@@ -160,7 +160,7 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 RSI Scalping - BUY Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 RSI Scalping - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -211,7 +211,7 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 RSI Scalping - SELL Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 RSI Scalping - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+

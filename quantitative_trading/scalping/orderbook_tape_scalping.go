@@ -126,7 +126,7 @@ func OrderbookTapeScalping(candles []repository.Candle) (*strategies.Signal, err
 				Type:  "BUY",
 				Price: latestPrice,
 				Time:  time.Now(),
-				Description: fmt.Sprintf("🚀 Orderbook Tape Scalping - BUY Signal %s/USDT\n\n"+
+				Description: fmt.Sprintf("🚀 Orderbook Tape Scalping - BUY Signal %s\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
 					"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -183,7 +183,7 @@ func OrderbookTapeScalping(candles []repository.Candle) (*strategies.Signal, err
 				Type:  "SELL",
 				Price: latestPrice,
 				Time:  time.Now(),
-				Description: fmt.Sprintf("🔻 Orderbook Tape Scalping - SELL Signal %s/USDT\n\n"+
+				Description: fmt.Sprintf("🔻 Orderbook Tape Scalping - SELL Signal %s\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
 					"• Stop Loss: %.5f (+%.2f%%)\n"+

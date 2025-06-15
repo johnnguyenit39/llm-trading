@@ -182,7 +182,7 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 Choppy Market Scalping - BUY Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 Choppy Market Scalping - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -237,7 +237,7 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 Choppy Market Scalping - SELL Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 Choppy Market Scalping - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+

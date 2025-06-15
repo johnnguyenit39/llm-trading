@@ -168,7 +168,7 @@ func VolumeProfileScalping(candles5m []repository.Candle) (*strategies.Signal, e
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 Volume Profile - BUY Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 Volume Profile - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -229,7 +229,7 @@ func VolumeProfileScalping(candles5m []repository.Candle) (*strategies.Signal, e
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 Volume Profile - SELL Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 Volume Profile - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+

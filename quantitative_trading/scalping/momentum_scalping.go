@@ -143,7 +143,7 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 Momentum Scalping - BUY Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 Momentum Scalping - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -216,7 +216,7 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 Momentum Scalping - SELL Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 Momentum Scalping - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+

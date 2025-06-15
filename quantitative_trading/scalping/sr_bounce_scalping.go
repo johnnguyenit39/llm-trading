@@ -189,7 +189,7 @@ func (s *SRBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 S/R Bounce Scalping - BUY Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 S/R Bounce Scalping - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -240,7 +240,7 @@ func (s *SRBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 S/R Bounce Scalping - SELL Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 S/R Bounce Scalping - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+

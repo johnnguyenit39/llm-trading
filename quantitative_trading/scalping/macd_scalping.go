@@ -155,7 +155,7 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 MACD Scalping - BUY Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 MACD Scalping - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -208,7 +208,7 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 MACD Scalping - SELL Signal %s/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 MACD Scalping - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
