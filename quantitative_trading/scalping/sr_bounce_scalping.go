@@ -7,6 +7,8 @@ import (
 	"j-ai-trade/quantitative_trading/strategies"
 	utils "j-ai-trade/utils/math"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -110,6 +112,18 @@ func (s *SRBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 		}
 	}
 
+	// Calculate maximum allowed stop loss (2% of price)
+	maxRiskPercent := 0.02
+	maxStopLossDistance := latestPrice * maxRiskPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
 	// Trading logic
 	if minSupportDiff < atrValue*0.5 && latestRSI < 40 && latestVolume > latestVolumeMA {
 		// Price near support, oversold, high volume
@@ -123,7 +137,11 @@ func (s *SRBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Support Level: %.5f\n"+
 				"• RSI: %.2f (Oversold)\n"+
 				"• Volume: %.2f (MA: %.2f)\n"+
@@ -131,19 +149,23 @@ func (s *SRBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				"💡 Strategy Notes:\n"+
 				"• Support bounce opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
-				latestPrice-(atrValue*1.2),
-				(atrValue*1.2/latestPrice)*100,
-				latestPrice+(atrValue*1.8),
-				(atrValue*1.8/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				riskPercent,
+				latestPrice+takeProfitDistance,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				nearestSupport,
 				latestRSI,
 				latestVolume,
 				latestVolumeMA,
 				atrValue),
-			StopLoss:   latestPrice - (atrValue * 1.2),
-			TakeProfit: latestPrice + (atrValue * 1.8),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if minResistanceDiff < atrValue*0.5 && latestRSI > 60 && latestVolume > latestVolumeMA {
 		// Price near resistance, overbought, high volume
@@ -157,7 +179,11 @@ func (s *SRBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Resistance Level: %.5f\n"+
 				"• RSI: %.2f (Overbought)\n"+
 				"• Volume: %.2f (MA: %.2f)\n"+
@@ -165,19 +191,23 @@ func (s *SRBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				"💡 Strategy Notes:\n"+
 				"• Resistance bounce opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
-				latestPrice+(atrValue*1.2),
-				(atrValue*1.2/latestPrice)*100,
-				latestPrice-(atrValue*1.8),
-				(atrValue*1.8/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				riskPercent,
+				latestPrice-takeProfitDistance,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				nearestResistance,
 				latestRSI,
 				latestVolume,
 				latestVolumeMA,
 				atrValue),
-			StopLoss:   latestPrice + (atrValue * 1.2),
-			TakeProfit: latestPrice - (atrValue * 1.8),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 

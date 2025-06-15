@@ -77,12 +77,16 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 	atrValue := atr[len(atr)-1]
 
 	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := latestPrice * maxStopLossPercent
+	maxRiskPercent := 0.02
+	maxStopLossDistance := latestPrice * maxRiskPercent
 
 	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.2, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.25 // 1:1.25 risk-reward ratio
+	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
 
 	// Trading logic
 	if latestRSI < 30 && prevRSI >= 30 {
@@ -96,8 +100,12 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.25\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• RSI oversold condition on 5m\n"+
 				"• Current RSI: %.2f\n"+
 				"• Previous RSI: %.2f\n"+
@@ -105,12 +113,16 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"💡 Strategy Notes:\n"+
 				"• Mean reversion opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for ranging markets",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestRSI,
 				prevRSI,
 				atrValue),
@@ -128,8 +140,12 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.25\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• RSI overbought condition on 5m\n"+
 				"• Current RSI: %.2f\n"+
 				"• Previous RSI: %.2f\n"+
@@ -137,12 +153,16 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"💡 Strategy Notes:\n"+
 				"• Mean reversion opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for ranging markets",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestRSI,
 				prevRSI,
 				atrValue),

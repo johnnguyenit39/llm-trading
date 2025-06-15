@@ -17,6 +17,7 @@ type Signal struct {
 	Strategy    string    // Strategy name
 	Confidence  float64   // Signal confidence (0-1)
 	Description string    // Signal description
+	Leverage    float64   // Suggested leverage for the trade
 }
 
 // Strategy defines the interface for all trading strategies

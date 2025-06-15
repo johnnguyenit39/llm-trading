@@ -37,12 +37,16 @@ func VWAPBounceScalping(candles5m []repository.Candle) (*strategies.Signal, erro
 	latestVolume := volumes[len(volumes)-1]
 
 	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := latestPrice * maxStopLossPercent
+	maxRiskPercent := 0.02
+	maxStopLossDistance := latestPrice * maxRiskPercent
 
 	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.2, maxStopLossDistance)
+	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
 	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
 
 	// Trading logic
 	if latestPrice < latestVWAP && latestVolume > 0 {
@@ -57,19 +61,27 @@ func VWAPBounceScalping(candles5m []repository.Candle) (*strategies.Signal, erro
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Price below VWAP: %.5f\n"+
 				"• Current Volume: %.2f\n"+
 				"• ATR: %.6f\n\n"+
 				"💡 Strategy Notes:\n"+
 				"• VWAP bounce setup\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for mean reversion",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestVWAP,
 				latestVolume,
 				atrValue),
@@ -88,19 +100,27 @@ func VWAPBounceScalping(candles5m []repository.Candle) (*strategies.Signal, erro
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Price above VWAP: %.5f\n"+
 				"• Current Volume: %.2f\n"+
 				"• ATR: %.6f\n\n"+
 				"💡 Strategy Notes:\n"+
 				"• VWAP reversal setup\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for mean reversion",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestVWAP,
 				latestVolume,
 				atrValue),

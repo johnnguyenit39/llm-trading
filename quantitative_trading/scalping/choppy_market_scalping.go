@@ -6,8 +6,6 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
-	"math"
-
 	"github.com/markcheno/go-talib"
 )
 
@@ -89,13 +87,49 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	latestVolumeMA := volumeMA[len(volumeMA)-1]
 	latestATR := atr[len(atr)-1]
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := latestPrice * maxStopLossPercent
+	// Calculate volatility percentage
+	volatilityPercent := (latestATR / latestPrice) * 100
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(latestATR*1.2, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio for choppy markets
+	// Calculate suggested leverage based on volatility
+	leverage := 10.0 // Default leverage
+	if volatilityPercent < 0.5 {
+		leverage = 20.0 // High leverage for low volatility
+	} else if volatilityPercent < 1.0 {
+		leverage = 15.0 // Medium leverage for medium volatility
+	} else if volatilityPercent < 2.0 {
+		leverage = 10.0 // Conservative leverage for high volatility
+	} else {
+		leverage = 5.0 // Very conservative for extreme volatility
+	}
+
+	// Adjust leverage based on market condition
+	if latestADX < 25 {
+		leverage *= 0.8 // Decrease leverage in choppy market
+	}
+
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
+	}
+
+	// Calculate stop loss using ATR and leverage
+	atrMultiplier := 1.0 // ATR multiplier for stop loss (more conservative in choppy market)
+	stopLossDistance := (latestATR * atrMultiplier) / leverage
+
+	// Ensure stop loss doesn't exceed max risk
+	maxRiskPercent := 2.0 // Maximum risk per trade
+	maxStopLossDistance := latestPrice * (maxRiskPercent / 100.0)
+	if stopLossDistance > maxStopLossDistance {
+		stopLossDistance = maxStopLossDistance
+	}
+
+	// Calculate risk:reward ratio based on leverage
+	riskRewardRatio := 1.5 // Conservative risk:reward ratio
+	takeProfitDistance := stopLossDistance * riskRewardRatio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
 
 	// Trading logic
 	if latestADX < 25 && latestSlowK < 20 && latestSlowD < 20 && latestVolume > latestVolumeMA {
@@ -107,32 +141,49 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Description: fmt.Sprintf("🚀 Choppy Market Scalping - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (-%.1f%%)\n"+
-				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
+				"• Stop Loss: %.5f (-%.2f%%)\n"+
+				"• Take Profit: %.5f (+%.2f%%)\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Suggested Leverage: %.1fx\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:%.2f\n\n"+
 				"📈 Signal Details:\n"+
 				"• ADX: %.2f (Weak Trend)\n"+
 				"• Stochastic K: %.2f\n"+
 				"• Stochastic D: %.2f\n"+
 				"• Volume: %.2f (MA: %.2f)\n"+
-				"• ATR: %.6f\n\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Strategy Notes:\n"+
 				"• Oversold condition in choppy market\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal",
+				"• High volume confirms signal\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry - (ATR * %.1f / Leverage)\n"+
+				"• TP = Entry + (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskRewardRatio,
+				leverage,
+				riskPercent,
+				rewardPercent,
+				riskRewardRatio,
 				latestADX,
 				latestSlowK,
 				latestSlowD,
 				latestVolume,
 				latestVolumeMA,
-				latestATR),
+				latestATR,
+				volatilityPercent,
+				atrMultiplier,
+				riskRewardRatio),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	} else if latestADX < 25 && latestSlowK > 80 && latestSlowD > 80 && latestVolume > latestVolumeMA {
 		// Weak trend, overbought, and high volume
@@ -143,32 +194,49 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Description: fmt.Sprintf("🔻 Choppy Market Scalping - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (+%.1f%%)\n"+
-				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
+				"• Stop Loss: %.5f (+%.2f%%)\n"+
+				"• Take Profit: %.5f (-%.2f%%)\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Suggested Leverage: %.1fx\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:%.2f\n\n"+
 				"📈 Signal Details:\n"+
 				"• ADX: %.2f (Weak Trend)\n"+
 				"• Stochastic K: %.2f\n"+
 				"• Stochastic D: %.2f\n"+
 				"• Volume: %.2f (MA: %.2f)\n"+
-				"• ATR: %.6f\n\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
 				"💡 Strategy Notes:\n"+
 				"• Overbought condition in choppy market\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal",
+				"• High volume confirms signal\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry + (ATR * %.1f / Leverage)\n"+
+				"• TP = Entry - (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskRewardRatio,
+				leverage,
+				riskPercent,
+				rewardPercent,
+				riskRewardRatio,
 				latestADX,
 				latestSlowK,
 				latestSlowD,
 				latestVolume,
 				latestVolumeMA,
-				latestATR),
+				latestATR,
+				volatilityPercent,
+				atrMultiplier,
+				riskRewardRatio),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	}
 

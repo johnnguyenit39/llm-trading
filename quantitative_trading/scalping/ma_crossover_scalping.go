@@ -92,8 +92,12 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 	maxStopLossDistance := latestPrice * maxStopLossPercent
 
 	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.2, maxStopLossDistance)
+	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
 	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
 
 	// Trading logic
 	if prevFastEMA <= prevSlowEMA && latestFastEMA > latestSlowEMA && latestVolume > 0 {
@@ -105,8 +109,12 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 			Description: fmt.Sprintf("🚀 MA Crossover - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (-%.1f%%)\n"+
-				"• Take Profit: %.5f (+%.1f%%)\n"+
+				"• Stop Loss: %.5f (-%.2f%%)\n"+
+				"• Take Profit: %.5f (+%.2f%%)\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• Fast EMA (9): %.5f\n"+
@@ -116,16 +124,23 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"💡 Strategy Notes:\n"+
 				"• Bullish EMA crossover\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for trend following",
+				"• Suitable for trend following\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry - (ATR * %.1f)\n"+
+				"• TP = Entry + (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestFastEMA,
 				latestSlowEMA,
 				latestVolume,
-				atrValue),
+				atrValue,
+				1.0,
+				1.5),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
@@ -138,8 +153,12 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 			Description: fmt.Sprintf("🔻 MA Crossover - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (+%.1f%%)\n"+
-				"• Take Profit: %.5f (-%.1f%%)\n"+
+				"• Stop Loss: %.5f (+%.2f%%)\n"+
+				"• Take Profit: %.5f (-%.2f%%)\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• Fast EMA (9): %.5f\n"+
@@ -149,16 +168,23 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"💡 Strategy Notes:\n"+
 				"• Bearish EMA crossover\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for trend following",
+				"• Suitable for trend following\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry + (ATR * %.1f)\n"+
+				"• TP = Entry - (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestFastEMA,
 				latestSlowEMA,
 				latestVolume,
-				atrValue),
+				atrValue,
+				1.0,
+				1.5),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil

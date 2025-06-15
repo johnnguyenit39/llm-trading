@@ -6,7 +6,6 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 	utils "j-ai-trade/utils/math"
-	"math"
 
 	"github.com/markcheno/go-talib"
 )
@@ -82,13 +81,49 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 	rangeWidth := latestUpper - latestLower
 	rangePercent := (rangeWidth / latestMiddle) * 100
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := latestPrice * maxStopLossPercent
+	// Calculate volatility percentage
+	volatilityPercent := (atrValue / latestPrice) * 100
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.2, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+	// Calculate suggested leverage based on volatility
+	leverage := 10.0 // Default leverage
+	if volatilityPercent < 0.5 {
+		leverage = 20.0 // High leverage for low volatility
+	} else if volatilityPercent < 1.0 {
+		leverage = 15.0 // Medium leverage for medium volatility
+	} else if volatilityPercent < 2.0 {
+		leverage = 10.0 // Conservative leverage for high volatility
+	} else {
+		leverage = 5.0 // Very conservative for extreme volatility
+	}
+
+	// Adjust leverage based on market condition
+	if rangePercent < 2.0 {
+		leverage *= 0.8 // Decrease leverage in tight range
+	}
+
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
+	}
+
+	// Calculate stop loss using ATR and leverage
+	atrMultiplier := 1.0 // ATR multiplier for stop loss (more conservative in grid trading)
+	stopLossDistance := (atrValue * atrMultiplier) / leverage
+
+	// Ensure stop loss doesn't exceed max risk
+	maxRiskPercent := 2.0 // Maximum risk per trade
+	maxStopLossDistance := latestPrice * (maxRiskPercent / 100.0)
+	if stopLossDistance > maxStopLossDistance {
+		stopLossDistance = maxStopLossDistance
+	}
+
+	// Calculate risk:reward ratio based on leverage
+	riskRewardRatio := 1.5 // Conservative risk:reward ratio
+	takeProfitDistance := stopLossDistance * riskRewardRatio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
 
 	// Check if market is in a tight range
 	if rangePercent < 2.0 {
@@ -121,27 +156,44 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				Description: fmt.Sprintf("🚀 Grid Scalping - BUY Signal ADA/USDT\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
-					"• Stop Loss: %.5f (-%.1f%%)\n"+
-					"• Take Profit: %.5f (+%.1f%%)\n"+
-					"• Risk/Reward: 1:1.5\n\n"+
+					"• Stop Loss: %.5f (-%.2f%%)\n"+
+					"• Take Profit: %.5f (+%.2f%%)\n"+
+					"• Risk/Reward: 1:%.2f\n"+
+					"• Suggested Leverage: %.1fx\n\n"+
+					"📈 P&L Projection:\n"+
+					"• Risk: -%.2f%%\n"+
+					"• Reward: +%.2f%%\n"+
+					"• Risk/Reward: 1:%.2f\n\n"+
 					"📈 Signal Details:\n"+
 					"• Grid Level: %.5f\n"+
 					"• Range Width: %.2f%%\n"+
-					"• ATR: %.6f\n\n"+
+					"• ATR: %.6f (%.2f%% volatility)\n\n"+
 					"💡 Strategy Notes:\n"+
 					"• Range-bound trading opportunity\n"+
 					"• Using grid levels for entries\n"+
-					"• Tight range confirms setup",
+					"• Tight range confirms setup\n"+
+					"• Max risk per trade: 2%%\n"+
+					"• SL = Entry - (ATR * %.1f / Leverage)\n"+
+					"• TP = Entry + (SL Distance * %.2f)",
 					latestPrice,
 					latestPrice-stopLossDistance,
-					(stopLossDistance/latestPrice)*100,
+					riskPercent,
 					latestPrice+takeProfitDistance,
-					(takeProfitDistance/latestPrice)*100,
+					rewardPercent,
+					riskRewardRatio,
+					leverage,
+					riskPercent,
+					rewardPercent,
+					riskRewardRatio,
 					nearestLevel,
 					rangePercent,
-					atrValue),
+					atrValue,
+					volatilityPercent,
+					atrMultiplier,
+					riskRewardRatio),
 				StopLoss:   latestPrice - stopLossDistance,
 				TakeProfit: latestPrice + takeProfitDistance,
+				Leverage:   leverage,
 			}, nil
 		} else if latestPrice > nearestLevel {
 			// Sell signal
@@ -152,27 +204,44 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				Description: fmt.Sprintf("🔻 Grid Scalping - SELL Signal ADA/USDT\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
-					"• Stop Loss: %.5f (+%.1f%%)\n"+
-					"• Take Profit: %.5f (-%.1f%%)\n"+
-					"• Risk/Reward: 1:1.5\n\n"+
+					"• Stop Loss: %.5f (+%.2f%%)\n"+
+					"• Take Profit: %.5f (-%.2f%%)\n"+
+					"• Risk/Reward: 1:%.2f\n"+
+					"• Suggested Leverage: %.1fx\n\n"+
+					"📈 P&L Projection:\n"+
+					"• Risk: -%.2f%%\n"+
+					"• Reward: +%.2f%%\n"+
+					"• Risk/Reward: 1:%.2f\n\n"+
 					"📈 Signal Details:\n"+
 					"• Grid Level: %.5f\n"+
 					"• Range Width: %.2f%%\n"+
-					"• ATR: %.6f\n\n"+
+					"• ATR: %.6f (%.2f%% volatility)\n\n"+
 					"💡 Strategy Notes:\n"+
 					"• Range-bound trading opportunity\n"+
 					"• Using grid levels for entries\n"+
-					"• Tight range confirms setup",
+					"• Tight range confirms setup\n"+
+					"• Max risk per trade: 2%%\n"+
+					"• SL = Entry + (ATR * %.1f / Leverage)\n"+
+					"• TP = Entry - (SL Distance * %.2f)",
 					latestPrice,
 					latestPrice+stopLossDistance,
-					(stopLossDistance/latestPrice)*100,
+					riskPercent,
 					latestPrice-takeProfitDistance,
-					(takeProfitDistance/latestPrice)*100,
+					rewardPercent,
+					riskRewardRatio,
+					leverage,
+					riskPercent,
+					rewardPercent,
+					riskRewardRatio,
 					nearestLevel,
 					rangePercent,
-					atrValue),
+					atrValue,
+					volatilityPercent,
+					atrMultiplier,
+					riskRewardRatio),
 				StopLoss:   latestPrice + stopLossDistance,
 				TakeProfit: latestPrice - takeProfitDistance,
+				Leverage:   leverage,
 			}, nil
 		}
 	}

@@ -6,8 +6,6 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
-	"math"
-
 	"github.com/markcheno/go-talib"
 )
 
@@ -82,13 +80,58 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	prevOBV := obv[len(obv)-2]
 	prevOBVMA := obvMA[len(obvMA)-2]
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := latestPrice * maxStopLossPercent
+	// Calculate volatility percentage
+	volatilityPercent := (atrValue / latestPrice) * 100
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.2, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+	// Calculate suggested leverage based on volatility
+	leverage := 10.0 // Default leverage
+	if volatilityPercent < 0.5 {
+		leverage = 20.0 // High leverage for low volatility
+	} else if volatilityPercent < 1.0 {
+		leverage = 15.0 // Medium leverage for medium volatility
+	} else if volatilityPercent < 2.0 {
+		leverage = 10.0 // Conservative leverage for high volatility
+	} else {
+		leverage = 5.0 // Very conservative for extreme volatility
+	}
+
+	// Get market condition
+	marketCondition := common.MarketAccumulation // Default to accumulation
+	if latestOBV < latestOBVMA {
+		marketCondition = common.MarketDistribution
+	}
+
+	// Adjust leverage based on market condition
+	if marketCondition == common.MarketAccumulation {
+		leverage *= 1.2 // Increase leverage in accumulation phase
+	} else if marketCondition == common.MarketDistribution {
+		leverage *= 0.8 // Decrease leverage in distribution phase
+	}
+
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
+	}
+
+	// --- FUTURES TP/SL FORMULA ---
+	// Calculate stop loss to ensure max 2% risk
+	maxRiskPercent := 2.0 // Maximum risk per trade
+	atrMultiplier := 1.0  // Conservative ATR multiplier
+	stopLossDistance := (atrValue * atrMultiplier) / leverage
+
+	// Ensure stop loss doesn't exceed max risk
+	maxStopLossDistance := latestPrice * (maxRiskPercent / 100.0)
+	if stopLossDistance > maxStopLossDistance {
+		stopLossDistance = maxStopLossDistance
+	}
+
+	// Calculate risk:reward ratio based on leverage
+	riskRewardRatio := 1.5 // Conservative risk:reward ratio
+	takeProfitDistance := stopLossDistance * riskRewardRatio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
 
 	// Trading logic
 	if latestOBV > latestOBVMA && prevOBV <= prevOBVMA {
@@ -97,31 +140,51 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 Accumulation Scalping - BUY Signal ADA/USDT\n\n"+
-				"📊 Trade Setup:\n"+
-				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (-%.1f%%)\n"+
-				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
-				"• OBV crosses above MA - accumulation pattern\n"+
-				"• Current OBV: %.2f\n"+
-				"• OBV MA: %.2f\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Institutional buying detected\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for accumulation phase",
+			Description: fmt.Sprintf(
+				"🚀 Accumulation Scalping - BUY Signal ADA/USDT\n\n"+
+					"📊 Trade Setup:\n"+
+					"• Entry Price: %.5f\n"+
+					"• Stop Loss: %.5f (-%.2f%%)\n"+
+					"• Take Profit: %.5f (+%.2f%%)\n"+
+					"• Risk/Reward: 1:%.2f\n"+
+					"• Suggested Leverage: %.1fx\n\n"+
+					"📈 P&L Projection:\n"+
+					"• Risk: -%.2f%%\n"+
+					"• Reward: +%.2f%%\n"+
+					"• Risk/Reward: 1:%.2f\n\n"+
+					"📈 Signal Details:\n"+
+					"• OBV crosses above MA - accumulation pattern\n"+
+					"• Current OBV: %.2f\n"+
+					"• OBV MA: %.2f\n"+
+					"• ATR: %.6f (%.2f%% volatility)\n\n"+
+					"💡 Strategy Notes:\n"+
+					"• Institutional buying detected\n"+
+					"• Using ATR for dynamic stop loss\n"+
+					"• Suitable for accumulation phase\n"+
+					"• Leverage adjusted based on volatility\n"+
+					"• Max risk per trade: 2%%\n"+
+					"• SL = Entry - (ATR * %.1f / Leverage)\n"+
+					"• TP = Entry + (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskRewardRatio,
+				leverage,
+				riskPercent,
+				rewardPercent,
+				riskRewardRatio,
 				latestOBV,
 				latestOBVMA,
-				atrValue),
+				atrValue,
+				volatilityPercent,
+				atrMultiplier,
+				riskRewardRatio,
+			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	} else if latestOBV < latestOBVMA && prevOBV >= prevOBVMA {
 		// OBV crosses below its MA - distribution pattern
@@ -129,31 +192,51 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 Accumulation Scalping - SELL Signal ADA/USDT\n\n"+
-				"📊 Trade Setup:\n"+
-				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (+%.1f%%)\n"+
-				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
-				"• OBV crosses below MA - distribution pattern\n"+
-				"• Current OBV: %.2f\n"+
-				"• OBV MA: %.2f\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Institutional selling detected\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for distribution phase",
+			Description: fmt.Sprintf(
+				"🔻 Accumulation Scalping - SELL Signal ADA/USDT\n\n"+
+					"📊 Trade Setup:\n"+
+					"• Entry Price: %.5f\n"+
+					"• Stop Loss: %.5f (+%.2f%%)\n"+
+					"• Take Profit: %.5f (-%.2f%%)\n"+
+					"• Risk/Reward: 1:%.2f\n"+
+					"• Suggested Leverage: %.1fx\n\n"+
+					"📈 P&L Projection:\n"+
+					"• Risk: -%.2f%%\n"+
+					"• Reward: +%.2f%%\n"+
+					"• Risk/Reward: 1:%.2f\n\n"+
+					"📈 Signal Details:\n"+
+					"• OBV crosses below MA - distribution pattern\n"+
+					"• Current OBV: %.2f\n"+
+					"• OBV MA: %.2f\n"+
+					"• ATR: %.6f (%.2f%% volatility)\n\n"+
+					"💡 Strategy Notes:\n"+
+					"• Institutional selling detected\n"+
+					"• Using ATR for dynamic stop loss\n"+
+					"• Suitable for distribution phase\n"+
+					"• Leverage adjusted based on volatility\n"+
+					"• Max risk per trade: 2%%\n"+
+					"• SL = Entry + (ATR * %.1f / Leverage)\n"+
+					"• TP = Entry - (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskRewardRatio,
+				leverage,
+				riskPercent,
+				rewardPercent,
+				riskRewardRatio,
 				latestOBV,
 				latestOBVMA,
-				atrValue),
+				atrValue,
+				volatilityPercent,
+				atrMultiplier,
+				riskRewardRatio,
+			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	}
 

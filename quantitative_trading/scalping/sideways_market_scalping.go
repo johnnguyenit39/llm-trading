@@ -5,6 +5,7 @@ import (
 	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
+	"math"
 
 	"github.com/markcheno/go-talib"
 )
@@ -92,6 +93,18 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 	rangeWidth := latestUpper - latestLower
 	rangePercent := (rangeWidth / latestMiddle) * 100
 
+	// Calculate maximum allowed stop loss (2% of price)
+	maxRiskPercent := 0.02
+	maxStopLossDistance := latestPrice * maxRiskPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(latestATR*1.0, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
 	// Trading logic
 	if latestPrice < latestLower && latestRSI < 30 && latestVolume > latestVolumeMA && rangePercent < 3 {
 		// Price near lower band, oversold, high volume, tight range
@@ -105,7 +118,11 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Price near lower BB: %.5f\n"+
 				"• RSI: %.2f (Oversold)\n"+
 				"• Range Width: %.2f%%\n"+
@@ -114,20 +131,24 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"💡 Strategy Notes:\n"+
 				"• Range-bound trading opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
-				latestPrice-(latestATR*1.2),
-				(latestATR*1.2/latestPrice)*100,
-				latestPrice+(latestATR*1.8),
-				(latestATR*1.8/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				riskPercent,
+				latestPrice+takeProfitDistance,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestLower,
 				latestRSI,
 				rangePercent,
 				latestVolume,
 				latestVolumeMA,
 				latestATR),
-			StopLoss:   latestPrice - (latestATR * 1.2),
-			TakeProfit: latestPrice + (latestATR * 1.8),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if latestPrice > latestUpper && latestRSI > 70 && latestVolume > latestVolumeMA && rangePercent < 3 {
 		// Price near upper band, overbought, high volume, tight range
@@ -141,7 +162,11 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Price near upper BB: %.5f\n"+
 				"• RSI: %.2f (Overbought)\n"+
 				"• Range Width: %.2f%%\n"+
@@ -150,20 +175,24 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"💡 Strategy Notes:\n"+
 				"• Range-bound trading opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
-				latestPrice+(latestATR*1.2),
-				(latestATR*1.2/latestPrice)*100,
-				latestPrice-(latestATR*1.8),
-				(latestATR*1.8/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				riskPercent,
+				latestPrice-takeProfitDistance,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestUpper,
 				latestRSI,
 				rangePercent,
 				latestVolume,
 				latestVolumeMA,
 				latestATR),
-			StopLoss:   latestPrice + (latestATR * 1.2),
-			TakeProfit: latestPrice - (latestATR * 1.8),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 

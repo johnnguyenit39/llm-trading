@@ -83,8 +83,12 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 	maxStopLossDistance := latestPrice * maxStopLossPercent
 
 	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.5, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.33 // 1:1.33 risk-reward ratio
+	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
 
 	// Trading logic
 	if latestHist > 0 && prevHist <= 0 {
@@ -96,9 +100,13 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 			Description: fmt.Sprintf("🚀 MACD Scalping - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (-%.1f%%)\n"+
-				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.33\n\n"+
+				"• Stop Loss: %.5f (-%.2f%%)\n"+
+				"• Take Profit: %.5f (+%.2f%%)\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• MACD bullish crossover on 5m\n"+
 				"• Current MACD Histogram: %.6f\n"+
@@ -107,15 +115,22 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"💡 Strategy Notes:\n"+
 				"• Quick scalping opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Tight risk management for scalping",
+				"• Tight risk management for scalping\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry - (ATR * %.1f)\n"+
+				"• TP = Entry + (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestHist,
 				prevHist,
-				atrValue),
+				atrValue,
+				1.0,
+				1.5),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
@@ -128,9 +143,13 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 			Description: fmt.Sprintf("🔻 MACD Scalping - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (+%.1f%%)\n"+
-				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.33\n\n"+
+				"• Stop Loss: %.5f (+%.2f%%)\n"+
+				"• Take Profit: %.5f (-%.2f%%)\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• MACD bearish crossover on 5m\n"+
 				"• Current MACD Histogram: %.6f\n"+
@@ -139,15 +158,22 @@ func (s *MACDScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"💡 Strategy Notes:\n"+
 				"• Quick scalping opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Tight risk management for scalping",
+				"• Tight risk management for scalping\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry + (ATR * %.1f)\n"+
+				"• TP = Entry - (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestHist,
 				prevHist,
-				atrValue),
+				atrValue,
+				1.0,
+				1.5),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil

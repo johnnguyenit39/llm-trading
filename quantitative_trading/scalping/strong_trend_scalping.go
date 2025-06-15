@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -81,6 +83,18 @@ func (s *StrongTrendScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 	latestVolume := volumes[len(volumes)-1]
 	latestVolumeMA := volumeMA[len(volumeMA)-1]
 
+	// Calculate maximum allowed stop loss (2% of price)
+	maxRiskPercent := 0.02
+	maxStopLossDistance := latestPrice * maxRiskPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
 	// Trading logic
 	if latestEMA20 > latestEMA50 && latestVolume > latestVolumeMA*1.5 {
 		// Strong uptrend with high volume
@@ -93,8 +107,12 @@ func (s *StrongTrendScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:2\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Strong uptrend with high volume\n"+
 				"• EMA20: %.5f\n"+
 				"• EMA50: %.5f\n"+
@@ -103,19 +121,23 @@ func (s *StrongTrendScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"💡 Strategy Notes:\n"+
 				"• Strong momentum opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms trend strength",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
-				latestPrice-(atrValue*1.5),
-				(atrValue*1.5/latestPrice)*100,
-				latestPrice+(atrValue*3),
-				(atrValue*3/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				riskPercent,
+				latestPrice+takeProfitDistance,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestEMA20,
 				latestEMA50,
 				latestVolume,
 				latestVolumeMA,
 				atrValue),
-			StopLoss:   latestPrice - (atrValue * 1.5),
-			TakeProfit: latestPrice + (atrValue * 3),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if latestEMA20 < latestEMA50 && latestVolume > latestVolumeMA*1.5 {
 		// Strong downtrend with high volume
@@ -128,8 +150,12 @@ func (s *StrongTrendScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:2\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Strong downtrend with high volume\n"+
 				"• EMA20: %.5f\n"+
 				"• EMA50: %.5f\n"+
@@ -138,19 +164,23 @@ func (s *StrongTrendScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"💡 Strategy Notes:\n"+
 				"• Strong momentum opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms trend strength",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
-				latestPrice+(atrValue*1.5),
-				(atrValue*1.5/latestPrice)*100,
-				latestPrice-(atrValue*3),
-				(atrValue*3/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				riskPercent,
+				latestPrice-takeProfitDistance,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestEMA20,
 				latestEMA50,
 				latestVolume,
 				latestVolumeMA,
 				atrValue),
-			StopLoss:   latestPrice + (atrValue * 1.5),
-			TakeProfit: latestPrice - (atrValue * 3),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 

@@ -5,6 +5,7 @@ import (
 	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
+	"math"
 
 	"github.com/markcheno/go-talib"
 )
@@ -87,6 +88,18 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 	latestKCLower := kcLower[len(kcLower)-1]
 	latestATR := atr[len(atr)-1]
 
+	// Calculate maximum allowed stop loss (2% of price)
+	maxRiskPercent := 0.02
+	maxStopLossDistance := latestPrice * maxRiskPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(latestATR*1.0, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
 	// Check for squeeze condition (BBands inside Keltner)
 	isSqueeze := latestBBUpper < latestKCUpper && latestBBLower > latestKCLower
 
@@ -102,8 +115,12 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:2\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Bollinger Bands inside Keltner Channels\n"+
 				"• BB Upper: %.5f\n"+
 				"• BB Lower: %.5f\n"+
@@ -113,19 +130,23 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 				"💡 Strategy Notes:\n"+
 				"• Potential bullish breakout from squeeze\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High probability setup",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
-				latestPrice-(latestATR*1.5),
-				(latestATR*1.5/latestPrice)*100,
-				latestPrice+(latestATR*3),
-				(latestATR*3/latestPrice)*100,
+				latestPrice-stopLossDistance,
+				riskPercent,
+				latestPrice+takeProfitDistance,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestBBUpper,
 				latestBBLower,
 				latestKCUpper,
 				latestKCLower,
 				latestATR),
-			StopLoss:   latestPrice - (latestATR * 1.5),
-			TakeProfit: latestPrice + (latestATR * 3),
+			StopLoss:   latestPrice - stopLossDistance,
+			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
 	} else if isSqueeze && latestPrice < latestBBMiddle {
 		// Potential bearish breakout from squeeze
@@ -138,8 +159,12 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:2\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Bollinger Bands inside Keltner Channels\n"+
 				"• BB Upper: %.5f\n"+
 				"• BB Lower: %.5f\n"+
@@ -149,19 +174,23 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 				"💡 Strategy Notes:\n"+
 				"• Potential bearish breakout from squeeze\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High probability setup",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
-				latestPrice+(latestATR*1.5),
-				(latestATR*1.5/latestPrice)*100,
-				latestPrice-(latestATR*3),
-				(latestATR*3/latestPrice)*100,
+				latestPrice+stopLossDistance,
+				riskPercent,
+				latestPrice-takeProfitDistance,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestBBUpper,
 				latestBBLower,
 				latestKCUpper,
 				latestKCLower,
 				latestATR),
-			StopLoss:   latestPrice + (latestATR * 1.5),
-			TakeProfit: latestPrice - (latestATR * 3),
+			StopLoss:   latestPrice + stopLossDistance,
+			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
 	}
 

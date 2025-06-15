@@ -5,6 +5,7 @@ import (
 	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
+	"math"
 
 	"github.com/markcheno/go-talib"
 )
@@ -90,6 +91,18 @@ func (s *TickVolumeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 	volumeMA := talib.Sma(volumes, 20)
 	latestVolumeMA := volumeMA[len(volumeMA)-1]
 
+	// Calculate maximum allowed stop loss (2% of price)
+	maxRiskPercent := 0.02
+	maxStopLossDistance := latestPrice * maxRiskPercent
+
+	// Use the smaller of ATR-based stop loss or max percentage stop loss
+	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
 	// Trading logic
 	if latestVolume > latestVolumeMA*s.volumeThreshold {
 		if latestPrice < latestVWAP && latestROC > 0 {
@@ -104,7 +117,11 @@ func (s *TickVolumeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 					"• Stop Loss: %.5f (-%.1f%%)\n"+
 					"• Take Profit: %.5f (+%.1f%%)\n"+
 					"• Risk/Reward: 1:1.5\n\n"+
-					"📈 Signal Details:\n"+
+					"📈 P&L Projection:\n"+
+					"• Risk: -%.2f%%\n"+
+					"• Reward: +%.2f%%\n"+
+					"• Risk/Reward: 1:1.5\n\n"+
+					"📊 Signal Details:\n"+
 					"• Volume: %.2f (MA: %.2f)\n"+
 					"• VWAP: %.5f\n"+
 					"• ROC: %.2f%%\n"+
@@ -112,19 +129,24 @@ func (s *TickVolumeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 					"💡 Strategy Notes:\n"+
 					"• High volume spike detected\n"+
 					"• Price below VWAP with positive momentum\n"+
-					"• Using ATR for dynamic stop loss",
+					"• Using ATR for dynamic stop loss\n"+
+					"• Max risk per trade: 2%%\n"+
+					"• SL: ATR * 1.0 (max 2%%)\n"+
+					"• TP: SL * 1.5",
 					latestPrice,
-					latestPrice-(atrValue*1.2),
-					(atrValue*1.2/latestPrice)*100,
-					latestPrice+(atrValue*1.8),
-					(atrValue*1.8/latestPrice)*100,
+					latestPrice-stopLossDistance,
+					riskPercent,
+					latestPrice+takeProfitDistance,
+					rewardPercent,
+					riskPercent,
+					rewardPercent,
 					latestVolume,
 					latestVolumeMA,
 					latestVWAP,
 					latestROC,
 					atrValue),
-				StopLoss:   latestPrice - (atrValue * 1.2),
-				TakeProfit: latestPrice + (atrValue * 1.8),
+				StopLoss:   latestPrice - stopLossDistance,
+				TakeProfit: latestPrice + takeProfitDistance,
 			}, nil
 		} else if latestPrice > latestVWAP && latestROC < 0 {
 			// Volume spike with price above VWAP and negative momentum
@@ -138,7 +160,11 @@ func (s *TickVolumeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 					"• Stop Loss: %.5f (+%.1f%%)\n"+
 					"• Take Profit: %.5f (-%.1f%%)\n"+
 					"• Risk/Reward: 1:1.5\n\n"+
-					"📈 Signal Details:\n"+
+					"📈 P&L Projection:\n"+
+					"• Risk: -%.2f%%\n"+
+					"• Reward: +%.2f%%\n"+
+					"• Risk/Reward: 1:1.5\n\n"+
+					"📊 Signal Details:\n"+
 					"• Volume: %.2f (MA: %.2f)\n"+
 					"• VWAP: %.5f\n"+
 					"• ROC: %.2f%%\n"+
@@ -146,19 +172,24 @@ func (s *TickVolumeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 					"💡 Strategy Notes:\n"+
 					"• High volume spike detected\n"+
 					"• Price above VWAP with negative momentum\n"+
-					"• Using ATR for dynamic stop loss",
+					"• Using ATR for dynamic stop loss\n"+
+					"• Max risk per trade: 2%%\n"+
+					"• SL: ATR * 1.0 (max 2%%)\n"+
+					"• TP: SL * 1.5",
 					latestPrice,
-					latestPrice+(atrValue*1.2),
-					(atrValue*1.2/latestPrice)*100,
-					latestPrice-(atrValue*1.8),
-					(atrValue*1.8/latestPrice)*100,
+					latestPrice+stopLossDistance,
+					riskPercent,
+					latestPrice-takeProfitDistance,
+					rewardPercent,
+					riskPercent,
+					rewardPercent,
 					latestVolume,
 					latestVolumeMA,
 					latestVWAP,
 					latestROC,
 					atrValue),
-				StopLoss:   latestPrice + (atrValue * 1.2),
-				TakeProfit: latestPrice - (atrValue * 1.8),
+				StopLoss:   latestPrice + stopLossDistance,
+				TakeProfit: latestPrice - takeProfitDistance,
 			}, nil
 		}
 	}

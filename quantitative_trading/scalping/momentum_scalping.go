@@ -45,8 +45,12 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 	maxStopLossDistance := latestPrice * maxStopLossPercent
 
 	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.2, maxStopLossDistance)
+	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
 	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
 
 	// Trading logic
 	if latestRSI < 30 && latestROC > 0 && latestVolume > 0 {
@@ -58,8 +62,12 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 			Description: fmt.Sprintf("🚀 Momentum Scalping - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (-%.1f%%)\n"+
-				"• Take Profit: %.5f (+%.1f%%)\n"+
+				"• Stop Loss: %.5f (-%.2f%%)\n"+
+				"• Take Profit: %.5f (+%.2f%%)\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• RSI: %.2f (Oversold)\n"+
@@ -69,16 +77,23 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 				"💡 Strategy Notes:\n"+
 				"• Oversold bounce setup\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for momentum trading",
+				"• Suitable for momentum trading\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry - (ATR * %.1f)\n"+
+				"• TP = Entry + (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestRSI,
 				latestROC,
 				latestVolume,
-				atrValue),
+				atrValue,
+				1.0,
+				1.5),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
@@ -91,8 +106,12 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 			Description: fmt.Sprintf("🔻 Momentum Scalping - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (+%.1f%%)\n"+
-				"• Take Profit: %.5f (-%.1f%%)\n"+
+				"• Stop Loss: %.5f (+%.2f%%)\n"+
+				"• Take Profit: %.5f (-%.2f%%)\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
 				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• RSI: %.2f (Overbought)\n"+
@@ -102,16 +121,23 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 				"💡 Strategy Notes:\n"+
 				"• Overbought reversal setup\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for momentum trading",
+				"• Suitable for momentum trading\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry + (ATR * %.1f)\n"+
+				"• TP = Entry - (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestRSI,
 				latestROC,
 				latestVolume,
-				atrValue),
+				atrValue,
+				1.0,
+				1.5),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil

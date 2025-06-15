@@ -70,12 +70,16 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 	atrValue := atr[len(atr)-1]
 
 	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := closes[len(closes)-1] * maxStopLossPercent
+	maxRiskPercent := 0.02
+	maxStopLossDistance := closes[len(closes)-1] * maxRiskPercent
 
 	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.5, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.33 // 1:1.33 risk-reward ratio
+	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / closes[len(closes)-1]) * 100
+	rewardPercent := (takeProfitDistance / closes[len(closes)-1]) * 100
 
 	// Calculate price momentum
 	roc := talib.Roc(closes, 10)
@@ -101,8 +105,12 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.33\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Price above upper Bollinger Band\n"+
 				"• Current ROC: %.2f%%\n"+
 				"• Upper Band: %.5f\n"+
@@ -111,12 +119,16 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 				"💡 Strategy Notes:\n"+
 				"• Volatility breakout opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for volatile markets",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestROC*100,
 				latestUpper,
 				latestLower,
@@ -135,8 +147,12 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.33\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📊 Signal Details:\n"+
 				"• Price below lower Bollinger Band\n"+
 				"• Current ROC: %.2f%%\n"+
 				"• Upper Band: %.5f\n"+
@@ -145,12 +161,16 @@ func (s *VolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[string][
 				"💡 Strategy Notes:\n"+
 				"• Volatility breakout opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for volatile markets",
+				"• Max risk per trade: 2%%\n"+
+				"• SL: ATR * 1.0 (max 2%%)\n"+
+				"• TP: SL * 1.5",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestROC*100,
 				latestUpper,
 				latestLower,

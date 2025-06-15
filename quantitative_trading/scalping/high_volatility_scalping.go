@@ -106,8 +106,12 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 	maxStopLossDistance := latestPrice * maxStopLossPercent
 
 	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(latestATR*2, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 2.5 // 1:2.5 risk-reward ratio for high volatility
+	stopLossDistance := math.Min(latestATR*1.0, maxStopLossDistance)
+	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio for high volatility
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
 
 	// Trading logic
 	if latestPrice < latestKCLower && latestRSI < 30 && latestVolume > latestVolumeMA*1.5 && volatilityRatio > 2 {
@@ -119,9 +123,13 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 			Description: fmt.Sprintf("🚀 High Volatility Scalping - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (-%.1f%%)\n"+
-				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:2.5\n\n"+
+				"• Stop Loss: %.5f (-%.2f%%)\n"+
+				"• Take Profit: %.5f (+%.2f%%)\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• Price below lower Keltner: %.5f\n"+
 				"• RSI: %.2f (Oversold)\n"+
@@ -131,18 +139,25 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"💡 Strategy Notes:\n"+
 				"• High volatility opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal",
+				"• High volume confirms signal\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry - (ATR * %.1f)\n"+
+				"• TP = Entry + (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestKCLower,
 				latestRSI,
 				volatilityRatio,
 				latestVolume,
 				latestVolumeMA,
-				latestATR),
+				latestATR,
+				1.0,
+				1.5),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
@@ -155,9 +170,13 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 			Description: fmt.Sprintf("🔻 High Volatility Scalping - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (+%.1f%%)\n"+
-				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:2.5\n\n"+
+				"• Stop Loss: %.5f (+%.2f%%)\n"+
+				"• Take Profit: %.5f (-%.2f%%)\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:1.5\n\n"+
 				"📈 Signal Details:\n"+
 				"• Price above upper Keltner: %.5f\n"+
 				"• RSI: %.2f (Overbought)\n"+
@@ -167,18 +186,25 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"💡 Strategy Notes:\n"+
 				"• High volatility opportunity\n"+
 				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal",
+				"• High volume confirms signal\n"+
+				"• Max risk per trade: 2%%\n"+
+				"• SL = Entry + (ATR * %.1f)\n"+
+				"• TP = Entry - (SL Distance * %.2f)",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice-takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
+				rewardPercent,
+				riskPercent,
+				rewardPercent,
 				latestKCUpper,
 				latestRSI,
 				volatilityRatio,
 				latestVolume,
 				latestVolumeMA,
-				latestATR),
+				latestATR,
+				1.0,
+				1.5),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil
