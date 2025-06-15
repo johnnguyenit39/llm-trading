@@ -25,7 +25,7 @@ func findSupportLevels(lows []float64, lookback int) []float64 {
 	}
 
 	var supports []float64
-	for i := lookback; i < len(lows); i++ {
+	for i := lookback; i < len(lows)-1; i++ {
 		if lows[i] < lows[i-1] && lows[i] < lows[i+1] {
 			supports = append(supports, lows[i])
 		}
