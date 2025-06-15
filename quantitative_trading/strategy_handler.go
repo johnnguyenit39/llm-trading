@@ -8,7 +8,7 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/market_analyzer"
 	"j-ai-trade/quantitative_trading/scalping"
-	"j-ai-trade/quantitative_trading/strategies"
+	strategies "j-ai-trade/quantitative_trading/strategies"
 )
 
 // Strategy defines the interface that all trading strategies must implement

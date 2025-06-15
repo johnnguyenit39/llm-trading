@@ -1,17 +1,17 @@
-package strategies
+package swing
 
 import (
 	"fmt"
-	"time"
-
 	"j-ai-trade/brokers/binance/repository"
+	strategies "j-ai-trade/quantitative_trading/strategies"
 	signalConfidence "j-ai-trade/utils/signal"
+	"time"
 
 	"github.com/markcheno/go-talib"
 )
 
 type RSI15m1hStrategy struct {
-	BaseStrategy
+	strategies.BaseStrategy
 	oversoldThreshold   float64
 	overboughtThreshold float64
 	period              int
@@ -22,7 +22,7 @@ type RSI15m1hStrategy struct {
 
 func NewRSI15m1hStrategy() *RSI15m1hStrategy {
 	return &RSI15m1hStrategy{
-		BaseStrategy: BaseStrategy{
+		BaseStrategy: strategies.BaseStrategy{
 			Name:       "RSI 15m-1h Strategy",
 			Timeframes: []string{"15m", "1h"}, // Using 15m and 1h for confirmation
 		},
@@ -35,7 +35,7 @@ func NewRSI15m1hStrategy() *RSI15m1hStrategy {
 	}
 }
 
-func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Signal, error) {
+func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*strategies.Signal, error) {
 	// Get 15m candles for main analysis
 	candles15m := candles["15m"]
 	if len(candles15m) < s.period {
@@ -81,7 +81,7 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 	priceChange1h := calculatePriceChange(candles1h)
 
 	// Generate signals
-	var tradingSignal *Signal
+	var tradingSignal *strategies.Signal
 
 	// Buy Signal: RSI oversold + 1h trend confirmation
 	if latestRSI < s.oversoldThreshold && latestRSI1h < 50 {
@@ -145,7 +145,7 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 		riskPercent := ((entryPrice - stopLoss) / entryPrice) * 100
 		rewardPercent := ((takeProfit - entryPrice) / entryPrice) * 100
 
-		tradingSignal = &Signal{
+		tradingSignal = &strategies.Signal{
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Type:       "BUY",
@@ -246,7 +246,7 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 		riskPercent := ((stopLoss - entryPrice) / entryPrice) * 100
 		rewardPercent := ((entryPrice - takeProfit) / entryPrice) * 100
 
-		tradingSignal = &Signal{
+		tradingSignal = &strategies.Signal{
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Type:       "SELL",

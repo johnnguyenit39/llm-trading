@@ -77,7 +77,7 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 	if len(atr) < 2 {
 		return nil, nil
 	}
-	atrValue := atr[len(atr)-1]
+	latestATR := atr[len(atr)-1]
 
 	// Get latest values
 	latestPrice := closes[len(closes)-1]
@@ -88,63 +88,58 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 	latestVolume := volumes[len(volumes)-1]
 	latestVolumeMA := volumeMA[len(volumeMA)-1]
 
-	// Calculate volatility percentage
-	volatilityPercent := (atrValue / latestPrice) * 100
-
-	// Calculate suggested leverage based on volatility
-	leverage := 10.0 // Default leverage
-	if volatilityPercent < 0.5 {
-		leverage = 20.0 // High leverage for low volatility
-	} else if volatilityPercent < 1.0 {
-		leverage = 15.0 // Medium leverage for medium volatility
-	} else if volatilityPercent < 2.0 {
-		leverage = 10.0 // Conservative leverage for high volatility
+	// Calculate stop loss and take profit based on fixed percentages
+	var stopLossDistance, takeProfitDistance float64
+	if latestFastEMA > latestSlowEMA {
+		// BUY signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	} else {
-		leverage = 5.0 // Very conservative for extreme volatility
+		// SELL signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	}
 
-	// Adjust leverage based on market condition
-	if math.Abs(latestFastEMA-latestSlowEMA)/latestSlowEMA < 0.001 {
-		leverage *= 0.8 // Decrease leverage in weak trend
+	// Calculate leverage based on MA crossover strength
+	leverage := 1.0 // Base leverage
+
+	// Calculate expected price movement based on MA signals
+	var expectedMove float64
+
+	// MA crossover strength
+	maDistance := math.Abs((latestFastEMA - latestSlowEMA) / latestSlowEMA * 100)
+	if maDistance > 0.5 {
+		expectedMove = 0.7 // Strong crossover, expect 0.7% move
+	} else if maDistance > 0.3 {
+		expectedMove = 0.5 // Moderate crossover, expect 0.5% move
+	} else {
+		expectedMove = 0.3 // Weak crossover, expect 0.3% move
+	}
+
+	// Volume confirmation
+	volumeStrength := (latestVolume / latestVolumeMA) * 100
+	if volumeStrength > 150.0 {
+		expectedMove *= 1.5 // Strong volume confirms move
+	} else if volumeStrength > 120.0 {
+		expectedMove *= 1.2 // Above average volume confirms move
+	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	volatilityPercent := (latestATR / latestPrice) * 100
+	if volatilityPercent > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if volatilityPercent > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
 	}
 
 	// Cap maximum leverage
 	if leverage > 20.0 {
 		leverage = 20.0
-	}
-
-	// --- TECHNICAL ANALYSIS BASED TP/SL ---
-	// Find nearest support and resistance levels
-	recentHighs := highs[len(highs)-20:]
-	recentLows := lows[len(lows)-20:]
-
-	// Find nearest resistance and support
-	nearestResistance := findNearestResistance(latestPrice, recentHighs)
-	nearestSupport := findNearestSupport(latestPrice, recentLows)
-
-	// Calculate actual price distances
-	resistanceDistance := math.Abs(nearestResistance - latestPrice)
-	supportDistance := math.Abs(latestPrice - nearestSupport)
-
-	// Calculate stop loss and take profit based on technical levels
-	var stopLossDistance, takeProfitDistance float64
-	if latestFastEMA > latestSlowEMA {
-		// BUY signal
-		stopLossDistance = supportDistance * 0.8      // Place SL below support
-		takeProfitDistance = resistanceDistance * 0.8 // Place TP below resistance
-	} else {
-		// SELL signal
-		stopLossDistance = resistanceDistance * 0.8 // Place SL above resistance
-		takeProfitDistance = supportDistance * 0.8  // Place TP above support
-	}
-
-	// Ensure minimum distances based on ATR
-	minDistance := atrValue * 0.5
-	if stopLossDistance < minDistance {
-		stopLossDistance = minDistance
-	}
-	if takeProfitDistance < minDistance {
-		takeProfitDistance = minDistance
 	}
 
 	// Calculate risk and reward percentages
@@ -159,54 +154,18 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 	accountRisk := 0.02   // 2% risk per trade
 	riskAmount := accountSize * accountRisk
 	positionSize := riskAmount / (riskPercent / 100.0)
-	rewardAmount := riskAmount * riskRewardRatio
 
-	// Calculate signal confidence based on multiple factors
-	signalConfidence := 0.0
-
-	// EMA crossover confirmation (0-40%)
-	emaDiff := math.Abs((latestFastEMA - latestSlowEMA) / latestPrice * 100)
-	if emaDiff > 0.5 {
-		signalConfidence += 40.0
-	} else if emaDiff > 0.3 {
-		signalConfidence += 30.0
-	} else if emaDiff > 0.1 {
-		signalConfidence += 20.0
-	}
-
-	// Volume confirmation (0-30%)
-	volumeStrength := (latestVolume / latestVolumeMA) * 100
-	if volumeStrength > 150.0 {
-		signalConfidence += 30.0
-	} else if volumeStrength > 120.0 {
-		signalConfidence += 20.0
-	} else if volumeStrength > 100.0 {
-		signalConfidence += 10.0
-	}
-
-	// Trend strength confirmation (0-30%)
-	trendStrength := math.Abs((latestFastEMA - latestSlowEMA) / latestSlowEMA * 100)
-	if trendStrength > 1.0 {
-		signalConfidence += 30.0
-	} else if trendStrength > 0.5 {
-		signalConfidence += 20.0
-	} else if trendStrength > 0.2 {
-		signalConfidence += 10.0
-	}
-
-	// Cap confidence at 100%
-	if signalConfidence > 100.0 {
-		signalConfidence = 100.0
-	}
+	// Calculate signal confidence
+	signalConfidence := 100.0 - riskPercent
 
 	// Trading logic
-	if prevFastEMA <= prevSlowEMA && latestFastEMA > latestSlowEMA && latestVolume > 0 {
-		// Bullish crossover with volume
+	if latestFastEMA > latestSlowEMA && prevFastEMA <= prevSlowEMA {
+		// Bullish crossover
 		return &strategies.Signal{
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 MA Crossover - BUY Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 MA Crossover Scalping - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -216,21 +175,17 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• Support Level: %.5f\n"+
-				"• Resistance Level: %.5f\n"+
 				"• Fast EMA (9): %.5f\n"+
 				"• Slow EMA (21): %.5f\n"+
-				"• ATR: %.6f (%.2f%% volatility)\n\n"+
+				"• EMA Distance: %.2f%%\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n"+
+				"• Volume Strength: %.2f%%\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Bullish EMA crossover\n"+
-				"• SL placed below support\n"+
-				"• TP placed below resistance\n"+
-				"• Based on actual price levels\n"+
+				"• Bullish MA crossover\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -240,28 +195,27 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				leverage,
 				positionSize*100/accountSize,
 				signalConfidence,
-				nearestSupport,
-				nearestResistance,
 				latestFastEMA,
 				latestSlowEMA,
-				atrValue,
+				maDistance,
+				latestATR,
 				volatilityPercent,
+				volumeStrength,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 			Leverage:   leverage,
 		}, nil
-	} else if prevFastEMA >= prevSlowEMA && latestFastEMA < latestSlowEMA && latestVolume > 0 {
-		// Bearish crossover with volume
+	} else if latestFastEMA < latestSlowEMA && prevFastEMA >= prevSlowEMA {
+		// Bearish crossover
 		return &strategies.Signal{
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 MA Crossover - SELL Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 MA Crossover Scalping - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
@@ -271,21 +225,17 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• Support Level: %.5f\n"+
-				"• Resistance Level: %.5f\n"+
 				"• Fast EMA (9): %.5f\n"+
 				"• Slow EMA (21): %.5f\n"+
-				"• ATR: %.6f (%.2f%% volatility)\n\n"+
+				"• EMA Distance: %.2f%%\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n"+
+				"• Volume Strength: %.2f%%\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Bearish EMA crossover\n"+
-				"• SL placed above resistance\n"+
-				"• TP placed above support\n"+
-				"• Based on actual price levels\n"+
+				"• Bearish MA crossover\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,
@@ -295,16 +245,15 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				leverage,
 				positionSize*100/accountSize,
 				signalConfidence,
-				nearestSupport,
-				nearestResistance,
 				latestFastEMA,
 				latestSlowEMA,
-				atrValue,
+				maDistance,
+				latestATR,
 				volatilityPercent,
+				volumeStrength,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,

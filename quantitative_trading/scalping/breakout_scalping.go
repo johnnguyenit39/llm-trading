@@ -6,8 +6,6 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
-	"math"
-
 	"github.com/markcheno/go-talib"
 )
 
@@ -120,62 +118,57 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 	// Calculate volatility percentage
 	volatilityPercent := (latestATR / latestPrice) * 100
 
-	// Calculate suggested leverage based on volatility
-	leverage := 10.0 // Default leverage
-	if volatilityPercent < 0.5 {
-		leverage = 20.0 // High leverage for low volatility
-	} else if volatilityPercent < 1.0 {
-		leverage = 15.0 // Medium leverage for medium volatility
-	} else if volatilityPercent < 2.0 {
-		leverage = 10.0 // Conservative leverage for high volatility
+	// Calculate stop loss and take profit based on fixed percentages
+	var stopLossDistance, takeProfitDistance float64
+	if latestPrice > latestUpper5m && latestPrice > latestUpper15m {
+		// BUY signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	} else {
-		leverage = 5.0 // Very conservative for extreme volatility
+		// SELL signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	}
 
-	// Adjust leverage based on market condition
+	// Calculate leverage based on breakout strength
+	leverage := 1.0 // Base leverage
+
+	// Calculate expected price movement based on breakout signals
+	var expectedMove float64
+
+	// Volume confirmation strength
+	volumeStrength5m := (latestVolume5m / latestVolumeMA5m) * 100
+	volumeStrength15m := (latestVolume15m / latestVolumeMA15m) * 100
+	if volumeStrength5m > 150.0 && volumeStrength15m > 120.0 {
+		expectedMove = 0.7 // Strong volume breakout, expect 0.7% move
+	} else if volumeStrength5m > 120.0 && volumeStrength15m > 100.0 {
+		expectedMove = 0.5 // Moderate volume breakout, expect 0.5% move
+	} else {
+		expectedMove = 0.3 // Weak volume breakout, expect 0.3% move
+	}
+
+	// Price momentum confirmation
 	if latestROC5m > 0 && latestROC15m > 0 {
-		leverage *= 1.2 // Increase leverage in strong uptrend
+		expectedMove *= 1.5 // Strong uptrend confirms move
 	} else if latestROC5m < 0 && latestROC15m < 0 {
-		leverage *= 0.8 // Decrease leverage in strong downtrend
+		expectedMove *= 1.5 // Strong downtrend confirms move
+	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	if volatilityPercent > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if volatilityPercent > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
 	}
 
 	// Cap maximum leverage
 	if leverage > 20.0 {
 		leverage = 20.0
-	}
-
-	// --- TECHNICAL ANALYSIS BASED TP/SL ---
-	// Find nearest support and resistance levels
-	recentHighs := highs5m[len(highs5m)-20:]
-	recentLows := lows5m[len(lows5m)-20:]
-
-	// Find nearest resistance and support
-	nearestResistance := findNearestResistance(latestPrice, recentHighs)
-	nearestSupport := findNearestSupport(latestPrice, recentLows)
-
-	// Calculate actual price distances
-	resistanceDistance := math.Abs(nearestResistance - latestPrice)
-	supportDistance := math.Abs(latestPrice - nearestSupport)
-
-	// Calculate stop loss and take profit based on technical levels
-	var stopLossDistance, takeProfitDistance float64
-	if latestPrice > latestUpper5m && latestPrice > latestUpper15m {
-		// BUY signal
-		stopLossDistance = supportDistance * 0.8      // Place SL below support
-		takeProfitDistance = resistanceDistance * 0.8 // Place TP below resistance
-	} else {
-		// SELL signal
-		stopLossDistance = resistanceDistance * 0.8 // Place SL above resistance
-		takeProfitDistance = supportDistance * 0.8  // Place TP above support
-	}
-
-	// Ensure minimum distances based on ATR
-	minDistance := latestATR * 0.5
-	if stopLossDistance < minDistance {
-		stopLossDistance = minDistance
-	}
-	if takeProfitDistance < minDistance {
-		takeProfitDistance = minDistance
 	}
 
 	// Calculate risk and reward percentages
@@ -192,12 +185,18 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 	positionSize := riskAmount / (riskPercent / 100.0)
 	rewardAmount := riskAmount * riskRewardRatio
 
+	// Find nearest resistance and support for display
+	recentHighs := highs5m[len(highs5m)-20:]
+	recentLows := lows5m[len(lows5m)-20:]
+	nearestResistance := findNearestResistance(latestPrice, recentHighs)
+	nearestSupport := findNearestSupport(latestPrice, recentLows)
+
 	// Calculate signal confidence based on multiple factors
 	signalConfidence := 0.0
 
 	// Volume confirmation (0-40%)
-	volumeStrength5m := (latestVolume5m / latestVolumeMA5m) * 100
-	volumeStrength15m := (latestVolume15m / latestVolumeMA15m) * 100
+	volumeStrength5m = (latestVolume5m / latestVolumeMA5m) * 100
+	volumeStrength15m = (latestVolume15m / latestVolumeMA15m) * 100
 	if volumeStrength5m > 150.0 && volumeStrength15m > 120.0 {
 		signalConfidence += 40.0
 	} else if volumeStrength5m > 120.0 && volumeStrength15m > 100.0 {

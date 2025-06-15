@@ -1,17 +1,18 @@
-package strategies
+package swing
 
 import (
 	"fmt"
 	"time"
 
 	"j-ai-trade/brokers/binance/repository"
+	strategies "j-ai-trade/quantitative_trading/strategies"
 	signalConfidence "j-ai-trade/utils/signal"
 
 	"github.com/markcheno/go-talib"
 )
 
 type MACD15m1hStrategy struct {
-	BaseStrategy
+	strategies.BaseStrategy
 	fastPeriod   int
 	slowPeriod   int
 	signalPeriod int
@@ -19,7 +20,7 @@ type MACD15m1hStrategy struct {
 
 func NewMACD15m1hStrategy() *MACD15m1hStrategy {
 	return &MACD15m1hStrategy{
-		BaseStrategy: BaseStrategy{
+		BaseStrategy: strategies.BaseStrategy{
 			Name:       "MACD 15m-1h Strategy",
 			Timeframes: []string{"15m", "1h"}, // Using 15m and 1h for confirmation
 		},
@@ -29,7 +30,7 @@ func NewMACD15m1hStrategy() *MACD15m1hStrategy {
 	}
 }
 
-func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Signal, error) {
+func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*strategies.Signal, error) {
 	// Get 15m candles for main analysis
 	candles15m := candles["15m"]
 	if len(candles15m) < s.slowPeriod {
@@ -102,7 +103,7 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 	}
 
 	// Generate signals
-	var tradingSignal *Signal
+	var tradingSignal *strategies.Signal
 
 	// Buy Signal: MACD crosses above signal line + 1h trend confirmation
 	if prevMACD < latestSignal && latestMACD > latestSignal && latestMACD1h > latestSignal1h {
@@ -145,7 +146,7 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			confidence = 0.95
 		}
 
-		tradingSignal = &Signal{
+		tradingSignal = &strategies.Signal{
 			Type:       "BUY",
 			Price:      latestCandle.Close,
 			Time:       time.Now(),
@@ -223,7 +224,7 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			confidence = 0.95
 		}
 
-		tradingSignal = &Signal{
+		tradingSignal = &strategies.Signal{
 			Type:       "SELL",
 			Price:      latestCandle.Close,
 			Time:       time.Now(),

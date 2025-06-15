@@ -54,12 +54,10 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 	closes := make([]float64, len(candles5m))
 	highs := make([]float64, len(candles5m))
 	lows := make([]float64, len(candles5m))
-	volumes := make([]float64, len(candles5m))
 	for i, c := range candles5m {
 		closes[i] = c.Close
 		highs[i] = c.High
 		lows[i] = c.Low
-		volumes[i] = c.Volume
 	}
 
 	// Calculate Bollinger Bands for range detection
@@ -73,21 +71,13 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 	if len(atr) < 2 {
 		return nil, nil
 	}
-	atrValue := atr[len(atr)-1]
-
-	// Calculate Volume Profile
-	volumeMA := talib.Sma(volumes, 20)
-	if len(volumeMA) < 2 {
-		return nil, nil
-	}
 
 	// Get latest values
 	latestPrice := closes[len(closes)-1]
 	latestUpper := bbUpper[len(bbUpper)-1]
 	latestLower := bbLower[len(bbLower)-1]
 	latestMiddle := bbMiddle[len(bbMiddle)-1]
-	latestVolume := volumes[len(volumes)-1]
-	latestVolumeMA := volumeMA[len(volumeMA)-1]
+	atrValue := atr[len(atr)-1]
 
 	// Calculate range width
 	rangeWidth := latestUpper - latestLower
@@ -118,54 +108,6 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 		leverage = 20.0
 	}
 
-	// --- TECHNICAL ANALYSIS BASED TP/SL ---
-	// Find nearest support and resistance levels
-	recentHighs := highs[len(highs)-20:]
-	recentLows := lows[len(lows)-20:]
-
-	// Find nearest resistance and support
-	nearestResistance := findNearestResistance(latestPrice, recentHighs)
-	nearestSupport := findNearestSupport(latestPrice, recentLows)
-
-	// Calculate actual price distances
-	resistanceDistance := math.Abs(nearestResistance - latestPrice)
-	supportDistance := math.Abs(latestPrice - nearestSupport)
-
-	// Calculate stop loss and take profit based on technical levels
-	var stopLossDistance, takeProfitDistance float64
-	if latestPrice < latestMiddle {
-		// BUY signal
-		stopLossDistance = supportDistance * 0.8      // Place SL below support
-		takeProfitDistance = resistanceDistance * 0.8 // Place TP below resistance
-	} else {
-		// SELL signal
-		stopLossDistance = resistanceDistance * 0.8 // Place SL above resistance
-		takeProfitDistance = supportDistance * 0.8  // Place TP above support
-	}
-
-	// Ensure minimum distances based on ATR
-	minDistance := atrValue * 0.5
-	if stopLossDistance < minDistance {
-		stopLossDistance = minDistance
-	}
-	if takeProfitDistance < minDistance {
-		takeProfitDistance = minDistance
-	}
-
-	// Calculate risk and reward percentages
-	riskPercent := (stopLossDistance / latestPrice) * 100
-	rewardPercent := (takeProfitDistance / latestPrice) * 100
-
-	// Calculate actual risk:reward ratio
-	riskRewardRatio := takeProfitDistance / stopLossDistance
-
-	// Calculate position size based on risk
-	accountSize := 1000.0 // $1000 account
-	accountRisk := 0.02   // 2% risk per trade
-	riskAmount := accountSize * accountRisk
-	positionSize := riskAmount / (riskPercent / 100.0)
-	rewardAmount := riskAmount * riskRewardRatio
-
 	// Calculate grid levels and find nearest level
 	s.gridLevels = make([]float64, 0)
 	basePrice := latestMiddle
@@ -184,40 +126,71 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 		}
 	}
 
-	// Calculate signal confidence based on multiple factors
-	signalConfidence := 0.0
-
-	// Range width confirmation (0-40%)
-	if rangePercent < 2.0 {
-		signalConfidence += 40.0
+	// Calculate stop loss and take profit based on fixed percentages
+	var stopLossDistance, takeProfitDistance float64
+	if latestPrice < nearestLevel {
+		// BUY signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	} else {
-		signalConfidence += (2.0 - rangePercent) * 20.0
+		// SELL signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	}
 
-	// Volume confirmation (0-30%)
-	volumeStrength := (latestVolume / latestVolumeMA) * 100
-	if volumeStrength > 150.0 {
-		signalConfidence += 30.0
-	} else if volumeStrength > 120.0 {
-		signalConfidence += 20.0
-	} else if volumeStrength > 100.0 {
-		signalConfidence += 10.0
-	}
+	// Calculate leverage based on grid trading conditions
+	leverage = 1.0 // Base leverage
 
-	// Grid level confirmation (0-30%)
+	// Calculate expected price movement based on grid conditions
+	var expectedMove float64
+
+	// Grid level strength
 	gridLevelStrength := math.Abs((latestPrice - nearestLevel) / latestPrice * 100)
 	if gridLevelStrength < 0.1 {
-		signalConfidence += 30.0
+		expectedMove = 0.7 // Strong grid level, expect 0.7% move
 	} else if gridLevelStrength < 0.2 {
-		signalConfidence += 20.0
-	} else if gridLevelStrength < 0.3 {
-		signalConfidence += 10.0
+		expectedMove = 0.5 // Moderate grid level, expect 0.5% move
+	} else {
+		expectedMove = 0.3 // Weak grid level, expect 0.3% move
 	}
 
-	// Cap confidence at 100%
-	if signalConfidence > 100.0 {
-		signalConfidence = 100.0
+	// Range width confirmation
+	if rangePercent < 2.0 {
+		expectedMove *= 1.5 // Strong range confirms move
 	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	if volatilityPercent > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if volatilityPercent > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
+	}
+
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
+	}
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
+	// Calculate actual risk:reward ratio
+	riskRewardRatio := takeProfitDistance / stopLossDistance
+
+	// Calculate position size based on risk
+	accountSize := 1000.0 // $1000 account
+	accountRisk := 0.02   // 2% risk per trade
+	riskAmount := accountSize * accountRisk
+	positionSize := riskAmount / (riskPercent / 100.0)
+
+	// Calculate signal confidence
+	signalConfidence := 100.0 - riskPercent
 
 	// Trading logic
 	if latestPrice < nearestLevel {
@@ -236,8 +209,6 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• Support Level: %.5f\n"+
-				"• Resistance Level: %.5f\n"+
 				"• Grid Level: %.5f\n"+
 				"• Range Width: %.2f%%\n"+
 				"• ATR: %.6f (%.2f%% volatility)\n\n"+
@@ -249,8 +220,7 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -260,16 +230,13 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				leverage,
 				positionSize*100/accountSize,
 				signalConfidence,
-				nearestSupport,
-				nearestResistance,
 				nearestLevel,
 				rangePercent,
 				atrValue,
 				volatilityPercent,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
@@ -291,8 +258,6 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• Support Level: %.5f\n"+
-				"• Resistance Level: %.5f\n"+
 				"• Grid Level: %.5f\n"+
 				"• Range Width: %.2f%%\n"+
 				"• ATR: %.6f (%.2f%% volatility)\n\n"+
@@ -304,8 +269,7 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,
@@ -315,16 +279,13 @@ func (s *GridScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repos
 				leverage,
 				positionSize*100/accountSize,
 				signalConfidence,
-				nearestSupport,
-				nearestResistance,
 				nearestLevel,
 				rangePercent,
 				atrValue,
 				volatilityPercent,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,

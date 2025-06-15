@@ -1,17 +1,17 @@
-package strategies
+package swing
 
 import (
 	"fmt"
-	"time"
-
 	"j-ai-trade/brokers/binance/repository"
+	strategies "j-ai-trade/quantitative_trading/strategies"
 	signalConfidence "j-ai-trade/utils/signal"
+	"time"
 
 	"github.com/markcheno/go-talib"
 )
 
 type HA1Strategy struct {
-	BaseStrategy
+	strategies.BaseStrategy
 	fastPeriod   int
 	slowPeriod   int
 	signalPeriod int
@@ -19,7 +19,7 @@ type HA1Strategy struct {
 
 func NewHA1Strategy() *HA1Strategy {
 	return &HA1Strategy{
-		BaseStrategy: BaseStrategy{
+		BaseStrategy: strategies.BaseStrategy{
 			Name:       "MACD + Trendline Strategy",
 			Timeframes: []string{"1d", "4h"}, // Using 1d and 4h for swing trading
 		},
@@ -29,7 +29,7 @@ func NewHA1Strategy() *HA1Strategy {
 	}
 }
 
-func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, error) {
+func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*strategies.Signal, error) {
 	// Get 1d candles for main analysis
 	candles1d := candles["1d"]
 	if len(candles1d) < s.slowPeriod {
@@ -91,7 +91,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 	trendline4h := calculateTrendline(candles4h)
 
 	// Generate signals
-	var tradingSignal *Signal
+	var tradingSignal *strategies.Signal
 
 	// Buy Signal: Chỉ cần 2 trong 3 điều kiện chính
 	buyConditions := 0
@@ -156,7 +156,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 			confidence = 0.95
 		}
 
-		tradingSignal = &Signal{
+		tradingSignal = &strategies.Signal{
 			Type:       "BUY",
 			Price:      latestCandle.Close,
 			Time:       time.Now(),
@@ -257,7 +257,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 			confidence = 0.95
 		}
 
-		tradingSignal = &Signal{
+		tradingSignal = &strategies.Signal{
 			Type:       "SELL",
 			Price:      latestCandle.Close,
 			Time:       time.Now(),

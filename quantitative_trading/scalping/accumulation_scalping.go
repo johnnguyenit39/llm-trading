@@ -85,16 +85,59 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	// Calculate volatility percentage
 	volatilityPercent := (atrValue / latestPrice) * 100
 
-	// Calculate suggested leverage based on volatility
-	leverage := 10.0 // Default leverage
-	if volatilityPercent < 0.5 {
-		leverage = 20.0 // High leverage for low volatility
-	} else if volatilityPercent < 1.0 {
-		leverage = 15.0 // Medium leverage for medium volatility
-	} else if volatilityPercent < 2.0 {
-		leverage = 10.0 // Conservative leverage for high volatility
+	// Calculate stop loss and take profit based on fixed percentages
+	var stopLossDistance, takeProfitDistance float64
+	if latestOBV > latestOBVMA {
+		// BUY signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
 	} else {
-		leverage = 5.0 // Very conservative for extreme volatility
+		// SELL signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
+	}
+
+	// Calculate leverage based on accumulation/distribution strength
+	leverage := 1.0 // Base leverage
+
+	// Calculate expected price movement based on OBV signals
+	var expectedMove float64
+
+	// OBV trend strength
+	obvTrendStrength := math.Abs((latestOBV - latestOBVMA) / latestOBVMA * 100)
+	if obvTrendStrength > 5.0 {
+		expectedMove = 0.7 // Strong accumulation/distribution, expect 0.7% move
+	} else if obvTrendStrength > 2.0 {
+		expectedMove = 0.5 // Moderate accumulation/distribution, expect 0.5% move
+	} else {
+		expectedMove = 0.3 // Weak accumulation/distribution, expect 0.3% move
+	}
+
+	// Volume confirmation
+	volumeMA := talib.Sma(volumes, 20)
+	latestVolumeMA := volumeMA[len(volumeMA)-1]
+	volumeStrength := (volumes[len(volumes)-1] / latestVolumeMA) * 100
+	if volumeStrength > 150.0 {
+		expectedMove *= 1.5 // Strong volume confirms move
+	} else if volumeStrength > 120.0 {
+		expectedMove *= 1.2 // Above average volume confirms move
+	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	if volatilityPercent > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if volatilityPercent > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
+	}
+
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
 	}
 
 	// Get market condition
@@ -108,11 +151,6 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 		leverage *= 1.2 // Increase leverage in accumulation phase
 	} else if marketCondition == common.MarketDistribution {
 		leverage *= 0.8 // Decrease leverage in distribution phase
-	}
-
-	// Cap maximum leverage
-	if leverage > 20.0 {
-		leverage = 20.0
 	}
 
 	// --- TECHNICAL ANALYSIS BASED TP/SL ---
@@ -129,41 +167,8 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	recentLows := lows[len(lows)-20:]
 
 	// Find nearest resistance and support
-	var nearestResistance, nearestSupport float64
-	if marketCondition == common.MarketAccumulation {
-		// For accumulation, look for higher resistance levels
-		nearestResistance = findNearestResistance(latestPrice, recentHighs)
-		nearestSupport = findNearestSupport(latestPrice, recentLows)
-	} else {
-		// For distribution, look for lower support levels
-		nearestResistance = findNearestResistance(latestPrice, recentHighs)
-		nearestSupport = findNearestSupport(latestPrice, recentLows)
-	}
-
-	// Calculate actual price distances
-	resistanceDistance := math.Abs(nearestResistance - latestPrice)
-	supportDistance := math.Abs(latestPrice - nearestSupport)
-
-	// Calculate stop loss and take profit based on technical levels
-	var stopLossDistance, takeProfitDistance float64
-	if latestOBV > latestOBVMA {
-		// BUY signal
-		stopLossDistance = supportDistance * 0.8      // Place SL below support
-		takeProfitDistance = resistanceDistance * 0.8 // Place TP below resistance
-	} else {
-		// SELL signal
-		stopLossDistance = resistanceDistance * 0.8 // Place SL above resistance
-		takeProfitDistance = supportDistance * 0.8  // Place TP above support
-	}
-
-	// Ensure minimum distances based on ATR
-	minDistance := atrValue * 0.5
-	if stopLossDistance < minDistance {
-		stopLossDistance = minDistance
-	}
-	if takeProfitDistance < minDistance {
-		takeProfitDistance = minDistance
-	}
+	nearestResistance := findNearestResistance(latestPrice, recentHighs)
+	nearestSupport := findNearestSupport(latestPrice, recentLows)
 
 	// Calculate risk and reward percentages
 	riskPercent := (stopLossDistance / latestPrice) * 100
@@ -176,7 +181,7 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	signalConfidence := 0.0
 
 	// OBV trend strength (0-40%)
-	obvTrendStrength := math.Abs((latestOBV - latestOBVMA) / latestOBVMA * 100)
+	obvTrendStrength = math.Abs((latestOBV - latestOBVMA) / latestOBVMA * 100)
 	if obvTrendStrength > 5.0 {
 		signalConfidence += 40.0
 	} else {
@@ -184,9 +189,7 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	}
 
 	// Volume confirmation (0-30%)
-	volumeMA := talib.Sma(volumes, 20)
-	latestVolumeMA := volumeMA[len(volumeMA)-1]
-	volumeStrength := (volumes[len(volumes)-1] / latestVolumeMA) * 100
+	volumeStrength = (volumes[len(volumes)-1] / latestVolumeMA) * 100
 	if volumeStrength > 150.0 {
 		signalConfidence += 30.0
 	} else if volumeStrength > 120.0 {

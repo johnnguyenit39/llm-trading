@@ -124,6 +124,72 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	// Calculate price momentum
 	priceMomentum := (latestPrice - prevClose) / prevClose * 100
 
+	// Calculate stop loss and take profit based on fixed percentages
+	var stopLossDistance, takeProfitDistance float64
+	if priceMomentum < 0 { // Negative momentum
+		// BUY signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
+	} else {
+		// SELL signal
+		stopLossDistance = latestPrice * 0.01   // 1% SL
+		takeProfitDistance = latestPrice * 0.02 // 2% TP
+	}
+
+	// Calculate leverage based on choppy market conditions
+	leverage := 1.0 // Base leverage
+
+	// Calculate expected price movement based on market conditions
+	var expectedMove float64
+
+	// Bollinger Band squeeze strength
+	bbWidth := (latestBBUpper - latestBBLower) / latestBBMiddle * 100
+	if bbWidth < 1.0 {
+		expectedMove = 0.7 // Strong squeeze, expect 0.7% move
+	} else if bbWidth < 2.0 {
+		expectedMove = 0.5 // Moderate squeeze, expect 0.5% move
+	} else {
+		expectedMove = 0.3 // Weak squeeze, expect 0.3% move
+	}
+
+	// Price momentum confirmation
+	if math.Abs(priceMomentum) > 0.5 {
+		expectedMove *= 1.5 // Strong momentum confirms move
+	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	if volatilityRatio > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if volatilityRatio > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
+	}
+
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
+	}
+
+	// Calculate risk and reward percentages
+	riskPercent := (stopLossDistance / latestPrice) * 100
+	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
+	// Calculate actual risk:reward ratio
+	riskRewardRatio := takeProfitDistance / stopLossDistance
+
+	// Calculate position size based on risk
+	accountSize := 1000.0
+	accountRisk := 0.02
+	riskAmount := accountSize * accountRisk
+	positionSize := riskAmount / (stopLossDistance / latestPrice)
+
+	// Calculate signal confidence
+	signalConfidence := 100.0 - riskPercent
+
 	// Trading logic with improved technical analysis
 	if latestADX < 25 && // Weak trend
 		latestSlowK < 20 && latestSlowD < 20 && // Oversold
@@ -132,39 +198,6 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 		volumeStrength > 120 && // Above average volume
 		!isDoji && // Not a doji
 		priceMomentum < 0 { // Negative momentum
-
-		// Calculate stop loss and take profit based on technical levels
-		stopLossDistance := math.Max(latestATR*1.5, (latestPrice-latestBBLower)*1.2)
-		takeProfitDistance := math.Max(latestATR*2.5, (latestBBMiddle-latestPrice)*1.5)
-
-		// Calculate position size based on risk
-		accountSize := 1000.0
-		accountRisk := 0.02
-		riskAmount := accountSize * accountRisk
-		positionSize := riskAmount / (stopLossDistance / latestPrice)
-		rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
-
-		// Calculate leverage based on volatility
-		leverage := 10.0
-		if volatilityRatio < 1.0 {
-			leverage = 20.0
-		} else if volatilityRatio < 2.0 {
-			leverage = 15.0
-		} else if volatilityRatio < 3.0 {
-			leverage = 10.0
-		} else {
-			leverage = 5.0
-		}
-
-		// Adjust leverage based on market structure
-		if isInsideBar {
-			leverage *= 0.8 // Reduce leverage for inside bars
-		}
-
-		// Cap maximum leverage
-		if leverage > 20.0 {
-			leverage = 20.0
-		}
 
 		return &strategies.Signal{
 			Type:  "BUY",
@@ -177,7 +210,8 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Take Profit: %.5f (+%.2f%%)\n"+
 				"• Risk/Reward: 1:%.2f\n"+
 				"• Leverage: %.1fx\n"+
-				"• Position Size: %.2f%% of account\n\n"+
+				"• Position Size: %.2f%% of account\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
 				"• ADX: %.2f (Weak Trend)\n"+
 				"• Stochastic K: %.2f (Oversold)\n"+
@@ -198,16 +232,16 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				(stopLossDistance/latestPrice)*100,
+				riskPercent,
 				latestPrice+takeProfitDistance,
-				(takeProfitDistance/latestPrice)*100,
-				takeProfitDistance/stopLossDistance,
+				rewardPercent,
+				riskRewardRatio,
 				leverage,
 				positionSize*100/accountSize,
+				signalConfidence,
 				latestADX,
 				latestSlowK,
 				latestSlowD,
@@ -223,8 +257,7 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				isDoji,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
@@ -247,7 +280,6 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 		accountRisk := 0.02
 		riskAmount := accountSize * accountRisk
 		positionSize := riskAmount / (stopLossDistance / latestPrice)
-		rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
 
 		// Calculate leverage based on volatility
 		leverage := 10.0
@@ -303,8 +335,7 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
-				"• Reward Amount: $%.2f\n"+
-				"• Position Value: $%.2f",
+				"• Expected Move: %.2f%%",
 				latestPrice,
 				latestPrice+stopLossDistance,
 				(stopLossDistance/latestPrice)*100,
@@ -328,8 +359,7 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				isDoji,
 				accountSize,
 				riskAmount,
-				rewardAmount,
-				positionSize,
+				expectedMove,
 			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,

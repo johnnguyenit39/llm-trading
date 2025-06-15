@@ -62,28 +62,51 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 	nearestSupport := findNearestSupport(latestPrice, supportLevels)
 	nearestResistance := findNearestResistance(latestPrice, resistanceLevels)
 
-	// Calculate leverage based on volatility and price position
-	leverage := 3.0 // Default for S/R trading
-	if volatilityRatio > 3.0 {
-		leverage = 2.0
-	} else if volatilityRatio > 2.0 {
-		leverage = 2.5
-	} else if volatilityRatio > 1.0 {
-		leverage = 3.0
-	} else {
-		leverage = 4.0
+	// Calculate leverage based on technical signal strength
+	leverage := 1.0 // Base leverage
+
+	// Calculate expected price movement based on technical signals
+	var expectedMove float64
+
+	// RSI signal strength
+	if latestRSI < 30 {
+		expectedMove = 0.5 // RSI oversold, expect 0.5% bounce
+	} else if latestRSI > 70 {
+		expectedMove = 0.5 // RSI overbought, expect 0.5% drop
 	}
 
-	// Adjust leverage based on distance to S/R levels
+	// Support/Resistance bounce strength
 	distanceToSupport := (latestPrice - nearestSupport) / latestPrice * 100
 	distanceToResistance := (nearestResistance - latestPrice) / latestPrice * 100
-	if distanceToSupport < 0.5 || distanceToResistance < 0.5 {
-		leverage *= 0.8 // Reduce leverage near S/R levels
+
+	if distanceToSupport < 0.3 {
+		expectedMove = 0.5 // Near support, expect 0.5% bounce
+	} else if distanceToResistance < 0.3 {
+		expectedMove = 0.5 // Near resistance, expect 0.5% drop
+	}
+
+	// EMA trend strength
+	if latestEMA20 > latestEMA50 {
+		expectedMove = 0.7 // Uptrend, expect 0.7% move
+	} else if latestEMA20 < latestEMA50 {
+		expectedMove = 0.7 // Downtrend, expect 0.7% move
+	}
+
+	// Calculate required leverage to achieve 2% profit
+	if expectedMove > 0 {
+		leverage = 2.0 / expectedMove // If we expect 0.5% move, we need 4x leverage
+	}
+
+	// Adjust leverage based on volatility
+	if volatilityRatio > 2.0 {
+		leverage *= 0.5 // Reduce leverage in high volatility
+	} else if volatilityRatio > 1.0 {
+		leverage *= 0.7 // Moderate reduction in medium volatility
 	}
 
 	// Cap maximum leverage
-	if leverage > 5.0 {
-		leverage = 5.0
+	if leverage > 20.0 {
+		leverage = 20.0
 	}
 
 	// Calculate stop loss and take profit based on S/R levels
