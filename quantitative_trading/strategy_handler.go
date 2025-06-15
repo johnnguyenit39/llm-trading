@@ -37,42 +37,50 @@ type Signal struct {
 }
 
 type StrategyHandler struct {
-	rsiStrategy            *strategies.RSI15m1hStrategy
-	macdStrategy           *strategies.MACD15m1hStrategy
-	strategies             []Strategy
-	marketAnalyzer         *market_analyzer.MarketAnalyzer
-	macdScalping           *scalping.MACDScalpingStrategy
-	rsiScalping            *scalping.RSIScalpingStrategy
-	volatilityScalping     *scalping.VolatilityScalpingStrategy
-	strongTrendScalping    *scalping.StrongTrendScalpingStrategy
-	accumulationScalping   *scalping.AccumulationScalpingStrategy
-	squeezeScalping        *scalping.SqueezeScalpingStrategy
-	gridScalping           *scalping.GridScalpingStrategy
-	maCrossoverScalping    *scalping.MACrossoverScalpingStrategy
-	srBounceScalping       *scalping.SRBounceScalpingStrategy
-	tickVolumeScalping     *scalping.TickVolumeScalpingStrategy
-	highVolatilityScalping *scalping.HighVolatilityScalpingStrategy
-	breakoutScalping       *scalping.BreakoutScalpingStrategy
-	choppyMarketScalping   *scalping.ChoppyMarketScalpingStrategy
+	rsiStrategy             *strategies.RSI15m1hStrategy
+	macdStrategy            *strategies.MACD15m1hStrategy
+	strategies              []Strategy
+	marketAnalyzer          *market_analyzer.MarketAnalyzer
+	macdScalping            *scalping.MACDScalpingStrategy
+	rsiScalping             *scalping.RSIScalpingStrategy
+	volatilityScalping      *scalping.VolatilityScalpingStrategy
+	strongTrendScalping     *scalping.StrongTrendScalpingStrategy
+	accumulationScalping    *scalping.AccumulationScalpingStrategy
+	squeezeScalping         *scalping.SqueezeScalpingStrategy
+	gridScalping            *scalping.GridScalpingStrategy
+	maCrossoverScalping     *scalping.MACrossoverScalpingStrategy
+	srBounceScalping        *scalping.SRBounceScalpingStrategy
+	tickVolumeScalping      *scalping.TickVolumeScalpingStrategy
+	highVolatilityScalping  *scalping.HighVolatilityScalpingStrategy
+	breakoutScalping        *scalping.BreakoutScalpingStrategy
+	choppyMarketScalping    *scalping.ChoppyMarketScalpingStrategy
+	vwapScalping            *scalping.VWAPScalpingStrategy
+	volumeProfileScalping   *scalping.VolumeProfileScalpingStrategy
+	volumeImbalanceScalping *scalping.VolumeImbalanceScalpingStrategy
+	orderbookTapeScalping   *scalping.OrderbookTapeScalpingStrategy
 }
 
 func NewStrategyHandler() *StrategyHandler {
 	handler := &StrategyHandler{
-		rsiStrategy:            strategies.NewRSI15m1hStrategy(),
-		macdStrategy:           strategies.NewMACD15m1hStrategy(),
-		macdScalping:           scalping.NewMACDScalpingStrategy(),
-		rsiScalping:            scalping.NewRSIScalpingStrategy(),
-		volatilityScalping:     scalping.NewVolatilityScalpingStrategy(),
-		strongTrendScalping:    scalping.NewStrongTrendScalpingStrategy(),
-		accumulationScalping:   scalping.NewAccumulationScalpingStrategy(),
-		squeezeScalping:        scalping.NewSqueezeScalpingStrategy(),
-		gridScalping:           scalping.NewGridScalpingStrategy(),
-		maCrossoverScalping:    scalping.NewMACrossoverScalpingStrategy(),
-		srBounceScalping:       scalping.NewSRBounceScalpingStrategy(),
-		tickVolumeScalping:     scalping.NewTickVolumeScalpingStrategy(),
-		highVolatilityScalping: scalping.NewHighVolatilityScalpingStrategy(),
-		breakoutScalping:       scalping.NewBreakoutScalpingStrategy(),
-		choppyMarketScalping:   scalping.NewChoppyMarketScalpingStrategy(),
+		rsiStrategy:             strategies.NewRSI15m1hStrategy(),
+		macdStrategy:            strategies.NewMACD15m1hStrategy(),
+		macdScalping:            scalping.NewMACDScalpingStrategy(),
+		rsiScalping:             scalping.NewRSIScalpingStrategy(),
+		volatilityScalping:      scalping.NewVolatilityScalpingStrategy(),
+		strongTrendScalping:     scalping.NewStrongTrendScalpingStrategy(),
+		accumulationScalping:    scalping.NewAccumulationScalpingStrategy(),
+		squeezeScalping:         scalping.NewSqueezeScalpingStrategy(),
+		gridScalping:            scalping.NewGridScalpingStrategy(),
+		maCrossoverScalping:     scalping.NewMACrossoverScalpingStrategy(),
+		srBounceScalping:        scalping.NewSRBounceScalpingStrategy(),
+		tickVolumeScalping:      scalping.NewTickVolumeScalpingStrategy(),
+		highVolatilityScalping:  scalping.NewHighVolatilityScalpingStrategy(),
+		breakoutScalping:        scalping.NewBreakoutScalpingStrategy(),
+		choppyMarketScalping:    scalping.NewChoppyMarketScalpingStrategy(),
+		vwapScalping:            scalping.NewVWAPScalpingStrategy(),
+		volumeProfileScalping:   scalping.NewVolumeProfileScalpingStrategy(),
+		volumeImbalanceScalping: scalping.NewVolumeImbalanceScalpingStrategy(),
+		orderbookTapeScalping:   scalping.NewOrderbookTapeScalpingStrategy(),
 	}
 
 	// Initialize strategies slice and register all strategies
@@ -90,6 +98,10 @@ func NewStrategyHandler() *StrategyHandler {
 		handler.highVolatilityScalping,
 		handler.breakoutScalping,
 		handler.choppyMarketScalping,
+		handler.vwapScalping,
+		handler.volumeProfileScalping,
+		handler.volumeImbalanceScalping,
+		handler.orderbookTapeScalping,
 	}
 
 	// Initialize market analyzer with all strategies
@@ -160,52 +172,58 @@ func (h *StrategyHandler) getSuitableStrategies(condition common.MarketCondition
 
 	switch condition {
 	case common.MarketStrongTrendUp, common.MarketStrongTrendDown:
-		// Use MACD, strong trend, and MA crossover strategies for strong trends
+		// Use MACD, strong trend, MA crossover, and VWAP strategies for strong trends
 		for _, strategy := range h.strategies {
 			if strategy.GetName() == "MACD Scalping" ||
 				strategy.GetName() == "Strong Trend Scalping" ||
-				strategy.GetName() == "MA Crossover Scalping" {
+				strategy.GetName() == "MA Crossover Scalping" ||
+				strategy.GetName() == "VWAP Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}
 
 	case common.MarketWeakTrendUp, common.MarketWeakTrendDown:
-		// Use MACD, RSI, and MA crossover strategies for weak trends
+		// Use MACD, RSI, MA crossover, and VWAP strategies for weak trends
 		for _, strategy := range h.strategies {
 			if strategy.GetName() == "MACD Scalping" ||
 				strategy.GetName() == "RSI Scalping" ||
-				strategy.GetName() == "MA Crossover Scalping" {
+				strategy.GetName() == "MA Crossover Scalping" ||
+				strategy.GetName() == "VWAP Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}
 
 	case common.MarketRanging, common.MarketSideways:
-		// Use RSI, accumulation, grid, and S/R bounce strategies for ranging and sideways markets
+		// Use RSI, accumulation, grid, S/R bounce, and volume profile strategies
 		for _, strategy := range h.strategies {
 			if strategy.GetName() == "RSI Scalping" ||
 				strategy.GetName() == "Accumulation Scalping" ||
 				strategy.GetName() == "Grid Scalping" ||
-				strategy.GetName() == "S/R Bounce Scalping" {
+				strategy.GetName() == "S/R Bounce Scalping" ||
+				strategy.GetName() == "Volume Profile Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}
 
 	case common.MarketHighVolatility, common.MarketVolatile, common.MarketChoppy:
-		// Use volatility, RSI, and tick/volume bar strategies for volatile markets
+		// Use volatility, RSI, tick/volume bar, and volume imbalance strategies
 		for _, strategy := range h.strategies {
 			if strategy.GetName() == "Volatility Scalping" ||
 				strategy.GetName() == "RSI Scalping" ||
-				strategy.GetName() == "Tick/Volume Bar Scalping" {
+				strategy.GetName() == "Tick/Volume Bar Scalping" ||
+				strategy.GetName() == "Volume Imbalance Scalping" ||
+				strategy.GetName() == "Orderbook Tape Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}
 
 	case common.MarketLowVolatility:
-		// Use RSI, accumulation, and grid strategies for low volatility markets
+		// Use RSI, accumulation, grid, and volume profile strategies
 		for _, strategy := range h.strategies {
 			if strategy.GetName() == "RSI Scalping" ||
 				strategy.GetName() == "Accumulation Scalping" ||
-				strategy.GetName() == "Grid Scalping" {
+				strategy.GetName() == "Grid Scalping" ||
+				strategy.GetName() == "Volume Profile Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}
@@ -216,45 +234,53 @@ func (h *StrategyHandler) getSuitableStrategies(condition common.MarketCondition
 			if strategy.GetName() == "MACD Scalping" ||
 				strategy.GetName() == "Volatility Scalping" ||
 				strategy.GetName() == "RSI Scalping" ||
-				strategy.GetName() == "MA Crossover Scalping" {
+				strategy.GetName() == "MA Crossover Scalping" ||
+				strategy.GetName() == "Volume Imbalance Scalping" ||
+				strategy.GetName() == "Orderbook Tape Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}
 
 	case common.MarketSqueeze:
-		// Use squeeze, volatility, and tick/volume bar strategies
+		// Use squeeze, volatility, tick/volume bar, and volume profile strategies
 		for _, strategy := range h.strategies {
 			if strategy.GetName() == "Squeeze Scalping" ||
 				strategy.GetName() == "Volatility Scalping" ||
-				strategy.GetName() == "Tick/Volume Bar Scalping" {
+				strategy.GetName() == "Tick/Volume Bar Scalping" ||
+				strategy.GetName() == "Volume Profile Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}
 
 	case common.MarketAccumulation, common.MarketDistribution:
-		// Use accumulation, RSI, and grid strategies
+		// Use accumulation, RSI, grid, and volume profile strategies
 		for _, strategy := range h.strategies {
 			if strategy.GetName() == "Accumulation Scalping" ||
 				strategy.GetName() == "RSI Scalping" ||
-				strategy.GetName() == "Grid Scalping" {
+				strategy.GetName() == "Grid Scalping" ||
+				strategy.GetName() == "Volume Profile Scalping" ||
+				strategy.GetName() == "Volume Imbalance Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}
 
 	case common.MarketReversal, common.MarketReversalUp, common.MarketReversalDown:
-		// Use RSI, MACD, and S/R bounce strategies for reversals
+		// Use RSI, MACD, S/R bounce, and volume imbalance strategies
 		for _, strategy := range h.strategies {
 			if strategy.GetName() == "RSI Scalping" ||
 				strategy.GetName() == "MACD Scalping" ||
-				strategy.GetName() == "S/R Bounce Scalping" {
+				strategy.GetName() == "S/R Bounce Scalping" ||
+				strategy.GetName() == "Volume Imbalance Scalping" ||
+				strategy.GetName() == "Orderbook Tape Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}
 
 	default:
-		// Default to RSI strategy for unknown conditions
+		// Default to RSI and VWAP strategies for unknown conditions
 		for _, strategy := range h.strategies {
-			if strategy.GetName() == "RSI Scalping" {
+			if strategy.GetName() == "RSI Scalping" ||
+				strategy.GetName() == "VWAP Scalping" {
 				suitableStrategies = append(suitableStrategies, strategy)
 			}
 		}

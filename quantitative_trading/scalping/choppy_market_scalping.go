@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -60,19 +62,31 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 		return nil, nil
 	}
 
-	// Calculate Stochastic
-	slowK, slowD := talib.Stoch(highs, lows, closes, 14, 3, talib.SMA, 3, talib.SMA)
+	// Calculate Stochastic with optimized parameters for choppy markets
+	slowK, slowD := talib.Stoch(highs, lows, closes, 9, 3, talib.SMA, 3, talib.SMA)
 	if len(slowK) < 2 || len(slowD) < 2 {
 		return nil, nil
 	}
 
-	// Calculate Volume Profile
-	volumeMA := talib.Sma(volumes, 20)
-	if len(volumeMA) < 2 {
+	// Calculate RSI for additional confirmation
+	rsi := talib.Rsi(closes, 14)
+	if len(rsi) < 2 {
 		return nil, nil
 	}
 
-	// Calculate ATR for stop loss
+	// Calculate Bollinger Bands for volatility and range
+	bbUpper, bbMiddle, bbLower := talib.BBands(closes, 20, 2, 2, talib.SMA)
+	if len(bbUpper) < 2 {
+		return nil, nil
+	}
+
+	// Calculate Volume Profile with EMA for smoother signals
+	volumeEMA := talib.Ema(volumes, 20)
+	if len(volumeEMA) < 2 {
+		return nil, nil
+	}
+
+	// Calculate ATR for volatility
 	atr := talib.Atr(highs, lows, closes, 14)
 	if len(atr) < 2 {
 		return nil, nil
@@ -83,57 +97,75 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	latestADX := adx[len(adx)-1]
 	latestSlowK := slowK[len(slowK)-1]
 	latestSlowD := slowD[len(slowD)-1]
+	latestRSI := rsi[len(rsi)-1]
+	latestBBUpper := bbUpper[len(bbUpper)-1]
+	latestBBMiddle := bbMiddle[len(bbMiddle)-1]
+	latestBBLower := bbLower[len(bbLower)-1]
 	latestVolume := volumes[len(volumes)-1]
-	latestVolumeMA := volumeMA[len(volumeMA)-1]
+	latestVolumeEMA := volumeEMA[len(volumeEMA)-1]
 	latestATR := atr[len(atr)-1]
 
-	// Calculate volatility percentage
-	volatilityPercent := (latestATR / latestPrice) * 100
+	// Calculate market structure
+	prevHigh := highs[len(highs)-2]
+	prevLow := lows[len(lows)-2]
+	prevClose := closes[len(closes)-2]
 
-	// Calculate suggested leverage based on volatility
-	leverage := 10.0 // Default leverage
-	if volatilityPercent < 0.5 {
-		leverage = 20.0 // High leverage for low volatility
-	} else if volatilityPercent < 1.0 {
-		leverage = 15.0 // Medium leverage for medium volatility
-	} else if volatilityPercent < 2.0 {
-		leverage = 10.0 // Conservative leverage for high volatility
-	} else {
-		leverage = 5.0 // Very conservative for extreme volatility
-	}
+	// Detect price action patterns
+	isInsideBar := latestPrice < prevHigh && latestPrice > prevLow
+	isOutsideBar := latestPrice > prevHigh && latestPrice < prevLow
+	isDoji := math.Abs(latestPrice-prevClose) < (latestATR * 0.1)
 
-	// Adjust leverage based on market condition
-	if latestADX < 25 {
-		leverage *= 0.8 // Decrease leverage in choppy market
-	}
+	// Calculate volatility ratio
+	volatilityRatio := latestATR / latestBBMiddle * 100
 
-	// Cap maximum leverage
-	if leverage > 20.0 {
-		leverage = 20.0
-	}
+	// Calculate volume strength
+	volumeStrength := (latestVolume / latestVolumeEMA) * 100
 
-	// Calculate stop loss using ATR and leverage
-	atrMultiplier := 1.0 // ATR multiplier for stop loss (more conservative in choppy market)
-	stopLossDistance := (latestATR * atrMultiplier) / leverage
+	// Calculate price momentum
+	priceMomentum := (latestPrice - prevClose) / prevClose * 100
 
-	// Ensure stop loss doesn't exceed max risk
-	maxRiskPercent := 2.0 // Maximum risk per trade
-	maxStopLossDistance := latestPrice * (maxRiskPercent / 100.0)
-	if stopLossDistance > maxStopLossDistance {
-		stopLossDistance = maxStopLossDistance
-	}
+	// Trading logic with improved technical analysis
+	if latestADX < 25 && // Weak trend
+		latestSlowK < 20 && latestSlowD < 20 && // Oversold
+		latestRSI < 30 && // RSI oversold
+		latestPrice < latestBBLower && // Price below lower BB
+		volumeStrength > 120 && // Above average volume
+		!isDoji && // Not a doji
+		priceMomentum < 0 { // Negative momentum
 
-	// Calculate risk:reward ratio based on leverage
-	riskRewardRatio := 1.5 // Conservative risk:reward ratio
-	takeProfitDistance := stopLossDistance * riskRewardRatio
+		// Calculate stop loss and take profit based on technical levels
+		stopLossDistance := math.Max(latestATR*1.5, (latestPrice-latestBBLower)*1.2)
+		takeProfitDistance := math.Max(latestATR*2.5, (latestBBMiddle-latestPrice)*1.5)
 
-	// Calculate risk and reward percentages
-	riskPercent := (stopLossDistance / latestPrice) * 100
-	rewardPercent := (takeProfitDistance / latestPrice) * 100
+		// Calculate position size based on risk
+		accountSize := 1000.0
+		accountRisk := 0.02
+		riskAmount := accountSize * accountRisk
+		positionSize := riskAmount / (stopLossDistance / latestPrice)
+		rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
 
-	// Trading logic
-	if latestADX < 25 && latestSlowK < 20 && latestSlowD < 20 && latestVolume > latestVolumeMA {
-		// Weak trend, oversold, and high volume
+		// Calculate leverage based on volatility
+		leverage := 10.0
+		if volatilityRatio < 1.0 {
+			leverage = 20.0
+		} else if volatilityRatio < 2.0 {
+			leverage = 15.0
+		} else if volatilityRatio < 3.0 {
+			leverage = 10.0
+		} else {
+			leverage = 5.0
+		}
+
+		// Adjust leverage based on market structure
+		if isInsideBar {
+			leverage *= 0.8 // Reduce leverage for inside bars
+		}
+
+		// Cap maximum leverage
+		if leverage > 20.0 {
+			leverage = 20.0
+		}
+
 		return &strategies.Signal{
 			Type:  "BUY",
 			Price: latestPrice,
@@ -144,49 +176,101 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
 				"• Take Profit: %.5f (+%.2f%%)\n"+
 				"• Risk/Reward: 1:%.2f\n"+
-				"• Suggested Leverage: %.1fx\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:%.2f\n\n"+
-				"📈 Signal Details:\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n\n"+
+				"📈 Technical Analysis:\n"+
 				"• ADX: %.2f (Weak Trend)\n"+
-				"• Stochastic K: %.2f\n"+
-				"• Stochastic D: %.2f\n"+
-				"• Volume: %.2f (MA: %.2f)\n"+
-				"• ATR: %.6f (%.2f%% volatility)\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Oversold condition in choppy market\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal\n"+
+				"• Stochastic K: %.2f (Oversold)\n"+
+				"• Stochastic D: %.2f (Oversold)\n"+
+				"• RSI: %.2f (Oversold)\n"+
+				"• BB Lower: %.5f\n"+
+				"• BB Middle: %.5f\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Price Momentum: %.2f%%\n"+
+				"• Inside Bar: %v\n"+
+				"• Outside Bar: %v\n"+
+				"• Doji: %v\n\n"+
+				"💡 Trade Notes:\n"+
+				"• Multiple oversold indicators\n"+
+				"• Price below lower BB\n"+
+				"• Strong volume confirmation\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry - (ATR * %.1f / Leverage)\n"+
-				"• TP = Entry + (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				riskPercent,
+				(stopLossDistance/latestPrice)*100,
 				latestPrice+takeProfitDistance,
-				rewardPercent,
-				riskRewardRatio,
+				(takeProfitDistance/latestPrice)*100,
+				takeProfitDistance/stopLossDistance,
 				leverage,
-				riskPercent,
-				rewardPercent,
-				riskRewardRatio,
+				positionSize*100/accountSize,
 				latestADX,
 				latestSlowK,
 				latestSlowD,
-				latestVolume,
-				latestVolumeMA,
+				latestRSI,
+				latestBBLower,
+				latestBBMiddle,
 				latestATR,
-				volatilityPercent,
-				atrMultiplier,
-				riskRewardRatio),
+				volatilityRatio,
+				volumeStrength,
+				priceMomentum,
+				isInsideBar,
+				isOutsideBar,
+				isDoji,
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 			Leverage:   leverage,
 		}, nil
-	} else if latestADX < 25 && latestSlowK > 80 && latestSlowD > 80 && latestVolume > latestVolumeMA {
-		// Weak trend, overbought, and high volume
+	} else if latestADX < 25 && // Weak trend
+		latestSlowK > 80 && latestSlowD > 80 && // Overbought
+		latestRSI > 70 && // RSI overbought
+		latestPrice > latestBBUpper && // Price above upper BB
+		volumeStrength > 120 && // Above average volume
+		!isDoji && // Not a doji
+		priceMomentum > 0 { // Positive momentum
+
+		// Calculate stop loss and take profit based on technical levels
+		stopLossDistance := math.Max(latestATR*1.5, (latestBBUpper-latestPrice)*1.2)
+		takeProfitDistance := math.Max(latestATR*2.5, (latestPrice-latestBBMiddle)*1.5)
+
+		// Calculate position size based on risk
+		accountSize := 1000.0
+		accountRisk := 0.02
+		riskAmount := accountSize * accountRisk
+		positionSize := riskAmount / (stopLossDistance / latestPrice)
+		rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
+
+		// Calculate leverage based on volatility
+		leverage := 10.0
+		if volatilityRatio < 1.0 {
+			leverage = 20.0
+		} else if volatilityRatio < 2.0 {
+			leverage = 15.0
+		} else if volatilityRatio < 3.0 {
+			leverage = 10.0
+		} else {
+			leverage = 5.0
+		}
+
+		// Adjust leverage based on market structure
+		if isInsideBar {
+			leverage *= 0.8 // Reduce leverage for inside bars
+		}
+
+		// Cap maximum leverage
+		if leverage > 20.0 {
+			leverage = 20.0
+		}
+
 		return &strategies.Signal{
 			Type:  "SELL",
 			Price: latestPrice,
@@ -197,43 +281,56 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
 				"• Take Profit: %.5f (-%.2f%%)\n"+
 				"• Risk/Reward: 1:%.2f\n"+
-				"• Suggested Leverage: %.1fx\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:%.2f\n\n"+
-				"📈 Signal Details:\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n\n"+
+				"📈 Technical Analysis:\n"+
 				"• ADX: %.2f (Weak Trend)\n"+
-				"• Stochastic K: %.2f\n"+
-				"• Stochastic D: %.2f\n"+
-				"• Volume: %.2f (MA: %.2f)\n"+
-				"• ATR: %.6f (%.2f%% volatility)\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Overbought condition in choppy market\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal\n"+
+				"• Stochastic K: %.2f (Overbought)\n"+
+				"• Stochastic D: %.2f (Overbought)\n"+
+				"• RSI: %.2f (Overbought)\n"+
+				"• BB Upper: %.5f\n"+
+				"• BB Middle: %.5f\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Price Momentum: %.2f%%\n"+
+				"• Inside Bar: %v\n"+
+				"• Outside Bar: %v\n"+
+				"• Doji: %v\n\n"+
+				"💡 Trade Notes:\n"+
+				"• Multiple overbought indicators\n"+
+				"• Price above upper BB\n"+
+				"• Strong volume confirmation\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry + (ATR * %.1f / Leverage)\n"+
-				"• TP = Entry - (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				riskPercent,
+				(stopLossDistance/latestPrice)*100,
 				latestPrice-takeProfitDistance,
-				rewardPercent,
-				riskRewardRatio,
+				(takeProfitDistance/latestPrice)*100,
+				takeProfitDistance/stopLossDistance,
 				leverage,
-				riskPercent,
-				rewardPercent,
-				riskRewardRatio,
+				positionSize*100/accountSize,
 				latestADX,
 				latestSlowK,
 				latestSlowD,
-				latestVolume,
-				latestVolumeMA,
+				latestRSI,
+				latestBBUpper,
+				latestBBMiddle,
 				latestATR,
-				volatilityPercent,
-				atrMultiplier,
-				riskRewardRatio),
+				volatilityRatio,
+				volumeStrength,
+				priceMomentum,
+				isInsideBar,
+				isOutsideBar,
+				isDoji,
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
 			Leverage:   leverage,
@@ -242,3 +339,25 @@ func (s *ChoppyMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 
 	return nil, nil
 }
+
+/*
+func findNearestResistance(price float64, highs []float64) float64 {
+	nearestResistance := math.Inf(-1)
+	for _, high := range highs {
+		if high > price && high > nearestResistance {
+			nearestResistance = high
+		}
+	}
+	return nearestResistance
+}
+
+func findNearestSupport(price float64, lows []float64) float64 {
+	nearestSupport := math.Inf(1)
+	for _, low := range lows {
+		if low < price && low < nearestSupport {
+			nearestSupport = low
+		}
+	}
+	return nearestSupport
+}
+*/

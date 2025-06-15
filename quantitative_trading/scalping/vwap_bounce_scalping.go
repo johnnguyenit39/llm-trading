@@ -131,26 +131,3 @@ func VWAPBounceScalping(candles5m []repository.Candle) (*strategies.Signal, erro
 
 	return nil, nil
 }
-
-// calculateVWAP calculates the Volume Weighted Average Price
-func calculateVWAP(prices, volumes []float64) []float64 {
-	if len(prices) != len(volumes) || len(prices) == 0 {
-		return nil
-	}
-
-	vwap := make([]float64, len(prices))
-	var cumulativePV float64
-	var cumulativeVolume float64
-
-	for i := 0; i < len(prices); i++ {
-		cumulativePV += prices[i] * volumes[i]
-		cumulativeVolume += volumes[i]
-		if cumulativeVolume > 0 {
-			vwap[i] = cumulativePV / cumulativeVolume
-		} else {
-			vwap[i] = prices[i]
-		}
-	}
-
-	return vwap
-}

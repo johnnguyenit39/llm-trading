@@ -30,31 +30,78 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 	// Calculate ROC (Rate of Change)
 	roc := talib.Roc(closes, 10)
 
+	// Calculate MACD for trend confirmation
+	macd, signal, hist := talib.Macd(closes, 12, 26, 9)
+
 	// Calculate ATR for stop loss
 	atr := talib.Atr(highs, lows, closes, 14)
 	atrValue := atr[len(atr)-1]
+
+	// Calculate EMA for trend direction
+	ema20 := talib.Ema(closes, 20)
+	ema50 := talib.Ema(closes, 50)
+
+	// Calculate Volume Profile with EMA
+	volumeEMA := talib.Ema(volumes, 20)
 
 	// Get latest values
 	latestPrice := closes[len(closes)-1]
 	latestRSI := rsi[len(rsi)-1]
 	latestROC := roc[len(roc)-1]
+	latestMACD := macd[len(macd)-1]
+	latestSignal := signal[len(signal)-1]
+	latestHist := hist[len(hist)-1]
 	latestVolume := volumes[len(volumes)-1]
+	latestVolumeEMA := volumeEMA[len(volumeEMA)-1]
+	latestEMA20 := ema20[len(ema20)-1]
+	latestEMA50 := ema50[len(ema50)-1]
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := latestPrice * maxStopLossPercent
+	// Calculate momentum indicators
+	priceMomentum := (latestPrice - closes[len(closes)-2]) / closes[len(closes)-2] * 100
+	volumeStrength := (latestVolume / latestVolumeEMA) * 100
+	macdMomentum := latestMACD - macd[len(macd)-2]
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+	// Calculate volatility ratio
+	volatilityRatio := atrValue / latestPrice * 100
 
-	// Calculate risk and reward percentages
-	riskPercent := (stopLossDistance / latestPrice) * 100
-	rewardPercent := (takeProfitDistance / latestPrice) * 100
+	// Calculate leverage based on volatility
+	leverage := 10.0 // Default for momentum trading
+	if volatilityRatio > 3.0 {
+		leverage = 5.0
+	} else if volatilityRatio > 2.0 {
+		leverage = 7.0
+	} else if volatilityRatio > 1.0 {
+		leverage = 10.0
+	} else {
+		leverage = 15.0
+	}
 
-	// Trading logic
-	if latestRSI < 30 && latestROC > 0 && latestVolume > 0 {
-		// Oversold with positive momentum and volume - potential bounce
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
+	}
+
+	// Calculate stop loss and take profit based on volatility
+	stopLossDistance := math.Max(atrValue*1.5, latestPrice*0.01) // Minimum 1% stop loss
+	takeProfitDistance := math.Max(atrValue*2.5, stopLossDistance*1.5)
+
+	// Calculate position size based on risk
+	accountSize := 1000.0
+	accountRisk := 0.02
+	riskAmount := accountSize * accountRisk
+	positionSize := riskAmount / (stopLossDistance / latestPrice)
+	rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
+
+	// Trading logic with improved momentum analysis
+	if latestRSI < 30 && // Oversold
+		latestROC > 0 && // Positive momentum
+		latestMACD > latestSignal && // MACD above signal
+		latestHist > 0 && // Positive histogram
+		latestPrice > latestEMA20 && // Price above short-term trend
+		latestEMA20 > latestEMA50 && // Uptrend confirmation
+		volumeStrength > 150 && // Strong volume
+		priceMomentum > 0 { // Positive price momentum
+
 		return &strategies.Signal{
 			Type:  "BUY",
 			Price: latestPrice,
@@ -64,44 +111,69 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
 				"• Take Profit: %.5f (+%.2f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 10x\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n\n"+
+				"📈 Technical Analysis:\n"+
 				"• RSI: %.2f (Oversold)\n"+
 				"• ROC: %.2f%%\n"+
-				"• Volume: %.2f\n"+
+				"• MACD: %.6f\n"+
+				"• Signal: %.6f\n"+
+				"• Histogram: %.6f\n"+
+				"• EMA20: %.5f\n"+
+				"• EMA50: %.5f\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Price Momentum: %.2f%%\n"+
+				"• MACD Momentum: %.6f\n"+
+				"• Volatility Ratio: %.2f%%\n"+
 				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Oversold bounce setup\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for momentum trading\n"+
+				"💡 Trade Notes:\n"+
+				"• Strong momentum setup\n"+
+				"• Multiple trend confirmations\n"+
+				"• High volume confirmation\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry - (ATR * %.1f)\n"+
-				"• TP = Entry + (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				riskPercent,
+				(stopLossDistance/latestPrice)*100,
 				latestPrice+takeProfitDistance,
-				rewardPercent,
-				riskPercent,
-				rewardPercent,
+				(takeProfitDistance/latestPrice)*100,
+				takeProfitDistance/stopLossDistance,
+				leverage,
+				positionSize*100/accountSize,
 				latestRSI,
 				latestROC,
-				latestVolume,
+				latestMACD,
+				latestSignal,
+				latestHist,
+				latestEMA20,
+				latestEMA50,
+				volumeStrength,
+				priceMomentum,
+				macdMomentum,
+				volatilityRatio,
 				atrValue,
-				1.0,
-				1.5,
-				100.0),
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
-	} else if latestRSI > 70 && latestROC < 0 && latestVolume > 0 {
-		// Overbought with negative momentum and volume - potential reversal
+	} else if latestRSI > 70 && // Overbought
+		latestROC < 0 && // Negative momentum
+		latestMACD < latestSignal && // MACD below signal
+		latestHist < 0 && // Negative histogram
+		latestPrice < latestEMA20 && // Price below short-term trend
+		latestEMA20 < latestEMA50 && // Downtrend confirmation
+		volumeStrength > 150 && // Strong volume
+		priceMomentum < 0 { // Negative price momentum
+
 		return &strategies.Signal{
 			Type:  "SELL",
 			Price: latestPrice,
@@ -111,41 +183,59 @@ func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error)
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
 				"• Take Profit: %.5f (-%.2f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 10x\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n\n"+
+				"📈 Technical Analysis:\n"+
 				"• RSI: %.2f (Overbought)\n"+
 				"• ROC: %.2f%%\n"+
-				"• Volume: %.2f\n"+
+				"• MACD: %.6f\n"+
+				"• Signal: %.6f\n"+
+				"• Histogram: %.6f\n"+
+				"• EMA20: %.5f\n"+
+				"• EMA50: %.5f\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Price Momentum: %.2f%%\n"+
+				"• MACD Momentum: %.6f\n"+
+				"• Volatility Ratio: %.2f%%\n"+
 				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Overbought reversal setup\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for momentum trading\n"+
+				"💡 Trade Notes:\n"+
+				"• Strong momentum setup\n"+
+				"• Multiple trend confirmations\n"+
+				"• High volume confirmation\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry + (ATR * %.1f)\n"+
-				"• TP = Entry - (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				riskPercent,
+				(stopLossDistance/latestPrice)*100,
 				latestPrice-takeProfitDistance,
-				rewardPercent,
-				riskPercent,
-				rewardPercent,
+				(takeProfitDistance/latestPrice)*100,
+				takeProfitDistance/stopLossDistance,
+				leverage,
+				positionSize*100/accountSize,
 				latestRSI,
 				latestROC,
-				latestVolume,
+				latestMACD,
+				latestSignal,
+				latestHist,
+				latestEMA20,
+				latestEMA50,
+				volumeStrength,
+				priceMomentum,
+				macdMomentum,
+				volatilityRatio,
 				atrValue,
-				1.0,
-				1.5,
-				100.0),
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	}
 

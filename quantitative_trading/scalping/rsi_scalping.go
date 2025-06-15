@@ -50,10 +50,12 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 	closes := make([]float64, len(candles5m))
 	highs := make([]float64, len(candles5m))
 	lows := make([]float64, len(candles5m))
+	volumes := make([]float64, len(candles5m))
 	for i, c := range candles5m {
 		closes[i] = c.Close
 		highs[i] = c.High
 		lows[i] = c.Low
+		volumes[i] = c.Volume
 	}
 
 	// Calculate RSI
@@ -62,35 +64,81 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 		return nil, nil
 	}
 
-	// Get latest values
-	latestRSI := rsi[len(rsi)-1]
-	prevRSI := rsi[len(rsi)-2]
+	// Calculate Stochastic for additional confirmation
+	slowK, slowD := talib.Stoch(highs, lows, closes, 14, 3, talib.SMA, 3, talib.SMA)
 
-	// Get latest price
-	latestPrice := candles5m[len(candles5m)-1].Close
-
-	// Calculate ATR for stop loss and take profit
+	// Calculate ATR for volatility
 	atr := talib.Atr(highs, lows, closes, 14)
 	if len(atr) < 2 {
 		return nil, nil
 	}
 	atrValue := atr[len(atr)-1]
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxRiskPercent := 0.02
-	maxStopLossDistance := latestPrice * maxRiskPercent
+	// Calculate EMA for trend
+	ema20 := talib.Ema(closes, 20)
+	ema50 := talib.Ema(closes, 50)
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+	// Calculate Volume Profile
+	volumeMA := talib.Sma(volumes, 20)
 
-	// Calculate risk and reward percentages
-	riskPercent := (stopLossDistance / latestPrice) * 100
-	rewardPercent := (takeProfitDistance / latestPrice) * 100
+	// Get latest values
+	latestRSI := rsi[len(rsi)-1]
+	prevRSI := rsi[len(rsi)-2]
+	latestSlowK := slowK[len(slowK)-1]
+	latestSlowD := slowD[len(slowD)-1]
+	latestPrice := closes[len(closes)-1]
+	latestVolume := volumes[len(volumes)-1]
+	latestVolumeMA := volumeMA[len(volumeMA)-1]
+	latestEMA20 := ema20[len(ema20)-1]
+	latestEMA50 := ema50[len(ema50)-1]
 
-	// Trading logic
-	if latestRSI < 30 && prevRSI >= 30 {
-		// Oversold condition
+	// Calculate market metrics
+	volumeStrength := (latestVolume / latestVolumeMA) * 100
+	priceVsEMA20 := ((latestPrice - latestEMA20) / latestEMA20) * 100
+	volatilityRatio := atrValue / latestPrice * 100
+
+	// Calculate leverage based on volatility and RSI
+	leverage := 3.0 // Default for RSI trading
+	if volatilityRatio > 3.0 {
+		leverage = 2.0
+	} else if volatilityRatio > 2.0 {
+		leverage = 2.5
+	} else if volatilityRatio > 1.0 {
+		leverage = 3.0
+	} else {
+		leverage = 4.0
+	}
+
+	// Adjust leverage based on RSI extremes
+	if latestRSI < 20 || latestRSI > 80 {
+		leverage *= 0.8 // Reduce leverage at extreme RSI levels
+	}
+
+	// Cap maximum leverage
+	if leverage > 5.0 {
+		leverage = 5.0
+	}
+
+	// Calculate stop loss and take profit based on volatility
+	stopLossDistance := math.Max(atrValue*1.2, latestPrice*0.01) // Minimum 1% stop loss
+	takeProfitDistance := math.Max(atrValue*2.0, stopLossDistance*1.5)
+
+	// Calculate position size based on risk
+	accountSize := 1000.0
+	accountRisk := 0.02
+	riskAmount := accountSize * accountRisk
+	positionSize := riskAmount / (stopLossDistance / latestPrice)
+	rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
+
+	// Trading logic with improved RSI analysis
+	if latestRSI < 30 && // Oversold
+		prevRSI >= 30 && // RSI crossing up from oversold
+		latestSlowK < 20 && // Stochastic oversold
+		latestSlowK > latestSlowD && // Stochastic bullish crossover
+		volumeStrength > 120 && // Above average volume
+		priceVsEMA20 > -1.0 && // Price near or above EMA20
+		latestEMA20 > latestEMA50 { // Uptrend confirmation
+
 		return &strategies.Signal{
 			Type:  "BUY",
 			Price: latestPrice,
@@ -98,42 +146,66 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 			Description: fmt.Sprintf("🚀 RSI Scalping - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (-%.1f%%)\n"+
-				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 3x\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📊 Signal Details:\n"+
-				"• RSI oversold condition on 5m\n"+
-				"• Current RSI: %.2f\n"+
+				"• Stop Loss: %.5f (-%.2f%%)\n"+
+				"• Take Profit: %.5f (+%.2f%%)\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n\n"+
+				"📈 Technical Analysis:\n"+
+				"• RSI: %.2f (Oversold)\n"+
 				"• Previous RSI: %.2f\n"+
+				"• Stochastic K: %.2f\n"+
+				"• Stochastic D: %.2f\n"+
+				"• EMA20: %.5f\n"+
+				"• EMA50: %.5f\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Price vs EMA20: %.2f%%\n"+
+				"• Volatility Ratio: %.2f%%\n"+
 				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Mean reversion opportunity\n"+
-				"• Using ATR for dynamic stop loss\n"+
+				"💡 Trade Notes:\n"+
+				"• RSI oversold bounce setup\n"+
+				"• Stochastic confirmation\n"+
+				"• Volume and trend support\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL: ATR * 1.0 (max 2%%)\n"+
-				"• TP: SL * 1.5",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				riskPercent,
+				(stopLossDistance/latestPrice)*100,
 				latestPrice+takeProfitDistance,
-				rewardPercent,
-				riskPercent,
-				rewardPercent,
+				(takeProfitDistance/latestPrice)*100,
+				takeProfitDistance/stopLossDistance,
+				leverage,
+				positionSize*100/accountSize,
 				latestRSI,
 				prevRSI,
+				latestSlowK,
+				latestSlowD,
+				latestEMA20,
+				latestEMA50,
+				volumeStrength,
+				priceVsEMA20,
+				volatilityRatio,
 				atrValue,
-				riskPercent),
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
-	} else if latestRSI > 70 && prevRSI <= 70 {
-		// Overbought condition
+	} else if latestRSI > 70 && // Overbought
+		prevRSI <= 70 && // RSI crossing down from overbought
+		latestSlowK > 80 && // Stochastic overbought
+		latestSlowK < latestSlowD && // Stochastic bearish crossover
+		volumeStrength > 120 && // Above average volume
+		priceVsEMA20 < 1.0 && // Price near or below EMA20
+		latestEMA20 < latestEMA50 { // Downtrend confirmation
+
 		return &strategies.Signal{
 			Type:  "SELL",
 			Price: latestPrice,
@@ -141,39 +213,57 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 			Description: fmt.Sprintf("🔻 RSI Scalping - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (+%.1f%%)\n"+
-				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 3x\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📊 Signal Details:\n"+
-				"• RSI overbought condition on 5m\n"+
-				"• Current RSI: %.2f\n"+
+				"• Stop Loss: %.5f (+%.2f%%)\n"+
+				"• Take Profit: %.5f (-%.2f%%)\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n\n"+
+				"📈 Technical Analysis:\n"+
+				"• RSI: %.2f (Overbought)\n"+
 				"• Previous RSI: %.2f\n"+
+				"• Stochastic K: %.2f\n"+
+				"• Stochastic D: %.2f\n"+
+				"• EMA20: %.5f\n"+
+				"• EMA50: %.5f\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Price vs EMA20: %.2f%%\n"+
+				"• Volatility Ratio: %.2f%%\n"+
 				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Mean reversion opportunity\n"+
-				"• Using ATR for dynamic stop loss\n"+
+				"💡 Trade Notes:\n"+
+				"• RSI overbought reversal setup\n"+
+				"• Stochastic confirmation\n"+
+				"• Volume and trend support\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL: ATR * 1.0 (max 2%%)\n"+
-				"• TP: SL * 1.5",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				riskPercent,
+				(stopLossDistance/latestPrice)*100,
 				latestPrice-takeProfitDistance,
-				rewardPercent,
-				riskPercent,
-				rewardPercent,
+				(takeProfitDistance/latestPrice)*100,
+				takeProfitDistance/stopLossDistance,
+				leverage,
+				positionSize*100/accountSize,
 				latestRSI,
 				prevRSI,
+				latestSlowK,
+				latestSlowD,
+				latestEMA20,
+				latestEMA50,
+				volumeStrength,
+				priceVsEMA20,
+				volatilityRatio,
 				atrValue,
-				riskPercent),
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	}
 

@@ -68,23 +68,30 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 		return nil, nil
 	}
 
-	// Calculate Keltner Channels
+	// Calculate Keltner Channels with dynamic multiplier based on volatility
+	kcMultiplier := 3.0
 	kcUpper := make([]float64, len(ema))
 	kcLower := make([]float64, len(ema))
 	for i := range ema {
-		kcUpper[i] = ema[i] + (3 * atr[i]) // Wider bands for high volatility
-		kcLower[i] = ema[i] - (3 * atr[i])
-	}
-
-	// Calculate Volume Profile
-	volumeMA := talib.Sma(volumes, 20)
-	if len(volumeMA) < 2 {
-		return nil, nil
+		kcUpper[i] = ema[i] + (kcMultiplier * atr[i])
+		kcLower[i] = ema[i] - (kcMultiplier * atr[i])
 	}
 
 	// Calculate RSI for overbought/oversold
 	rsi := talib.Rsi(closes, 14)
 	if len(rsi) < 2 {
+		return nil, nil
+	}
+
+	// Calculate MACD for trend confirmation
+	macd, signal, hist := talib.Macd(closes, 12, 26, 9)
+	if len(macd) < 2 {
+		return nil, nil
+	}
+
+	// Calculate Volume Profile with EMA
+	volumeEMA := talib.Ema(volumes, 20)
+	if len(volumeEMA) < 2 {
 		return nil, nil
 	}
 
@@ -94,28 +101,73 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 	latestEMA := ema[len(ema)-1]
 	latestKCUpper := kcUpper[len(kcUpper)-1]
 	latestKCLower := kcLower[len(kcLower)-1]
-	latestVolume := volumes[len(volumes)-1]
-	latestVolumeMA := volumeMA[len(volumeMA)-1]
 	latestRSI := rsi[len(rsi)-1]
+	latestMACD := macd[len(macd)-1]
+	latestSignal := signal[len(signal)-1]
+	latestHist := hist[len(hist)-1]
+	latestVolume := volumes[len(volumes)-1]
+	latestVolumeEMA := volumeEMA[len(volumeEMA)-1]
 
-	// Calculate volatility ratio
+	// Calculate market structure
+	prevHigh := highs[len(highs)-2]
+	prevLow := lows[len(lows)-2]
+	prevClose := closes[len(closes)-2]
+
+	// Detect volatility patterns
 	volatilityRatio := latestATR / latestEMA * 100
+	priceRange := (prevHigh - prevLow) / prevLow * 100
+	isVolatilityExpanding := latestATR > atr[len(atr)-2]
+	isVolatilityContraction := latestATR < atr[len(atr)-2]
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := latestPrice * maxStopLossPercent
+	// Calculate momentum indicators
+	priceMomentum := (latestPrice - prevClose) / prevClose * 100
+	volumeStrength := (latestVolume / latestVolumeEMA) * 100
+	macdMomentum := latestMACD - macd[len(macd)-2]
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(latestATR*1.0, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio for high volatility
+	// Trading logic with improved technical analysis
+	if latestPrice < latestKCLower && // Price below lower Keltner
+		latestRSI < 30 && // RSI oversold
+		latestMACD < latestSignal && // MACD below signal
+		latestHist < 0 && // Negative histogram
+		volumeStrength > 150 && // Strong volume
+		isVolatilityExpanding && // Volatility expanding
+		priceMomentum < 0 { // Negative momentum
 
-	// Calculate risk and reward percentages
-	riskPercent := (stopLossDistance / latestPrice) * 100
-	rewardPercent := (takeProfitDistance / latestPrice) * 100
+		// Calculate stop loss and take profit based on volatility
+		stopLossDistance := math.Max(latestATR*2.0, (latestPrice-latestKCLower)*1.5)
+		takeProfitDistance := math.Max(latestATR*3.0, (latestEMA-latestPrice)*2.0)
 
-	// Trading logic
-	if latestPrice < latestKCLower && latestRSI < 30 && latestVolume > latestVolumeMA*1.5 && volatilityRatio > 2 {
-		// Price below lower Keltner, oversold, high volume, high volatility
+		// Calculate position size based on risk
+		accountSize := 1000.0
+		accountRisk := 0.02
+		riskAmount := accountSize * accountRisk
+		positionSize := riskAmount / (stopLossDistance / latestPrice)
+		rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
+
+		// Calculate leverage based on volatility
+		leverage := 5.0 // Conservative default for high volatility
+		if volatilityRatio < 2.0 {
+			leverage = 10.0
+		} else if volatilityRatio < 3.0 {
+			leverage = 7.0
+		} else if volatilityRatio < 4.0 {
+			leverage = 5.0
+		} else {
+			leverage = 3.0 // Very conservative for extreme volatility
+		}
+
+		// Adjust leverage based on market conditions
+		if isVolatilityContraction {
+			leverage *= 1.2 // Increase leverage during volatility contraction
+		} else if isVolatilityExpanding {
+			leverage *= 0.8 // Decrease leverage during volatility expansion
+		}
+
+		// Cap maximum leverage
+		if leverage > 20.0 {
+			leverage = 20.0
+		}
+
 		return &strategies.Signal{
 			Type:  "BUY",
 			Price: latestPrice,
@@ -125,47 +177,106 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
 				"• Take Profit: %.5f (+%.2f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 10x\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n\n"+
+				"📈 Technical Analysis:\n"+
 				"• Price below lower Keltner: %.5f\n"+
 				"• RSI: %.2f (Oversold)\n"+
+				"• MACD: %.6f\n"+
+				"• Signal: %.6f\n"+
+				"• Histogram: %.6f\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n"+
 				"• Volatility Ratio: %.2f%%\n"+
-				"• Volume: %.2f (MA: %.2f)\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• High volatility opportunity\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal\n"+
+				"• Price Range: %.2f%%\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Price Momentum: %.2f%%\n"+
+				"• MACD Momentum: %.6f\n"+
+				"• Volatility Expanding: %v\n"+
+				"• Volatility Contraction: %v\n\n"+
+				"💡 Trade Notes:\n"+
+				"• Multiple oversold indicators\n"+
+				"• Strong volume confirmation\n"+
+				"• Volatility-based position sizing\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry - (ATR * %.1f)\n"+
-				"• TP = Entry + (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice-stopLossDistance,
-				riskPercent,
+				(stopLossDistance/latestPrice)*100,
 				latestPrice+takeProfitDistance,
-				rewardPercent,
-				riskPercent,
-				rewardPercent,
+				(takeProfitDistance/latestPrice)*100,
+				takeProfitDistance/stopLossDistance,
+				leverage,
+				positionSize*100/accountSize,
 				latestKCLower,
 				latestRSI,
-				volatilityRatio,
-				latestVolume,
-				latestVolumeMA,
+				latestMACD,
+				latestSignal,
+				latestHist,
 				latestATR,
-				1.0,
-				1.5,
-				100.0),
+				volatilityRatio,
+				volatilityRatio,
+				priceRange,
+				volumeStrength,
+				priceMomentum,
+				macdMomentum,
+				isVolatilityExpanding,
+				isVolatilityContraction,
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
-	} else if latestPrice > latestKCUpper && latestRSI > 70 && latestVolume > latestVolumeMA*1.5 && volatilityRatio > 2 {
-		// Price above upper Keltner, overbought, high volume, high volatility
+	} else if latestPrice > latestKCUpper && // Price above upper Keltner
+		latestRSI > 70 && // RSI overbought
+		latestMACD > latestSignal && // MACD above signal
+		latestHist > 0 && // Positive histogram
+		volumeStrength > 150 && // Strong volume
+		isVolatilityExpanding && // Volatility expanding
+		priceMomentum > 0 { // Positive momentum
+
+		// Calculate stop loss and take profit based on volatility
+		stopLossDistance := math.Max(latestATR*2.0, (latestKCUpper-latestPrice)*1.5)
+		takeProfitDistance := math.Max(latestATR*3.0, (latestPrice-latestEMA)*2.0)
+
+		// Calculate position size based on risk
+		accountSize := 1000.0
+		accountRisk := 0.02
+		riskAmount := accountSize * accountRisk
+		positionSize := riskAmount / (stopLossDistance / latestPrice)
+		rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
+
+		// Calculate leverage based on volatility
+		leverage := 5.0 // Conservative default for high volatility
+		if volatilityRatio < 2.0 {
+			leverage = 10.0
+		} else if volatilityRatio < 3.0 {
+			leverage = 7.0
+		} else if volatilityRatio < 4.0 {
+			leverage = 5.0
+		} else {
+			leverage = 3.0 // Very conservative for extreme volatility
+		}
+
+		// Adjust leverage based on market conditions
+		if isVolatilityContraction {
+			leverage *= 1.2 // Increase leverage during volatility contraction
+		} else if isVolatilityExpanding {
+			leverage *= 0.8 // Decrease leverage during volatility expansion
+		}
+
+		// Cap maximum leverage
+		if leverage > 20.0 {
+			leverage = 20.0
+		}
+
 		return &strategies.Signal{
 			Type:  "SELL",
 			Price: latestPrice,
@@ -175,44 +286,62 @@ func (s *HighVolatilityScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
 				"• Take Profit: %.5f (-%.2f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 10x\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n\n"+
+				"📈 Technical Analysis:\n"+
 				"• Price above upper Keltner: %.5f\n"+
 				"• RSI: %.2f (Overbought)\n"+
+				"• MACD: %.6f\n"+
+				"• Signal: %.6f\n"+
+				"• Histogram: %.6f\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n"+
 				"• Volatility Ratio: %.2f%%\n"+
-				"• Volume: %.2f (MA: %.2f)\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• High volatility opportunity\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• High volume confirms signal\n"+
+				"• Price Range: %.2f%%\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Price Momentum: %.2f%%\n"+
+				"• MACD Momentum: %.6f\n"+
+				"• Volatility Expanding: %v\n"+
+				"• Volatility Contraction: %v\n\n"+
+				"💡 Trade Notes:\n"+
+				"• Multiple overbought indicators\n"+
+				"• Strong volume confirmation\n"+
+				"• Volatility-based position sizing\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry + (ATR * %.1f)\n"+
-				"• TP = Entry - (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice+stopLossDistance,
-				riskPercent,
+				(stopLossDistance/latestPrice)*100,
 				latestPrice-takeProfitDistance,
-				rewardPercent,
-				riskPercent,
-				rewardPercent,
+				(takeProfitDistance/latestPrice)*100,
+				takeProfitDistance/stopLossDistance,
+				leverage,
+				positionSize*100/accountSize,
 				latestKCUpper,
 				latestRSI,
-				volatilityRatio,
-				latestVolume,
-				latestVolumeMA,
+				latestMACD,
+				latestSignal,
+				latestHist,
 				latestATR,
-				1.0,
-				1.5,
-				100.0),
+				volatilityRatio,
+				volatilityRatio,
+				priceRange,
+				volumeStrength,
+				priceMomentum,
+				macdMomentum,
+				isVolatilityExpanding,
+				isVolatilityContraction,
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	}
 

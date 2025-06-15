@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -142,24 +144,88 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 		leverage = 20.0
 	}
 
-	// Calculate stop loss using ATR and leverage
-	atrMultiplier := 1.0 // ATR multiplier for stop loss
-	stopLossDistance := (latestATR * atrMultiplier) / leverage
+	// --- TECHNICAL ANALYSIS BASED TP/SL ---
+	// Find nearest support and resistance levels
+	recentHighs := highs5m[len(highs5m)-20:]
+	recentLows := lows5m[len(lows5m)-20:]
 
-	// Ensure stop loss doesn't exceed max risk
-	maxRiskPercent := 2.0 // Maximum risk per trade
-	maxStopLossDistance := latestPrice * (maxRiskPercent / 100.0)
-	if stopLossDistance > maxStopLossDistance {
-		stopLossDistance = maxStopLossDistance
+	// Find nearest resistance and support
+	nearestResistance := findNearestResistance(latestPrice, recentHighs)
+	nearestSupport := findNearestSupport(latestPrice, recentLows)
+
+	// Calculate actual price distances
+	resistanceDistance := math.Abs(nearestResistance - latestPrice)
+	supportDistance := math.Abs(latestPrice - nearestSupport)
+
+	// Calculate stop loss and take profit based on technical levels
+	var stopLossDistance, takeProfitDistance float64
+	if latestPrice > latestUpper5m && latestPrice > latestUpper15m {
+		// BUY signal
+		stopLossDistance = supportDistance * 0.8      // Place SL below support
+		takeProfitDistance = resistanceDistance * 0.8 // Place TP below resistance
+	} else {
+		// SELL signal
+		stopLossDistance = resistanceDistance * 0.8 // Place SL above resistance
+		takeProfitDistance = supportDistance * 0.8  // Place TP above support
 	}
 
-	// Calculate risk:reward ratio based on leverage
-	riskRewardRatio := 1.5 // Conservative risk:reward ratio
-	takeProfitDistance := stopLossDistance * riskRewardRatio
+	// Ensure minimum distances based on ATR
+	minDistance := latestATR * 0.5
+	if stopLossDistance < minDistance {
+		stopLossDistance = minDistance
+	}
+	if takeProfitDistance < minDistance {
+		takeProfitDistance = minDistance
+	}
 
 	// Calculate risk and reward percentages
 	riskPercent := (stopLossDistance / latestPrice) * 100
 	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
+	// Calculate actual risk:reward ratio
+	riskRewardRatio := takeProfitDistance / stopLossDistance
+
+	// Calculate position size based on risk
+	accountSize := 1000.0 // $1000 account
+	accountRisk := 0.02   // 2% risk per trade
+	riskAmount := accountSize * accountRisk
+	positionSize := riskAmount / (riskPercent / 100.0)
+	rewardAmount := riskAmount * riskRewardRatio
+
+	// Calculate signal confidence based on multiple factors
+	signalConfidence := 0.0
+
+	// Volume confirmation (0-40%)
+	volumeStrength5m := (latestVolume5m / latestVolumeMA5m) * 100
+	volumeStrength15m := (latestVolume15m / latestVolumeMA15m) * 100
+	if volumeStrength5m > 150.0 && volumeStrength15m > 120.0 {
+		signalConfidence += 40.0
+	} else if volumeStrength5m > 120.0 && volumeStrength15m > 100.0 {
+		signalConfidence += 30.0
+	} else if volumeStrength5m > 100.0 && volumeStrength15m > 90.0 {
+		signalConfidence += 20.0
+	}
+
+	// Price momentum confirmation (0-30%)
+	if latestROC5m > 0 && latestROC15m > 0 {
+		signalConfidence += 30.0
+	} else if latestROC5m < 0 && latestROC15m < 0 {
+		signalConfidence += 30.0
+	}
+
+	// Volatility confirmation (0-30%)
+	if volatilityPercent < 1.0 {
+		signalConfidence += 30.0
+	} else if volatilityPercent < 2.0 {
+		signalConfidence += 20.0
+	} else if volatilityPercent < 3.0 {
+		signalConfidence += 10.0
+	}
+
+	// Cap confidence at 100%
+	if signalConfidence > 100.0 {
+		signalConfidence = 100.0
+	}
 
 	// Trading logic
 	if latestPrice > latestUpper5m && latestPrice > latestUpper15m &&
@@ -176,25 +242,25 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
 				"• Take Profit: %.5f (+%.2f%%)\n"+
 				"• Risk/Reward: 1:%.2f\n"+
-				"• Suggested Leverage: %.1fx\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:%.2f\n\n"+
-				"📈 Signal Details:\n"+
-				"• Price above BB on 5m and 15m\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
+				"📈 Technical Analysis:\n"+
+				"• Support Level: %.5f\n"+
+				"• Resistance Level: %.5f\n"+
 				"• 5m ROC: %.2f%%\n"+
 				"• 15m ROC: %.2f%%\n"+
-				"• 5m Volume: %.2f (MA: %.2f)\n"+
-				"• 15m Volume: %.2f (MA: %.2f)\n"+
 				"• ATR: %.6f (%.2f%% volatility)\n\n"+
-				"💡 Strategy Notes:\n"+
+				"💡 Trade Notes:\n"+
 				"• Strong breakout opportunity\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Volume confirms breakout\n"+
+				"• SL placed below support\n"+
+				"• TP placed below resistance\n"+
+				"• Based on actual price levels\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry - (ATR * %.1f / Leverage)\n"+
-				"• TP = Entry + (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -202,19 +268,19 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				rewardPercent,
 				riskRewardRatio,
 				leverage,
-				riskPercent,
-				rewardPercent,
-				riskRewardRatio,
+				positionSize*100/accountSize,
+				signalConfidence,
+				nearestSupport,
+				nearestResistance,
 				latestROC5m*100,
 				latestROC15m*100,
-				latestVolume5m,
-				latestVolumeMA5m,
-				latestVolume15m,
-				latestVolumeMA15m,
 				latestATR,
 				volatilityPercent,
-				atrMultiplier,
-				riskRewardRatio),
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 			Leverage:   leverage,
@@ -233,25 +299,25 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
 				"• Take Profit: %.5f (-%.2f%%)\n"+
 				"• Risk/Reward: 1:%.2f\n"+
-				"• Suggested Leverage: %.1fx\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:%.2f\n\n"+
-				"📈 Signal Details:\n"+
-				"• Price below BB on 5m and 15m\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
+				"📈 Technical Analysis:\n"+
+				"• Support Level: %.5f\n"+
+				"• Resistance Level: %.5f\n"+
 				"• 5m ROC: %.2f%%\n"+
 				"• 15m ROC: %.2f%%\n"+
-				"• 5m Volume: %.2f (MA: %.2f)\n"+
-				"• 15m Volume: %.2f (MA: %.2f)\n"+
 				"• ATR: %.6f (%.2f%% volatility)\n\n"+
-				"💡 Strategy Notes:\n"+
+				"💡 Trade Notes:\n"+
 				"• Strong breakout opportunity\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Volume confirms breakout\n"+
+				"• SL placed above resistance\n"+
+				"• TP placed above support\n"+
+				"• Based on actual price levels\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry + (ATR * %.1f / Leverage)\n"+
-				"• TP = Entry - (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,
@@ -259,19 +325,19 @@ func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]r
 				rewardPercent,
 				riskRewardRatio,
 				leverage,
-				riskPercent,
-				rewardPercent,
-				riskRewardRatio,
+				positionSize*100/accountSize,
+				signalConfidence,
+				nearestSupport,
+				nearestResistance,
 				latestROC5m*100,
 				latestROC15m*100,
-				latestVolume5m,
-				latestVolumeMA5m,
-				latestVolume15m,
-				latestVolumeMA15m,
 				latestATR,
 				volatilityPercent,
-				atrMultiplier,
-				riskRewardRatio),
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
 			Leverage:   leverage,

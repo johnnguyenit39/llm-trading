@@ -86,18 +86,118 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 	prevFastEMA := fastEMA[len(fastEMA)-2]
 	prevSlowEMA := slowEMA[len(slowEMA)-2]
 	latestVolume := volumes[len(volumes)-1]
+	latestVolumeMA := volumeMA[len(volumeMA)-1]
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := latestPrice * maxStopLossPercent
+	// Calculate volatility percentage
+	volatilityPercent := (atrValue / latestPrice) * 100
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
+	// Calculate suggested leverage based on volatility
+	leverage := 10.0 // Default leverage
+	if volatilityPercent < 0.5 {
+		leverage = 20.0 // High leverage for low volatility
+	} else if volatilityPercent < 1.0 {
+		leverage = 15.0 // Medium leverage for medium volatility
+	} else if volatilityPercent < 2.0 {
+		leverage = 10.0 // Conservative leverage for high volatility
+	} else {
+		leverage = 5.0 // Very conservative for extreme volatility
+	}
+
+	// Adjust leverage based on market condition
+	if math.Abs(latestFastEMA-latestSlowEMA)/latestSlowEMA < 0.001 {
+		leverage *= 0.8 // Decrease leverage in weak trend
+	}
+
+	// Cap maximum leverage
+	if leverage > 20.0 {
+		leverage = 20.0
+	}
+
+	// --- TECHNICAL ANALYSIS BASED TP/SL ---
+	// Find nearest support and resistance levels
+	recentHighs := highs[len(highs)-20:]
+	recentLows := lows[len(lows)-20:]
+
+	// Find nearest resistance and support
+	nearestResistance := findNearestResistance(latestPrice, recentHighs)
+	nearestSupport := findNearestSupport(latestPrice, recentLows)
+
+	// Calculate actual price distances
+	resistanceDistance := math.Abs(nearestResistance - latestPrice)
+	supportDistance := math.Abs(latestPrice - nearestSupport)
+
+	// Calculate stop loss and take profit based on technical levels
+	var stopLossDistance, takeProfitDistance float64
+	if latestFastEMA > latestSlowEMA {
+		// BUY signal
+		stopLossDistance = supportDistance * 0.8      // Place SL below support
+		takeProfitDistance = resistanceDistance * 0.8 // Place TP below resistance
+	} else {
+		// SELL signal
+		stopLossDistance = resistanceDistance * 0.8 // Place SL above resistance
+		takeProfitDistance = supportDistance * 0.8  // Place TP above support
+	}
+
+	// Ensure minimum distances based on ATR
+	minDistance := atrValue * 0.5
+	if stopLossDistance < minDistance {
+		stopLossDistance = minDistance
+	}
+	if takeProfitDistance < minDistance {
+		takeProfitDistance = minDistance
+	}
 
 	// Calculate risk and reward percentages
 	riskPercent := (stopLossDistance / latestPrice) * 100
 	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
+	// Calculate actual risk:reward ratio
+	riskRewardRatio := takeProfitDistance / stopLossDistance
+
+	// Calculate position size based on risk
+	accountSize := 1000.0 // $1000 account
+	accountRisk := 0.02   // 2% risk per trade
+	riskAmount := accountSize * accountRisk
+	positionSize := riskAmount / (riskPercent / 100.0)
+	rewardAmount := riskAmount * riskRewardRatio
+
+	// Calculate signal confidence based on multiple factors
+	signalConfidence := 0.0
+
+	// EMA crossover confirmation (0-40%)
+	emaDiff := math.Abs((latestFastEMA - latestSlowEMA) / latestPrice * 100)
+	if emaDiff > 0.5 {
+		signalConfidence += 40.0
+	} else if emaDiff > 0.3 {
+		signalConfidence += 30.0
+	} else if emaDiff > 0.1 {
+		signalConfidence += 20.0
+	}
+
+	// Volume confirmation (0-30%)
+	volumeStrength := (latestVolume / latestVolumeMA) * 100
+	if volumeStrength > 150.0 {
+		signalConfidence += 30.0
+	} else if volumeStrength > 120.0 {
+		signalConfidence += 20.0
+	} else if volumeStrength > 100.0 {
+		signalConfidence += 10.0
+	}
+
+	// Trend strength confirmation (0-30%)
+	trendStrength := math.Abs((latestFastEMA - latestSlowEMA) / latestSlowEMA * 100)
+	if trendStrength > 1.0 {
+		signalConfidence += 30.0
+	} else if trendStrength > 0.5 {
+		signalConfidence += 20.0
+	} else if trendStrength > 0.2 {
+		signalConfidence += 10.0
+	}
+
+	// Cap confidence at 100%
+	if signalConfidence > 100.0 {
+		signalConfidence = 100.0
+	}
 
 	// Trading logic
 	if prevFastEMA <= prevSlowEMA && latestFastEMA > latestSlowEMA && latestVolume > 0 {
@@ -111,41 +211,49 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
 				"• Take Profit: %.5f (+%.2f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 10x\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 Technical Analysis:\n"+
+				"• Support Level: %.5f\n"+
+				"• Resistance Level: %.5f\n"+
 				"• Fast EMA (9): %.5f\n"+
 				"• Slow EMA (21): %.5f\n"+
-				"• Volume: %.2f\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
+				"💡 Trade Notes:\n"+
 				"• Bullish EMA crossover\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for trend following\n"+
+				"• SL placed below support\n"+
+				"• TP placed below resistance\n"+
+				"• Based on actual price levels\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry - (ATR * %.1f)\n"+
-				"• TP = Entry + (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
 				latestPrice+takeProfitDistance,
 				rewardPercent,
-				riskPercent,
-				rewardPercent,
+				riskRewardRatio,
+				leverage,
+				positionSize*100/accountSize,
+				signalConfidence,
+				nearestSupport,
+				nearestResistance,
 				latestFastEMA,
 				latestSlowEMA,
-				latestVolume,
 				atrValue,
-				1.0,
-				1.5,
-				100.0*riskPercent),
+				volatilityPercent,
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	} else if prevFastEMA >= prevSlowEMA && latestFastEMA < latestSlowEMA && latestVolume > 0 {
 		// Bearish crossover with volume
@@ -158,41 +266,49 @@ func (s *MACrossoverScalpingStrategy) AnalyzeShortTermMarket(candles map[string]
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
 				"• Take Profit: %.5f (-%.2f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 10x\n"+
+				"• Risk/Reward: 1:%.2f\n"+
+				"• Leverage: %.1fx\n"+
+				"• Position Size: %.2f%% of account\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 Technical Analysis:\n"+
+				"• Support Level: %.5f\n"+
+				"• Resistance Level: %.5f\n"+
 				"• Fast EMA (9): %.5f\n"+
 				"• Slow EMA (21): %.5f\n"+
-				"• Volume: %.2f\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n\n"+
+				"💡 Trade Notes:\n"+
 				"• Bearish EMA crossover\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for trend following\n"+
+				"• SL placed above resistance\n"+
+				"• TP placed above support\n"+
+				"• Based on actual price levels\n"+
 				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry + (ATR * %.1f)\n"+
-				"• TP = Entry - (SL Distance * %.2f)",
+				"• Account Size: $%.2f\n"+
+				"• Risk Amount: $%.2f\n"+
+				"• Reward Amount: $%.2f\n"+
+				"• Position Value: $%.2f",
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,
 				latestPrice-takeProfitDistance,
 				rewardPercent,
-				riskPercent,
-				rewardPercent,
+				riskRewardRatio,
+				leverage,
+				positionSize*100/accountSize,
+				signalConfidence,
+				nearestSupport,
+				nearestResistance,
 				latestFastEMA,
 				latestSlowEMA,
-				latestVolume,
 				atrValue,
-				1.0,
-				1.5,
-				100.0*riskPercent),
+				volatilityPercent,
+				accountSize,
+				riskAmount,
+				rewardAmount,
+				positionSize,
+			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
+			Leverage:   leverage,
 		}, nil
 	}
 

@@ -5,13 +5,50 @@ import (
 	"math"
 
 	"j-ai-trade/brokers/binance/repository"
+	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
 )
 
-// SupportResistanceScalping implements a scalping strategy based on support and resistance bounces
-func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
+type VolumeImbalanceScalpingStrategy struct {
+	name        string
+	description string
+}
+
+func NewVolumeImbalanceScalpingStrategy() *VolumeImbalanceScalpingStrategy {
+	return &VolumeImbalanceScalpingStrategy{
+		name:        "Volume Imbalance Scalping",
+		description: "Scalping strategy based on volume imbalance analysis and order flow",
+	}
+}
+
+func (s *VolumeImbalanceScalpingStrategy) GetName() string {
+	return s.name
+}
+
+func (s *VolumeImbalanceScalpingStrategy) GetDescription() string {
+	return s.description
+}
+
+func (s *VolumeImbalanceScalpingStrategy) IsSuitableForCondition(condition common.MarketCondition) bool {
+	switch condition {
+	case common.MarketHighVolatility, common.MarketVolatile,
+		common.MarketBreakout, common.MarketBreakoutUp, common.MarketBreakoutDown,
+		common.MarketAccumulation, common.MarketDistribution,
+		common.MarketReversal, common.MarketReversalUp, common.MarketReversalDown:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *VolumeImbalanceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.Candle) (*strategies.Signal, error) {
+	return VolumeImbalanceScalping(candles["5m"])
+}
+
+// VolumeImbalanceScalping implements a scalping strategy based on volume imbalance analysis
+func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
 	// Convert to float64 arrays
 	closes := make([]float64, len(candles5m))
 	highs := make([]float64, len(candles5m))
@@ -37,6 +74,7 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 
 	// Calculate Volume Profile
 	volumeMA := talib.Sma(volumes, 20)
+	volumeEMA := talib.Ema(volumes, 20)
 
 	// Calculate RSI for additional confirmation
 	rsi := talib.Rsi(closes, 14)
@@ -45,25 +83,22 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 	latestPrice := closes[len(closes)-1]
 	latestVolume := volumes[len(volumes)-1]
 	latestVolumeMA := volumeMA[len(volumeMA)-1]
+	latestVolumeEMA := volumeEMA[len(volumeEMA)-1]
 	latestEMA20 := ema20[len(ema20)-1]
 	latestEMA50 := ema50[len(ema50)-1]
 	latestRSI := rsi[len(rsi)-1]
 
 	// Calculate market metrics
 	volumeStrength := (latestVolume / latestVolumeMA) * 100
+	volumeTrend := (latestVolumeEMA / latestVolumeMA) * 100
 	priceVsEMA20 := ((latestPrice - latestEMA20) / latestEMA20) * 100
 	volatilityRatio := atrValue / latestPrice * 100
 
-	// Find support and resistance levels
-	supportLevels := findSupportLevels(lows, 20)
-	resistanceLevels := findResistanceLevels(highs, 20)
+	// Calculate volume imbalance
+	volumeImbalance := calculateVolumeImbalance(closes, volumes, 5)
 
-	// Find nearest support and resistance
-	nearestSupport := findNearestSupport(latestPrice, supportLevels)
-	nearestResistance := findNearestResistance(latestPrice, resistanceLevels)
-
-	// Calculate leverage based on volatility and price position
-	leverage := 3.0 // Default for S/R trading
+	// Calculate leverage based on volatility and volume imbalance
+	leverage := 3.0 // Default for volume imbalance trading
 	if volatilityRatio > 3.0 {
 		leverage = 2.0
 	} else if volatilityRatio > 2.0 {
@@ -74,11 +109,9 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 		leverage = 4.0
 	}
 
-	// Adjust leverage based on distance to S/R levels
-	distanceToSupport := (latestPrice - nearestSupport) / latestPrice * 100
-	distanceToResistance := (nearestResistance - latestPrice) / latestPrice * 100
-	if distanceToSupport < 0.5 || distanceToResistance < 0.5 {
-		leverage *= 0.8 // Reduce leverage near S/R levels
+	// Adjust leverage based on volume imbalance
+	if math.Abs(volumeImbalance) > 2.0 {
+		leverage *= 0.8 // Reduce leverage on extreme volume imbalance
 	}
 
 	// Cap maximum leverage
@@ -86,7 +119,7 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 		leverage = 5.0
 	}
 
-	// Calculate stop loss and take profit based on S/R levels
+	// Calculate stop loss and take profit based on volume imbalance
 	stopLossDistance := math.Max(atrValue*1.2, latestPrice*0.01) // Minimum 1% stop loss
 	takeProfitDistance := math.Max(atrValue*2.0, stopLossDistance*1.5)
 
@@ -97,11 +130,11 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 	positionSize := riskAmount / (stopLossDistance / latestPrice)
 	rewardAmount := riskAmount * (takeProfitDistance / stopLossDistance)
 
-	// Trading logic with improved S/R analysis
-	if latestPrice > nearestSupport && // Price above support
-		latestPrice < nearestResistance && // Price below resistance
+	// Trading logic with improved volume imbalance analysis
+	if volumeImbalance > 1.5 && // Strong buying pressure
+		volumeStrength > 150 && // Above average volume
+		volumeTrend > 110 && // Increasing volume trend
 		latestRSI < 60 && // Not overbought
-		volumeStrength > 120 && // Above average volume
 		priceVsEMA20 > -1.0 && // Price near or above EMA20
 		latestEMA20 > latestEMA50 { // Uptrend confirmation
 
@@ -109,7 +142,7 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 S/R Scalping - BUY Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 Volume Imbalance - BUY Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -118,20 +151,18 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 				"• Leverage: %.1fx\n"+
 				"• Position Size: %.2f%% of account\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• Nearest Support: %.5f\n"+
-				"• Nearest Resistance: %.5f\n"+
-				"• Distance to Support: %.2f%%\n"+
-				"• Distance to Resistance: %.2f%%\n"+
+				"• Volume Imbalance: %.2f\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Volume Trend: %.2f%%\n"+
 				"• RSI: %.2f\n"+
 				"• EMA20: %.5f\n"+
 				"• EMA50: %.5f\n"+
-				"• Volume Strength: %.2f%%\n"+
 				"• Price vs EMA20: %.2f%%\n"+
 				"• Volatility Ratio: %.2f%%\n"+
 				"• ATR: %.6f\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Support bounce setup\n"+
-				"• Volume and trend support\n"+
+				"• Volume imbalance breakout setup\n"+
+				"• Strong buying pressure\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
@@ -145,14 +176,12 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 				takeProfitDistance/stopLossDistance,
 				leverage,
 				positionSize*100/accountSize,
-				nearestSupport,
-				nearestResistance,
-				distanceToSupport,
-				distanceToResistance,
+				volumeImbalance,
+				volumeStrength,
+				volumeTrend,
 				latestRSI,
 				latestEMA20,
 				latestEMA50,
-				volumeStrength,
 				priceVsEMA20,
 				volatilityRatio,
 				atrValue,
@@ -165,10 +194,10 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 			TakeProfit: latestPrice + takeProfitDistance,
 			Leverage:   leverage,
 		}, nil
-	} else if latestPrice < nearestResistance && // Price below resistance
-		latestPrice > nearestSupport && // Price above support
+	} else if volumeImbalance < -1.5 && // Strong selling pressure
+		volumeStrength > 150 && // Above average volume
+		volumeTrend > 110 && // Increasing volume trend
 		latestRSI > 40 && // Not oversold
-		volumeStrength > 120 && // Above average volume
 		priceVsEMA20 < 1.0 && // Price near or below EMA20
 		latestEMA20 < latestEMA50 { // Downtrend confirmation
 
@@ -176,7 +205,7 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 S/R Scalping - SELL Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 Volume Imbalance - SELL Signal ADA/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
@@ -185,20 +214,18 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 				"• Leverage: %.1fx\n"+
 				"• Position Size: %.2f%% of account\n\n"+
 				"📈 Technical Analysis:\n"+
-				"• Nearest Support: %.5f\n"+
-				"• Nearest Resistance: %.5f\n"+
-				"• Distance to Support: %.2f%%\n"+
-				"• Distance to Resistance: %.2f%%\n"+
+				"• Volume Imbalance: %.2f\n"+
+				"• Volume Strength: %.2f%%\n"+
+				"• Volume Trend: %.2f%%\n"+
 				"• RSI: %.2f\n"+
 				"• EMA20: %.5f\n"+
 				"• EMA50: %.5f\n"+
-				"• Volume Strength: %.2f%%\n"+
 				"• Price vs EMA20: %.2f%%\n"+
 				"• Volatility Ratio: %.2f%%\n"+
 				"• ATR: %.6f\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Resistance rejection setup\n"+
-				"• Volume and trend support\n"+
+				"• Volume imbalance breakdown setup\n"+
+				"• Strong selling pressure\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
@@ -212,14 +239,12 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 				takeProfitDistance/stopLossDistance,
 				leverage,
 				positionSize*100/accountSize,
-				nearestSupport,
-				nearestResistance,
-				distanceToSupport,
-				distanceToResistance,
+				volumeImbalance,
+				volumeStrength,
+				volumeTrend,
 				latestRSI,
 				latestEMA20,
 				latestEMA50,
-				volumeStrength,
 				priceVsEMA20,
 				volatilityRatio,
 				atrValue,
@@ -237,4 +262,24 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 	return nil, nil
 }
 
-// Remove duplicate helper functions since they are now in helpers.go
+// Helper function to calculate volume imbalance
+func calculateVolumeImbalance(prices, volumes []float64, lookback int) float64 {
+	if len(prices) < lookback || len(volumes) < lookback {
+		return 0
+	}
+
+	var buyVolume, sellVolume float64
+	for i := len(prices) - lookback; i < len(prices); i++ {
+		if prices[i] > prices[i-1] {
+			buyVolume += volumes[i]
+		} else if prices[i] < prices[i-1] {
+			sellVolume += volumes[i]
+		}
+	}
+
+	if sellVolume == 0 {
+		return 2.0 // Maximum imbalance
+	}
+
+	return buyVolume / sellVolume
+}

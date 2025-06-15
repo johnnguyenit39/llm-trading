@@ -317,23 +317,4 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	return nil, nil
 }
 
-// Helper functions for finding support and resistance
-func findNearestResistance(currentPrice float64, highs []float64) float64 {
-	var nearest float64 = currentPrice * 1.1 // Default 10% above
-	for _, high := range highs {
-		if high > currentPrice && high < nearest {
-			nearest = high
-		}
-	}
-	return nearest
-}
-
-func findNearestSupport(currentPrice float64, lows []float64) float64 {
-	var nearest float64 = currentPrice * 0.9 // Default 10% below
-	for _, low := range lows {
-		if low < currentPrice && low > nearest {
-			nearest = low
-		}
-	}
-	return nearest
-}
+// Remove duplicate helper functions since they are now in helpers.go

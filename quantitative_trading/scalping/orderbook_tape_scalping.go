@@ -3,153 +3,118 @@ package scalping
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"j-ai-trade/brokers/binance/repository"
+	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
 )
 
-// OrderBookTapeScalping implements a scalping strategy based on order book and tape reading
-func OrderBookTapeScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
-	// Convert candle data to float64 arrays
-	closes := make([]float64, len(candles5m))
-	volumes := make([]float64, len(candles5m))
-	for i, candle := range candles5m {
+// OrderbookTapeScalping implements a scalping strategy based on orderbook tape analysis
+func OrderbookTapeScalping(candles []repository.Candle) (*strategies.Signal, error) {
+	if len(candles) < 20 {
+		return nil, nil
+	}
+
+	// Convert candles to float64 arrays
+	closes := make([]float64, len(candles))
+	highs := make([]float64, len(candles))
+	lows := make([]float64, len(candles))
+	volumes := make([]float64, len(candles))
+
+	for i, candle := range candles {
 		closes[i] = candle.Close
+		highs[i] = candle.High
+		lows[i] = candle.Low
 		volumes[i] = candle.Volume
 	}
 
-	// Calculate volume moving average
-	volumeMA := talib.Sma(volumes, 20)
-
-	// Calculate bid/ask ratio (simplified for example)
-	bidAskRatio := make([]float64, len(candles5m))
-	for i := range bidAskRatio {
-		bidAskRatio[i] = 1.0 + (float64(i%3) * 0.2) // Example ratio calculation
-	}
-
-	// Calculate ATR for stop loss
-	atr := talib.Atr(
-		make([]float64, len(candles5m)),
-		make([]float64, len(candles5m)),
-		closes,
-		14,
-	)
-	atrValue := atr[len(atr)-1]
+	// Calculate indicators
+	atr := talib.Atr(highs, lows, closes, 14)
+	ema20 := talib.Ema(closes, 20)
+	ema50 := talib.Ema(closes, 50)
+	rsi := talib.Rsi(closes, 14)
 
 	// Get latest values
 	latestPrice := closes[len(closes)-1]
 	latestVolume := volumes[len(volumes)-1]
-	latestVolumeMA := volumeMA[len(volumeMA)-1]
-	latestBidAskRatio := bidAskRatio[len(bidAskRatio)-1]
+	latestATR := atr[len(atr)-1]
+	latestEMA20 := ema20[len(ema20)-1]
+	latestEMA50 := ema50[len(ema50)-1]
+	latestRSI := rsi[len(rsi)-1]
 
-	// Calculate maximum allowed stop loss (2% of price)
-	maxStopLossPercent := 0.02
-	maxStopLossDistance := latestPrice * maxStopLossPercent
+	// Calculate market metrics
+	volumeStrength := latestVolume / talib.Sma(volumes, 20)[len(volumes)-1]
+	volatilityRatio := latestATR / talib.Sma(atr, 20)[len(atr)-1]
+	trendStrength := math.Abs(latestEMA20-latestEMA50) / latestATR
 
-	// Use the smaller of ATR-based stop loss or max percentage stop loss
-	stopLossDistance := math.Min(atrValue*1.0, maxStopLossDistance)
-	takeProfitDistance := stopLossDistance * 1.5 // 1:1.5 risk-reward ratio
-
-	// Calculate risk and reward percentages
-	riskPercent := (stopLossDistance / latestPrice) * 100
-	rewardPercent := (takeProfitDistance / latestPrice) * 100
+	// Calculate stop loss and take profit distances
+	stopLossDistance := latestATR * 1.5
+	takeProfitDistance := latestATR * 2.0
 
 	// Trading logic
-	if latestBidAskRatio > 1.5 && latestVolume > latestVolumeMA*1.5 {
-		// Strong buying pressure with high volume
-		return &strategies.Signal{
-			Type:  "BUY",
-			Price: latestPrice,
-			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 Order Book & Tape Reading - BUY Signal ADA/USDT\n\n"+
-				"📊 Trade Setup:\n"+
-				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (-%.2f%%)\n"+
-				"• Take Profit: %.5f (+%.2f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 5x\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
-				"• Strong buying pressure (Bid/Ask ratio: %.2f)\n"+
-				"• High volume (%.2f vs MA: %.2f)\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Order book imbalance detected\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for high liquidity conditions\n"+
-				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry - (ATR * %.1f)\n"+
-				"• TP = Entry + (SL Distance * %.2f)",
-				latestPrice,
-				latestPrice-stopLossDistance,
-				riskPercent,
-				latestPrice+takeProfitDistance,
-				rewardPercent,
-				riskPercent,
-				rewardPercent,
-				latestBidAskRatio,
-				latestVolume,
-				latestVolumeMA,
-				atrValue,
-				1.0,
-				1.5,
-				100.0),
-			StopLoss:   latestPrice - stopLossDistance,
-			TakeProfit: latestPrice + takeProfitDistance,
-		}, nil
-	} else if latestBidAskRatio < 0.67 && latestVolume > latestVolumeMA*1.5 {
-		// Strong selling pressure with high volume
-		return &strategies.Signal{
-			Type:  "SELL",
-			Price: latestPrice,
-			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 Order Book & Tape Reading - SELL Signal ADA/USDT\n\n"+
-				"📊 Trade Setup:\n"+
-				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f (+%.2f%%)\n"+
-				"• Take Profit: %.5f (-%.2f%%)\n"+
-				"• Risk/Reward: 1:1.5\n"+
-				"• Leverage: 5x\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 P&L Projection:\n"+
-				"• Risk: -%.2f%%\n"+
-				"• Reward: +%.2f%%\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
-				"📈 Signal Details:\n"+
-				"• Strong selling pressure (Bid/Ask ratio: %.2f)\n"+
-				"• High volume (%.2f vs MA: %.2f)\n"+
-				"• ATR: %.6f\n\n"+
-				"💡 Strategy Notes:\n"+
-				"• Order book imbalance detected\n"+
-				"• Using ATR for dynamic stop loss\n"+
-				"• Suitable for high liquidity conditions\n"+
-				"• Max risk per trade: 2%%\n"+
-				"• SL = Entry + (ATR * %.1f)\n"+
-				"• TP = Entry - (SL Distance * %.2f)",
-				latestPrice,
-				latestPrice+stopLossDistance,
-				riskPercent,
-				latestPrice-takeProfitDistance,
-				rewardPercent,
-				riskPercent,
-				rewardPercent,
-				latestBidAskRatio,
-				latestVolume,
-				latestVolumeMA,
-				atrValue,
-				1.0,
-				1.5,
-				100.0),
-			StopLoss:   latestPrice + stopLossDistance,
-			TakeProfit: latestPrice - takeProfitDistance,
-		}, nil
+	if latestPrice > latestEMA20 && latestEMA20 > latestEMA50 && latestRSI < 70 {
+		// Strong buy signal
+		if volumeStrength > 1.2 && trendStrength > 0.5 && volatilityRatio < 1.5 {
+			return &strategies.Signal{
+				Type:        "BUY",
+				Price:       latestPrice,
+				Time:        time.Now(),
+				StopLoss:    latestPrice - stopLossDistance,
+				TakeProfit:  latestPrice + takeProfitDistance,
+				Description: fmt.Sprintf("Strong buy signal with volume strength %.2f, trend strength %.2f, and volatility ratio %.2f", volumeStrength, trendStrength, volatilityRatio),
+			}, nil
+		}
+	} else if latestPrice < latestEMA20 && latestEMA20 < latestEMA50 && latestRSI > 30 {
+		// Strong sell signal
+		if volumeStrength > 1.2 && trendStrength > 0.5 && volatilityRatio < 1.5 {
+			return &strategies.Signal{
+				Type:        "SELL",
+				Price:       latestPrice,
+				Time:        time.Now(),
+				StopLoss:    latestPrice + stopLossDistance,
+				TakeProfit:  latestPrice - takeProfitDistance,
+				Description: fmt.Sprintf("Strong sell signal with volume strength %.2f, trend strength %.2f, and volatility ratio %.2f", volumeStrength, trendStrength, volatilityRatio),
+			}, nil
+		}
 	}
 
 	return nil, nil
+}
+
+type OrderbookTapeScalpingStrategy struct {
+	name        string
+	description string
+}
+
+func NewOrderbookTapeScalpingStrategy() *OrderbookTapeScalpingStrategy {
+	return &OrderbookTapeScalpingStrategy{
+		name:        "Orderbook Tape Scalping",
+		description: "Scalping strategy based on orderbook tape analysis and order flow",
+	}
+}
+
+func (s *OrderbookTapeScalpingStrategy) GetName() string {
+	return s.name
+}
+
+func (s *OrderbookTapeScalpingStrategy) GetDescription() string {
+	return s.description
+}
+
+func (s *OrderbookTapeScalpingStrategy) IsSuitableForCondition(condition common.MarketCondition) bool {
+	switch condition {
+	case common.MarketHighVolatility, common.MarketVolatile,
+		common.MarketBreakout, common.MarketBreakoutUp, common.MarketBreakoutDown,
+		common.MarketReversal, common.MarketReversalUp, common.MarketReversalDown:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *OrderbookTapeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.Candle) (*strategies.Signal, error) {
+	return OrderbookTapeScalping(candles["5m"])
 }
