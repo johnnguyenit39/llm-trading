@@ -102,9 +102,9 @@ func (j *BinanceCandlesJob) handleSignal(signal *quantitativetrading.Signal, sym
 func (j *BinanceCandlesJob) Start() {
 	// Start all strategies for each symbol
 	for _, symbol := range j.symbols {
-		j.startRsiStrategy(symbol)
-		j.startMacdStrategy(symbol)
-		j.startHA1Strategy(symbol)
+		// j.startRsiStrategy(symbol)
+		// j.startMacdStrategy(symbol)
+		// j.startHA1Strategy(symbol)
 		j.startShortTermStrategy(symbol)
 	}
 
