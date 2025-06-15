@@ -85,7 +85,7 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 
 	// Buy Signal: RSI oversold + 1h trend confirmation
 	if latestRSI < s.oversoldThreshold && latestRSI1h < 50 {
-		strength := 0.7 // base confidence
+		strength := calculateSignalStrength(latestRSI, latestRSI1h, priceChange15m, priceChange1h, candles15m)
 		descExtra := ""
 
 		// RSI Extremes (0.1)
@@ -153,22 +153,23 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 			Time:       time.Now(),
 			Strategy:   s.GetName(),
 			Confidence: strength,
-			Description: fmt.Sprintf("🟢 RSI Strategy (SWING) Strong Buy Signal Detected! ADA/USDT %s\n\n"+
+			Description: fmt.Sprintf("🚀 RSI 15M-1H Strategy (SWING) - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n"+
+				"• Leverage: 5x\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
 				"• Risk/Reward: 1:2\n\n"+
 				"📊 Signal Details:\n"+
-				"• 15m RSI(14): %.2f (Oversold)\n"+
-				"• 1h RSI(14): %.2f (Trend Support)\n"+
-				"• 15m Price Change: %s\n"+
-				"• 1h Price Change: %s\n\n"+
+				"• RSI bullish divergence on 1H\n"+
+				"• RSI oversold on 15M\n"+
+				"• Current RSI 1H: %.1f\n"+
+				"• Current RSI 15M: %.1f\n\n"+
 				"💡 Additional Confirmation:%s",
 				signalConfidence.SetConfidenceIndicator(strength),
 				entryPrice,
@@ -177,17 +178,15 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 				strength*100,
 				riskPercent,
 				rewardPercent,
-				latestRSI,
 				latestRSI1h,
-				formatPercentage(priceChange15m),
-				formatPercentage(priceChange1h),
+				latestRSI,
 				descExtra),
 		}
 	}
 
 	// Sell Signal: RSI overbought + 1h trend confirmation
 	if latestRSI > s.overboughtThreshold && latestRSI1h > 50 {
-		strength := 0.7 // base confidence
+		strength := calculateSignalStrength(latestRSI, latestRSI1h, priceChange15m, priceChange1h, candles15m)
 		descExtra := ""
 
 		// RSI Extremes (0.1)
@@ -255,22 +254,23 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 			Time:       time.Now(),
 			Strategy:   s.GetName(),
 			Confidence: strength,
-			Description: fmt.Sprintf("🔴 RSI Strategy (SWING) Strong Sell Signal Detected! ADA/USDT %s\n\n"+
+			Description: fmt.Sprintf("🔻RSI 15M-1H Strategy (SWING) - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n"+
+				"• Leverage: 5x\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
 				"• Risk/Reward: 1:2\n\n"+
 				"📊 Signal Details:\n"+
-				"• 15m RSI(14): %.2f (Overbought)\n"+
-				"• 1h RSI(14): %.2f (Trend Resistance)\n"+
-				"• 15m Price Change: %s\n"+
-				"• 1h Price Change: %s\n\n"+
+				"• RSI bearish divergence on 1H\n"+
+				"• RSI overbought on 15M\n"+
+				"• Current RSI 1H: %.1f\n"+
+				"• Current RSI 15M: %.1f\n\n"+
 				"💡 Additional Confirmation:%s",
 				signalConfidence.SetConfidenceIndicator(strength),
 				entryPrice,
@@ -279,10 +279,8 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 				strength*100,
 				riskPercent,
 				rewardPercent,
-				latestRSI,
 				latestRSI1h,
-				formatPercentage(priceChange15m),
-				formatPercentage(priceChange1h),
+				latestRSI,
 				descExtra),
 		}
 	}

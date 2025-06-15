@@ -170,6 +170,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n"+
+				"• Leverage: 5x\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
@@ -270,6 +271,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n"+
+				"• Leverage: 5x\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+

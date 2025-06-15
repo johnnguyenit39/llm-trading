@@ -100,7 +100,9 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
+				"• Risk/Reward: 1:1.5\n"+
+				"• Leverage: 3x\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
@@ -125,7 +127,8 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				rewardPercent,
 				latestRSI,
 				prevRSI,
-				atrValue),
+				atrValue,
+				riskPercent),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
 		}, nil
@@ -140,7 +143,9 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
+				"• Risk/Reward: 1:1.5\n"+
+				"• Leverage: 3x\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
@@ -165,7 +170,8 @@ func (s *RSIScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]reposi
 				rewardPercent,
 				latestRSI,
 				prevRSI,
-				atrValue),
+				atrValue,
+				riskPercent),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
 		}, nil

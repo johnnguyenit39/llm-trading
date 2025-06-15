@@ -153,23 +153,23 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🚀 MACD Strategy (SWING) - BUY Signal ADA/USDT %s\n\n"+
+			Description: fmt.Sprintf("🚀 MACD 15M-1H Strategy (SWING) - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n"+
+				"• Leverage: 5x\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
 				"• Risk/Reward: 1:2\n\n"+
 				"📊 Signal Details:\n"+
-				"• MACD bullish crossover on 15m\n"+
-				"• 1h trend confirmation\n"+
-				"• Current MACD: %.6f\n"+
-				"• Current Signal: %.6f\n"+
-				"• MACD Histogram: %.6f\n\n"+
+				"• MACD bullish divergence on 1H\n"+
+				"• MACD bullish crossover on 15M\n"+
+				"• Current MACD 1H: %.6f\n"+
+				"• Current MACD 15M: %.6f\n\n"+
 				"💡 Additional Confirmation:%s",
 				signalConfidence.SetConfidenceIndicator(confidence),
 				latestCandle.Close, stopLoss, riskPercent,
@@ -177,8 +177,7 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 				confidence*100,
 				riskPercent,
 				rewardPercent,
-				latestMACD, latestSignal,
-				latestMACD-latestSignal,
+				latestMACD1h, latestMACD,
 				descExtra),
 		}
 	}
@@ -232,23 +231,23 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
 			Confidence: confidence,
-			Description: fmt.Sprintf("🔻 MACD Strategy (SWING) - SELL Signal ADA/USDT %s\n\n"+
+			Description: fmt.Sprintf("🔻MACD 15M-1H Strategy (SWING) - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n"+
+				"• Leverage: 5x\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
 				"• Risk/Reward: 1:2\n\n"+
 				"📊 Signal Details:\n"+
-				"• MACD bearish crossover on 15m\n"+
-				"• 1h trend confirmation\n"+
-				"• Current MACD: %.6f\n"+
-				"• Current Signal: %.6f\n"+
-				"• MACD Histogram: %.6f\n\n"+
+				"• MACD bearish divergence on 1H\n"+
+				"• MACD bearish crossover on 15M\n"+
+				"• Current MACD 1H: %.6f\n"+
+				"• Current MACD 15M: %.6f\n\n"+
 				"💡 Additional Confirmation:%s",
 				signalConfidence.SetConfidenceIndicator(confidence),
 				latestCandle.Close, stopLoss, riskPercent,
@@ -256,8 +255,7 @@ func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Si
 				confidence*100,
 				riskPercent,
 				rewardPercent,
-				latestMACD, latestSignal,
-				latestMACD-latestSignal,
+				latestMACD1h, latestMACD,
 				descExtra),
 		}
 	}

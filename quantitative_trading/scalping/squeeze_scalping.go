@@ -115,7 +115,9 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
+				"• Risk/Reward: 1:1.5\n"+
+				"• Leverage: 5x\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
@@ -144,6 +146,13 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 				latestBBLower,
 				latestKCUpper,
 				latestKCLower,
+				latestATR,
+				riskPercent,
+				rewardPercent,
+				latestBBUpper,
+				latestBBLower,
+				latestKCUpper,
+				latestKCLower,
 				latestATR),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
@@ -159,7 +168,9 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
+				"• Risk/Reward: 1:1.5\n"+
+				"• Leverage: 5x\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
@@ -182,6 +193,13 @@ func (s *SqueezeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]re
 				riskPercent,
 				latestPrice-takeProfitDistance,
 				rewardPercent,
+				riskPercent,
+				rewardPercent,
+				latestBBUpper,
+				latestBBLower,
+				latestKCUpper,
+				latestKCLower,
+				latestATR,
 				riskPercent,
 				rewardPercent,
 				latestBBUpper,

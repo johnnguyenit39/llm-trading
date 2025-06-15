@@ -117,7 +117,9 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.1f%%)\n"+
 				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
+				"• Risk/Reward: 1:1.5\n"+
+				"• Leverage: 3x\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
@@ -146,6 +148,14 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				rangePercent,
 				latestVolume,
 				latestVolumeMA,
+				latestATR,
+				riskPercent,
+				rewardPercent,
+				latestLower,
+				latestRSI,
+				rangePercent,
+				latestVolume,
+				latestVolumeMA,
 				latestATR),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
@@ -161,7 +171,9 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.1f%%)\n"+
 				"• Take Profit: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:1.5\n\n"+
+				"• Risk/Reward: 1:1.5\n"+
+				"• Leverage: 3x\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 P&L Projection:\n"+
 				"• Risk: -%.2f%%\n"+
 				"• Reward: +%.2f%%\n"+
@@ -183,6 +195,14 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				riskPercent,
 				latestPrice-takeProfitDistance,
 				rewardPercent,
+				riskPercent,
+				rewardPercent,
+				latestUpper,
+				latestRSI,
+				rangePercent,
+				latestVolume,
+				latestVolumeMA,
+				latestATR,
 				riskPercent,
 				rewardPercent,
 				latestUpper,
