@@ -166,7 +166,7 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 Sideways Market Scalping - BUY Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 Sideways Market Scalping - BUY Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -189,6 +189,7 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -220,7 +221,7 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 Sideways Market Scalping - SELL Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 Sideways Market Scalping - SELL Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
@@ -243,6 +244,7 @@ func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[stri
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,

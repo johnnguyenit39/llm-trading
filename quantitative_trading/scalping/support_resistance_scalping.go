@@ -5,13 +5,48 @@ import (
 	"math"
 
 	"j-ai-trade/brokers/binance/repository"
+	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
 )
 
-// SupportResistanceScalping implements a scalping strategy based on support and resistance bounces
-func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
+type SupportResistanceScalpingStrategy struct {
+	strategies.BaseStrategy
+}
+
+func NewSupportResistanceScalpingStrategy() *SupportResistanceScalpingStrategy {
+	return &SupportResistanceScalpingStrategy{
+		BaseStrategy: strategies.BaseStrategy{
+			Name: "Support/Resistance Scalping",
+		},
+	}
+}
+
+func (s *SupportResistanceScalpingStrategy) GetDescription() string {
+	return "Scalping strategy based on support and resistance bounces. Best for ranging markets with clear S/R levels."
+}
+
+func (s *SupportResistanceScalpingStrategy) IsSuitableForCondition(condition common.MarketCondition) bool {
+	switch condition {
+	case common.MarketRanging:
+		return true
+	case common.MarketSideways:
+		return true
+	case common.MarketLowVolatility:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *SupportResistanceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.Candle) (*strategies.Signal, error) {
+	// Get 5m candles for quick signals
+	candles5m := candles["5m"]
+	if len(candles5m) < 20 {
+		return nil, nil
+	}
+
 	// Convert to float64 arrays
 	closes := make([]float64, len(candles5m))
 	highs := make([]float64, len(candles5m))
@@ -132,7 +167,7 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 S/R Scalping - BUY Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 S/R Scalping - BUY Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -160,6 +195,7 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 				"• Risk Amount: $%.2f\n"+
 				"• Reward Amount: $%.2f\n"+
 				"• Position Value: $%.2f",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice-stopLossDistance,
 				(stopLossDistance/latestPrice)*100,
@@ -199,7 +235,7 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 S/R Scalping - SELL Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 S/R Scalping - SELL Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
@@ -227,6 +263,7 @@ func SupportResistanceScalping(candles5m []repository.Candle) (*strategies.Signa
 				"• Risk Amount: $%.2f\n"+
 				"• Reward Amount: $%.2f\n"+
 				"• Position Value: $%.2f",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice+stopLossDistance,
 				(stopLossDistance/latestPrice)*100,

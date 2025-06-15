@@ -218,6 +218,8 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	accountRisk := 0.02 // 2% risk per trade
 	positionSize := accountRisk / (riskPercent / 100.0)
 
+	symbol := candles5m[len(candles5m)-1].Symbol
+
 	// Trading logic
 	if latestOBV > latestOBVMA && prevOBV <= prevOBVMA {
 		// OBV crosses above its MA - accumulation pattern
@@ -226,7 +228,7 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
 			Description: fmt.Sprintf(
-				"🚀 Accumulation Scalping - BUY Signal ADA/USDT\n\n"+
+				"🚀 Accumulation Scalping - BUY Signal %s/USDT\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
 					"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -249,6 +251,7 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 					"• Max risk per trade: 2%%\n"+
 					"• Risk: $%.2f\n"+
 					"• Reward: $%.2f",
+				symbol,
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -278,7 +281,7 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
 			Description: fmt.Sprintf(
-				"🔻 Accumulation Scalping - SELL Signal ADA/USDT\n\n"+
+				"🔻 Accumulation Scalping - SELL Signal %s/USDT\n\n"+
 					"📊 Trade Setup:\n"+
 					"• Entry Price: %.5f\n"+
 					"• Stop Loss: %.5f (+%.2f%%)\n"+
@@ -297,6 +300,7 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 					"• TP placed above support\n"+
 					"• Based on actual price levels\n"+
 					"• Max risk per trade: 2%%",
+				symbol,
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,

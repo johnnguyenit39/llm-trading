@@ -153,13 +153,13 @@ func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal,
 	signalConfidence := 100.0 - riskPercent
 
 	// Trading logic
-	if volumeImbalance > 1.5 && volumeMA[len(volumeMA)-1] > 150 {
-		// Strong buying pressure
+	if volumeImbalance > 2.0 && latestPrice > closes[len(closes)-2] && volumeStrength > 1.5 {
+		// Strong bullish volume imbalance
 		return &strategies.Signal{
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 Volume Imbalance - BUY Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 Volume Imbalance Scalping - BUY Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -170,14 +170,16 @@ func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal,
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
 				"• Volume Imbalance: %.2f\n"+
-				"• Volume Strength: %.2f%%\n"+
-				"• ATR: %.6f (%.2f%% volatility)\n\n"+
+				"• Price Change: %.2f%%\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n"+
+				"• Volume Strength: %.2f%%\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Strong buying pressure\n"+
+				"• Strong bullish volume\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -188,9 +190,10 @@ func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal,
 				positionSize*100/accountSize,
 				signalConfidence,
 				volumeImbalance,
-				volumeMA[len(volumeMA)-1],
+				latestPrice-closes[len(closes)-2],
 				latestATR,
-				latestATR/latestPrice*100,
+				volatilityPercent,
+				volumeStrength,
 				accountSize,
 				riskAmount,
 				expectedMove,
@@ -199,13 +202,13 @@ func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal,
 			TakeProfit: latestPrice + takeProfitDistance,
 			Leverage:   leverage,
 		}, nil
-	} else if volumeImbalance < -1.5 && volumeStrength > 150 {
-		// Strong selling pressure
+	} else if volumeImbalance < -2.0 && latestPrice < closes[len(closes)-2] && volumeStrength > 1.5 {
+		// Strong bearish volume imbalance
 		return &strategies.Signal{
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 Volume Imbalance - SELL Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 Volume Imbalance Scalping - SELL Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
@@ -216,14 +219,16 @@ func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal,
 				"• Signal Confidence: %.1f%%\n\n"+
 				"📈 Technical Analysis:\n"+
 				"• Volume Imbalance: %.2f\n"+
-				"• Volume Strength: %.2f%%\n"+
-				"• ATR: %.6f (%.2f%% volatility)\n\n"+
+				"• Price Change: %.2f%%\n"+
+				"• ATR: %.6f (%.2f%% volatility)\n"+
+				"• Volume Strength: %.2f%%\n\n"+
 				"💡 Trade Notes:\n"+
-				"• Strong selling pressure\n"+
+				"• Strong bearish volume\n"+
 				"• Max risk per trade: 2%%\n"+
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,
@@ -234,9 +239,10 @@ func VolumeImbalanceScalping(candles5m []repository.Candle) (*strategies.Signal,
 				positionSize*100/accountSize,
 				signalConfidence,
 				volumeImbalance,
-				volumeStrength,
+				latestPrice-closes[len(closes)-2],
 				latestATR,
 				volatilityPercent,
+				volumeStrength,
 				accountSize,
 				riskAmount,
 				expectedMove,

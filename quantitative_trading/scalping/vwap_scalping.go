@@ -156,7 +156,7 @@ func VWAPScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 VWAP Scalping - BUY Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 VWAP Scalping - BUY Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -176,6 +176,7 @@ func VWAPScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -204,7 +205,7 @@ func VWAPScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 VWAP Scalping - SELL Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 VWAP Scalping - SELL Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
@@ -224,6 +225,7 @@ func VWAPScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,

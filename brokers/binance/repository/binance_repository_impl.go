@@ -61,6 +61,7 @@ func (r *binanceRepositoryImpl) FetchCandles(ctx context.Context, symbol string,
 		volume, _ := strconv.ParseFloat(raw[5].(string), 64)
 
 		candles = append(candles, Candle{
+			Symbol:    symbol,
 			OpenTime:  time.Unix(0, openTime*int64(time.Millisecond)),
 			Open:      open,
 			High:      high,

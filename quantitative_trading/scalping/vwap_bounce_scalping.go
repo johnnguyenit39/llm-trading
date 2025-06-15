@@ -5,13 +5,48 @@ import (
 	"math"
 
 	"j-ai-trade/brokers/binance/repository"
+	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
 )
 
-// VWAPBounceScalping implements a scalping strategy based on VWAP bounces
-func VWAPBounceScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
+type VWAPBounceScalpingStrategy struct {
+	strategies.BaseStrategy
+}
+
+func NewVWAPBounceScalpingStrategy() *VWAPBounceScalpingStrategy {
+	return &VWAPBounceScalpingStrategy{
+		BaseStrategy: strategies.BaseStrategy{
+			Name: "VWAP Bounce Scalping",
+		},
+	}
+}
+
+func (s *VWAPBounceScalpingStrategy) GetDescription() string {
+	return "Scalping strategy based on VWAP bounces and rejections. Best for ranging markets with clear VWAP levels."
+}
+
+func (s *VWAPBounceScalpingStrategy) IsSuitableForCondition(condition common.MarketCondition) bool {
+	switch condition {
+	case common.MarketRanging:
+		return true
+	case common.MarketSideways:
+		return true
+	case common.MarketLowVolatility:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *VWAPBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.Candle) (*strategies.Signal, error) {
+	// Get 5m candles for quick signals
+	candles5m := candles["5m"]
+	if len(candles5m) < 20 {
+		return nil, nil
+	}
+
 	// Convert candle data to float64 arrays
 	closes := make([]float64, len(candles5m))
 	volumes := make([]float64, len(candles5m))
@@ -122,7 +157,7 @@ func VWAPBounceScalping(candles5m []repository.Candle) (*strategies.Signal, erro
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 VWAP Bounce - BUY Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 VWAP Bounce - BUY Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -142,6 +177,7 @@ func VWAPBounceScalping(candles5m []repository.Candle) (*strategies.Signal, erro
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -170,7 +206,7 @@ func VWAPBounceScalping(candles5m []repository.Candle) (*strategies.Signal, erro
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 VWAP Bounce - SELL Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 VWAP Bounce - SELL Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
@@ -190,6 +226,7 @@ func VWAPBounceScalping(candles5m []repository.Candle) (*strategies.Signal, erro
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,

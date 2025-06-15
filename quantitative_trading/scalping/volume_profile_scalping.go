@@ -168,7 +168,7 @@ func VolumeProfileScalping(candles5m []repository.Candle) (*strategies.Signal, e
 			Type:  "BUY",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🚀 Volume Profile - BUY Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🚀 Volume Profile - BUY Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (-%.2f%%)\n"+
@@ -192,6 +192,7 @@ func VolumeProfileScalping(candles5m []repository.Candle) (*strategies.Signal, e
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -228,7 +229,7 @@ func VolumeProfileScalping(candles5m []repository.Candle) (*strategies.Signal, e
 			Type:  "SELL",
 			Price: latestPrice,
 			Time:  candles5m[len(candles5m)-1].OpenTime,
-			Description: fmt.Sprintf("🔻 Volume Profile - SELL Signal ADA/USDT\n\n"+
+			Description: fmt.Sprintf("🔻 Volume Profile - SELL Signal %s/USDT\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
 				"• Stop Loss: %.5f (+%.2f%%)\n"+
@@ -252,6 +253,7 @@ func VolumeProfileScalping(candles5m []repository.Candle) (*strategies.Signal, e
 				"• Account Size: $%.2f\n"+
 				"• Risk Amount: $%.2f\n"+
 				"• Expected Move: %.2f%%",
+				candles5m[len(candles5m)-1].Symbol,
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,
