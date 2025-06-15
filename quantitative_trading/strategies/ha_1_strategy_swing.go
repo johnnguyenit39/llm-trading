@@ -110,6 +110,10 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 		stopLoss := findSupportLevel(candles4h)
 		takeProfit := latestCandle.Close * 1.02 // 2% above entry
 
+		// Calculate risk and reward percentages
+		riskPercent := ((latestCandle.Close - stopLoss) / latestCandle.Close) * 100
+		rewardPercent := ((takeProfit - latestCandle.Close) / latestCandle.Close) * 100
+
 		confidence := 0.6 // Giảm base confidence xuống 0.6
 		descExtra := ""
 
@@ -163,11 +167,15 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 			Description: fmt.Sprintf("🚀 HA-1: MACD + Trendline Strategy (SWING) - BUY Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f\n"+
-				"• Take Profit: %.5f (+2.0%%)\n"+
+				"• Stop Loss: %.5f (-%.1f%%)\n"+
+				"• Take Profit: %.5f (+%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:2\n\n"+
+				"📊 Signal Details:\n"+
 				"• MACD bullish divergence on 1D\n"+
 				"• Trendline break on 4H\n"+
 				"• Current MACD 1D: %.6f\n"+
@@ -175,8 +183,11 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 				"• Current MACD 1H: %.6f\n\n"+
 				"💡 Additional Confirmation:%s",
 				signalConfidence.SetConfidenceIndicator(confidence),
-				latestCandle.Close, stopLoss, takeProfit,
+				latestCandle.Close, stopLoss, riskPercent,
+				takeProfit, rewardPercent,
 				confidence*100,
+				riskPercent,
+				rewardPercent,
 				latestMACD1d, latestMACD4h, latestMACD1h,
 				descExtra),
 		}
@@ -198,6 +209,10 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 		latestCandle := candles4h[len(candles4h)-1]
 		stopLoss := findResistanceLevel(candles4h)
 		takeProfit := latestCandle.Close * 0.98 // 2% below entry
+
+		// Calculate risk and reward percentages
+		riskPercent := ((stopLoss - latestCandle.Close) / latestCandle.Close) * 100
+		rewardPercent := ((latestCandle.Close - takeProfit) / latestCandle.Close) * 100
 
 		confidence := 0.6 // Giảm base confidence xuống 0.6
 		descExtra := ""
@@ -252,11 +267,15 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 			Description: fmt.Sprintf("🔻HA-1: MACD + Trendline Strategy (SWING) - SELL Signal %s\n\n"+
 				"📊 Trade Setup:\n"+
 				"• Entry Price: %.5f\n"+
-				"• Stop Loss: %.5f\n"+
-				"• Take Profit: %.5f (-2.0%%)\n"+
+				"• Stop Loss: %.5f (+%.1f%%)\n"+
+				"• Take Profit: %.5f (-%.1f%%)\n"+
 				"• Risk/Reward: 1:2\n"+
 				"• Signal Confidence: %.1f%%\n\n"+
-				"📈 Signal Details:\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:2\n\n"+
+				"📊 Signal Details:\n"+
 				"• MACD bearish divergence on 1D\n"+
 				"• Trendline break on 4H\n"+
 				"• Current MACD 1D: %.6f\n"+
@@ -264,8 +283,11 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.Candle) (*Signal, 
 				"• Current MACD 1H: %.6f\n\n"+
 				"💡 Additional Confirmation:%s",
 				signalConfidence.SetConfidenceIndicator(confidence),
-				latestCandle.Close, stopLoss, takeProfit,
+				latestCandle.Close, stopLoss, riskPercent,
+				takeProfit, rewardPercent,
 				confidence*100,
+				riskPercent,
+				rewardPercent,
 				latestMACD1d, latestMACD4h, latestMACD1h,
 				descExtra),
 		}

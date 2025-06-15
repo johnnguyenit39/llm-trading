@@ -141,6 +141,10 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 		takeProfit := entryPrice * (1 + s.tpPercentage/100)
 		stopLoss := entryPrice * (1 - s.slPercentage/100)
 
+		// Calculate risk and reward percentages
+		riskPercent := ((entryPrice - stopLoss) / entryPrice) * 100
+		rewardPercent := ((takeProfit - entryPrice) / entryPrice) * 100
+
 		tradingSignal = &Signal{
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
@@ -149,27 +153,34 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 			Time:       time.Now(),
 			Strategy:   s.GetName(),
 			Confidence: strength,
-			Description: fmt.Sprintf("🟢 RSI Strategy (SWING) Strong Buy Signal Detected! ADA/USDT %s\n"+
+			Description: fmt.Sprintf("🟢 RSI Strategy (SWING) Strong Buy Signal Detected! ADA/USDT %s\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.5f\n"+
+				"• Stop Loss: %.5f (-%.1f%%)\n"+
+				"• Take Profit: %.5f (+%.1f%%)\n"+
+				"• Risk/Reward: 1:2\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:2\n\n"+
+				"📊 Signal Details:\n"+
 				"• 15m RSI(14): %.2f (Oversold)\n"+
 				"• 1h RSI(14): %.2f (Trend Support)\n"+
 				"• 15m Price Change: %s\n"+
-				"• 1h Price Change: %s\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📊 Trade Setup:\n"+
-				"• Entry: %.5f\n"+
-				"• Take Profit: %.5f (+%.1f%%)\n"+
-				"• Stop Loss: %.5f (-%.1f%%)\n"+
-				"• Risk/Reward: 1:2\n\n"+
+				"• 1h Price Change: %s\n\n"+
 				"💡 Additional Confirmation:%s",
 				signalConfidence.SetConfidenceIndicator(strength),
+				entryPrice,
+				stopLoss, riskPercent,
+				takeProfit, rewardPercent,
+				strength*100,
+				riskPercent,
+				rewardPercent,
 				latestRSI,
 				latestRSI1h,
 				formatPercentage(priceChange15m),
 				formatPercentage(priceChange1h),
-				strength*100,
-				entryPrice,
-				takeProfit, s.tpPercentage,
-				stopLoss, s.slPercentage,
 				descExtra),
 		}
 	}
@@ -232,6 +243,10 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 		takeProfit := entryPrice * (1 - s.tpPercentage/100)
 		stopLoss := entryPrice * (1 + s.slPercentage/100)
 
+		// Calculate risk and reward percentages
+		riskPercent := ((stopLoss - entryPrice) / entryPrice) * 100
+		rewardPercent := ((entryPrice - takeProfit) / entryPrice) * 100
+
 		tradingSignal = &Signal{
 			StopLoss:   stopLoss,
 			TakeProfit: takeProfit,
@@ -240,27 +255,34 @@ func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*Sig
 			Time:       time.Now(),
 			Strategy:   s.GetName(),
 			Confidence: strength,
-			Description: fmt.Sprintf("🔴 RSI Strategy (SWING) Strong Sell Signal Detected! ADA/USDT %s\n"+
+			Description: fmt.Sprintf("🔴 RSI Strategy (SWING) Strong Sell Signal Detected! ADA/USDT %s\n\n"+
+				"📊 Trade Setup:\n"+
+				"• Entry Price: %.5f\n"+
+				"• Stop Loss: %.5f (+%.1f%%)\n"+
+				"• Take Profit: %.5f (-%.1f%%)\n"+
+				"• Risk/Reward: 1:2\n"+
+				"• Signal Confidence: %.1f%%\n\n"+
+				"📈 P&L Projection:\n"+
+				"• Risk: -%.2f%%\n"+
+				"• Reward: +%.2f%%\n"+
+				"• Risk/Reward: 1:2\n\n"+
+				"📊 Signal Details:\n"+
 				"• 15m RSI(14): %.2f (Overbought)\n"+
 				"• 1h RSI(14): %.2f (Trend Resistance)\n"+
 				"• 15m Price Change: %s\n"+
-				"• 1h Price Change: %s\n"+
-				"• Signal Confidence: %.1f%%\n\n"+
-				"📊 Trade Setup:\n"+
-				"• Entry: %.2f\n"+
-				"• Take Profit: %.2f (-%.1f%%)\n"+
-				"• Stop Loss: %.2f (+%.1f%%)\n"+
-				"• Risk/Reward: 1:2\n\n"+
+				"• 1h Price Change: %s\n\n"+
 				"💡 Additional Confirmation:%s",
 				signalConfidence.SetConfidenceIndicator(strength),
+				entryPrice,
+				stopLoss, riskPercent,
+				takeProfit, rewardPercent,
+				strength*100,
+				riskPercent,
+				rewardPercent,
 				latestRSI,
 				latestRSI1h,
 				formatPercentage(priceChange15m),
 				formatPercentage(priceChange1h),
-				strength*100,
-				entryPrice,
-				takeProfit, s.tpPercentage,
-				stopLoss, s.slPercentage,
 				descExtra),
 		}
 	}
