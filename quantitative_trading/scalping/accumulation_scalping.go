@@ -186,22 +186,18 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 					"• Stop Loss: %.5f (-%.2f%%)\n"+
 					"• Take Profit: %.5f (+%.2f%%)\n"+
 					"• Risk/Reward: 1:%.2f\n"+
-					"• Suggested Leverage: %.1fx\n\n"+
-					"📈 P&L Projection:\n"+
-					"• Risk: -%.2f%%\n"+
-					"• Reward: +%.2f%%\n"+
-					"• Risk/Reward: 1:%.2f\n\n"+
-					"📈 Signal Details:\n"+
-					"• OBV crosses above MA - accumulation pattern\n"+
+					"• Leverage: %.1fx\n\n"+
+					"📈 Technical Analysis:\n"+
+					"• Support Level: %.5f\n"+
+					"• Resistance Level: %.5f\n"+
 					"• Current OBV: %.2f\n"+
 					"• OBV MA: %.2f\n"+
 					"• ATR: %.6f (%.2f%% volatility)\n\n"+
-					"💡 Strategy Notes:\n"+
+					"💡 Trade Notes:\n"+
 					"• Institutional buying detected\n"+
-					"• SL placed below support: %.5f\n"+
-					"• TP placed below resistance: %.5f\n"+
+					"• SL placed below support\n"+
+					"• TP placed below resistance\n"+
 					"• Based on actual price levels\n"+
-					"• Leverage adjusted based on volatility\n"+
 					"• Max risk per trade: 2%%",
 				latestPrice,
 				latestPrice-stopLossDistance,
@@ -210,15 +206,12 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				rewardPercent,
 				riskRewardRatio,
 				leverage,
-				riskPercent,
-				rewardPercent,
-				riskRewardRatio,
+				nearestSupport,
+				nearestResistance,
 				latestOBV,
 				latestOBVMA,
 				atrValue,
 				volatilityPercent,
-				nearestSupport,
-				nearestResistance,
 			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
@@ -237,22 +230,18 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 					"• Stop Loss: %.5f (+%.2f%%)\n"+
 					"• Take Profit: %.5f (-%.2f%%)\n"+
 					"• Risk/Reward: 1:%.2f\n"+
-					"• Suggested Leverage: %.1fx\n\n"+
-					"📈 P&L Projection:\n"+
-					"• Risk: -%.2f%%\n"+
-					"• Reward: +%.2f%%\n"+
-					"• Risk/Reward: 1:%.2f\n\n"+
-					"📈 Signal Details:\n"+
-					"• OBV crosses below MA - distribution pattern\n"+
+					"• Leverage: %.1fx\n\n"+
+					"📈 Technical Analysis:\n"+
+					"• Support Level: %.5f\n"+
+					"• Resistance Level: %.5f\n"+
 					"• Current OBV: %.2f\n"+
 					"• OBV MA: %.2f\n"+
 					"• ATR: %.6f (%.2f%% volatility)\n\n"+
-					"💡 Strategy Notes:\n"+
+					"💡 Trade Notes:\n"+
 					"• Institutional selling detected\n"+
-					"• SL placed above resistance: %.5f\n"+
-					"• TP placed above support: %.5f\n"+
+					"• SL placed above resistance\n"+
+					"• TP placed above support\n"+
 					"• Based on actual price levels\n"+
-					"• Leverage adjusted based on volatility\n"+
 					"• Max risk per trade: 2%%",
 				latestPrice,
 				latestPrice+stopLossDistance,
@@ -261,15 +250,12 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				rewardPercent,
 				riskRewardRatio,
 				leverage,
-				riskPercent,
-				rewardPercent,
-				riskRewardRatio,
+				nearestSupport,
+				nearestResistance,
 				latestOBV,
 				latestOBVMA,
 				atrValue,
 				volatilityPercent,
-				nearestResistance,
-				nearestSupport,
 			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
