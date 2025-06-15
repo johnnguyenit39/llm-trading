@@ -9,6 +9,7 @@ import (
 	"j-ai-trade/quantitative_trading/market_analyzer"
 	"j-ai-trade/quantitative_trading/scalping"
 	strategies "j-ai-trade/quantitative_trading/strategies"
+	"j-ai-trade/quantitative_trading/swing"
 )
 
 // Strategy defines the interface that all trading strategies must implement
@@ -37,8 +38,8 @@ type Signal struct {
 }
 
 type StrategyHandler struct {
-	rsiStrategy             *strategies.RSI15m1hStrategy
-	macdStrategy            *strategies.MACD15m1hStrategy
+	rsiStrategy             *swing.RSI15m1hStrategy
+	macdStrategy            *swing.MACD15m1hStrategy
 	strategies              []Strategy
 	marketAnalyzer          *market_analyzer.MarketAnalyzer
 	macdScalping            *scalping.MACDScalpingStrategy
@@ -62,8 +63,8 @@ type StrategyHandler struct {
 
 func NewStrategyHandler() *StrategyHandler {
 	handler := &StrategyHandler{
-		rsiStrategy:             strategies.NewRSI15m1hStrategy(),
-		macdStrategy:            strategies.NewMACD15m1hStrategy(),
+		rsiStrategy:             swing.NewRSI15m1hStrategy(),
+		macdStrategy:            swing.NewMACD15m1hStrategy(),
 		macdScalping:            scalping.NewMACDScalpingStrategy(),
 		rsiScalping:             scalping.NewRSIScalpingStrategy(),
 		volatilityScalping:      scalping.NewVolatilityScalpingStrategy(),
@@ -352,8 +353,7 @@ func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []reposit
 
 // ProcessHA1WithCandles processes candles through the HA-1 strategy
 func (h *StrategyHandler) ProcessHA1WithCandles(candles1d, candles4h, candles1h []repository.Candle) (*Signal, error) {
-	// Create strategy instance
-	strategy := strategies.NewHA1Strategy()
+	strategy := swing.NewHA1Strategy()
 
 	// Convert candles to map for strategy
 	candles := map[string][]repository.Candle{
