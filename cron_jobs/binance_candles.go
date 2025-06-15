@@ -117,7 +117,7 @@ func (j *BinanceCandlesJob) startRsiStrategy(symbol string) {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
 	// Add job that runs every 5 minutes
-	_, err := j.cron.AddFunc("*/5 * * * *", func() {
+	_, err := j.cron.AddFunc("0 */5 * * * *", func() {
 		ctx := context.Background()
 
 		// Create channels for results
@@ -195,7 +195,7 @@ func (j *BinanceCandlesJob) startMacdStrategy(symbol string) {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
 	// Add job that runs every 5 minutes
-	_, err := j.cron.AddFunc("*/5 * * * *", func() {
+	_, err := j.cron.AddFunc("0 */5 * * * *", func() {
 		ctx := context.Background()
 
 		// Create channels for results
@@ -273,7 +273,7 @@ func (j *BinanceCandlesJob) startHA1Strategy(symbol string) {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
 	// Add job that runs every hour
-	_, err := j.cron.AddFunc("0 * * * *", func() {
+	_, err := j.cron.AddFunc("0 0 * * * *", func() {
 		ctx := context.Background()
 
 		// Create channels for results
