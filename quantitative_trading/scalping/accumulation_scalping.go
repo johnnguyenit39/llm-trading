@@ -6,6 +6,8 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/quantitative_trading/strategies"
 
+	"math"
+
 	"github.com/markcheno/go-talib"
 )
 
@@ -113,25 +115,62 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 		leverage = 20.0
 	}
 
-	// --- FUTURES TP/SL FORMULA ---
-	// Calculate stop loss to ensure max 2% risk
-	maxRiskPercent := 2.0 // Maximum risk per trade
-	atrMultiplier := 1.0  // Conservative ATR multiplier
-	stopLossDistance := (atrValue * atrMultiplier) / leverage
-
-	// Ensure stop loss doesn't exceed max risk
-	maxStopLossDistance := latestPrice * (maxRiskPercent / 100.0)
-	if stopLossDistance > maxStopLossDistance {
-		stopLossDistance = maxStopLossDistance
+	// --- TECHNICAL ANALYSIS BASED TP/SL ---
+	// Find nearest support and resistance levels
+	highs := make([]float64, len(candles5m))
+	lows := make([]float64, len(candles5m))
+	for i, c := range candles5m {
+		highs[i] = c.High
+		lows[i] = c.Low
 	}
 
-	// Calculate risk:reward ratio based on leverage
-	riskRewardRatio := 1.5 // Conservative risk:reward ratio
-	takeProfitDistance := stopLossDistance * riskRewardRatio
+	// Calculate recent swing highs and lows (last 20 candles)
+	recentHighs := highs[len(highs)-20:]
+	recentLows := lows[len(lows)-20:]
+
+	// Find nearest resistance and support
+	var nearestResistance, nearestSupport float64
+	if marketCondition == common.MarketAccumulation {
+		// For accumulation, look for higher resistance levels
+		nearestResistance = findNearestResistance(latestPrice, recentHighs)
+		nearestSupport = findNearestSupport(latestPrice, recentLows)
+	} else {
+		// For distribution, look for lower support levels
+		nearestResistance = findNearestResistance(latestPrice, recentHighs)
+		nearestSupport = findNearestSupport(latestPrice, recentLows)
+	}
+
+	// Calculate actual price distances
+	resistanceDistance := math.Abs(nearestResistance - latestPrice)
+	supportDistance := math.Abs(latestPrice - nearestSupport)
+
+	// Calculate stop loss and take profit based on technical levels
+	var stopLossDistance, takeProfitDistance float64
+	if latestOBV > latestOBVMA {
+		// BUY signal
+		stopLossDistance = supportDistance * 0.8      // Place SL below support
+		takeProfitDistance = resistanceDistance * 0.8 // Place TP below resistance
+	} else {
+		// SELL signal
+		stopLossDistance = resistanceDistance * 0.8 // Place SL above resistance
+		takeProfitDistance = supportDistance * 0.8  // Place TP above support
+	}
+
+	// Ensure minimum distances based on ATR
+	minDistance := atrValue * 0.5
+	if stopLossDistance < minDistance {
+		stopLossDistance = minDistance
+	}
+	if takeProfitDistance < minDistance {
+		takeProfitDistance = minDistance
+	}
 
 	// Calculate risk and reward percentages
 	riskPercent := (stopLossDistance / latestPrice) * 100
 	rewardPercent := (takeProfitDistance / latestPrice) * 100
+
+	// Calculate actual risk:reward ratio
+	riskRewardRatio := takeProfitDistance / stopLossDistance
 
 	// Trading logic
 	if latestOBV > latestOBVMA && prevOBV <= prevOBVMA {
@@ -159,12 +198,11 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 					"• ATR: %.6f (%.2f%% volatility)\n\n"+
 					"💡 Strategy Notes:\n"+
 					"• Institutional buying detected\n"+
-					"• Using ATR for dynamic stop loss\n"+
-					"• Suitable for accumulation phase\n"+
+					"• SL placed below support: %.5f\n"+
+					"• TP placed below resistance: %.5f\n"+
+					"• Based on actual price levels\n"+
 					"• Leverage adjusted based on volatility\n"+
-					"• Max risk per trade: 2%%\n"+
-					"• SL = Entry - (ATR * %.1f / Leverage)\n"+
-					"• TP = Entry + (SL Distance * %.2f)",
+					"• Max risk per trade: 2%%",
 				latestPrice,
 				latestPrice-stopLossDistance,
 				riskPercent,
@@ -179,8 +217,8 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				latestOBVMA,
 				atrValue,
 				volatilityPercent,
-				atrMultiplier,
-				riskRewardRatio,
+				nearestSupport,
+				nearestResistance,
 			),
 			StopLoss:   latestPrice - stopLossDistance,
 			TakeProfit: latestPrice + takeProfitDistance,
@@ -211,12 +249,11 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 					"• ATR: %.6f (%.2f%% volatility)\n\n"+
 					"💡 Strategy Notes:\n"+
 					"• Institutional selling detected\n"+
-					"• Using ATR for dynamic stop loss\n"+
-					"• Suitable for distribution phase\n"+
+					"• SL placed above resistance: %.5f\n"+
+					"• TP placed above support: %.5f\n"+
+					"• Based on actual price levels\n"+
 					"• Leverage adjusted based on volatility\n"+
-					"• Max risk per trade: 2%%\n"+
-					"• SL = Entry + (ATR * %.1f / Leverage)\n"+
-					"• TP = Entry - (SL Distance * %.2f)",
+					"• Max risk per trade: 2%%",
 				latestPrice,
 				latestPrice+stopLossDistance,
 				riskPercent,
@@ -231,8 +268,8 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 				latestOBVMA,
 				atrValue,
 				volatilityPercent,
-				atrMultiplier,
-				riskRewardRatio,
+				nearestResistance,
+				nearestSupport,
 			),
 			StopLoss:   latestPrice + stopLossDistance,
 			TakeProfit: latestPrice - takeProfitDistance,
@@ -241,4 +278,25 @@ func (s *AccumulationScalpingStrategy) AnalyzeShortTermMarket(candles map[string
 	}
 
 	return nil, nil
+}
+
+// Helper functions for finding support and resistance
+func findNearestResistance(currentPrice float64, highs []float64) float64 {
+	var nearest float64 = currentPrice * 1.1 // Default 10% above
+	for _, high := range highs {
+		if high > currentPrice && high < nearest {
+			nearest = high
+		}
+	}
+	return nearest
+}
+
+func findNearestSupport(currentPrice float64, lows []float64) float64 {
+	var nearest float64 = currentPrice * 0.9 // Default 10% below
+	for _, low := range lows {
+		if low < currentPrice && low > nearest {
+			nearest = low
+		}
+	}
+	return nearest
 }

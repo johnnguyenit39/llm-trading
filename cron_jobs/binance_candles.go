@@ -273,8 +273,8 @@ func (j *BinanceCandlesJob) startHA1Strategy() {
 func (j *BinanceCandlesJob) startShortTermStrategy() {
 	log := log.With().Str("component", "BinanceCandlesJob").Logger()
 
-	// Add job that runs every 120 seconds
-	_, err := j.cron.AddFunc("@every 120s", func() {
+	// Add job that runs every 5 MINS
+	_, err := j.cron.AddFunc("@every 300s", func() {
 		ctx := context.Background()
 
 		// Fetch 5-minute candles
@@ -324,7 +324,7 @@ func (j *BinanceCandlesJob) startShortTermStrategy() {
 
 		// Handle all signals
 		for _, signal := range signals {
-			j.handleSignal(signal, "ShortTerm")
+			j.handleSignal(signal, signal.StrategyName)
 		}
 	})
 

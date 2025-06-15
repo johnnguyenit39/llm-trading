@@ -27,12 +27,13 @@ type Strategy interface {
 }
 
 type Signal struct {
-	Type        string
-	Price       float64
-	Timestamp   time.Time
-	Description string
-	TakeProfit  float64
-	StopLoss    float64
+	Type         string
+	Price        float64
+	Timestamp    time.Time
+	Description  string
+	TakeProfit   float64
+	StopLoss     float64
+	StrategyName string
 }
 
 type StrategyHandler struct {
@@ -138,12 +139,13 @@ func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1
 		if strategySignal != nil {
 			// Convert strategy signal to handler signal
 			signal := &Signal{
-				Type:        strategySignal.Type,
-				Price:       strategySignal.Price,
-				Timestamp:   time.Now(),
-				Description: strategySignal.Description,
-				TakeProfit:  strategySignal.TakeProfit,
-				StopLoss:    strategySignal.StopLoss,
+				Type:         strategySignal.Type,
+				Price:        strategySignal.Price,
+				Timestamp:    time.Now(),
+				Description:  strategySignal.Description,
+				TakeProfit:   strategySignal.TakeProfit,
+				StopLoss:     strategySignal.StopLoss,
+				StrategyName: strategy.GetName(),
 			}
 			signals = append(signals, signal)
 		}
