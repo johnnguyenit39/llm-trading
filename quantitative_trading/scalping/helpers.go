@@ -35,12 +35,12 @@ func findSupportLevels(lows []float64, lookback int) []float64 {
 
 // findResistanceLevels identifies resistance levels from a slice of highs
 func findResistanceLevels(highs []float64, lookback int) []float64 {
-	if len(highs) < lookback {
+	if len(highs) < lookback+2 {
 		return nil
 	}
 
 	var resistances []float64
-	for i := lookback; i < len(highs); i++ {
+	for i := lookback; i < len(highs)-1; i++ {
 		if highs[i] > highs[i-1] && highs[i] > highs[i+1] {
 			resistances = append(resistances, highs[i])
 		}

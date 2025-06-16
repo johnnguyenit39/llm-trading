@@ -115,7 +115,7 @@ func (s *TwelveService) Fetch1hCandles(ctx context.Context, symbol string, limit
 	if len(limit) > 0 {
 		actualLimit = limit[0]
 	}
-	return s.repo.FetchCandles(ctx, symbol, "1hour", actualLimit)
+	return s.repo.FetchCandles(ctx, symbol, "1h", actualLimit)
 }
 
 // Fetch4hCandles fetches 4-hour candles
@@ -124,7 +124,7 @@ func (s *TwelveService) Fetch4hCandles(ctx context.Context, symbol string, limit
 	if len(limit) > 0 {
 		actualLimit = limit[0]
 	}
-	return s.repo.FetchCandles(ctx, symbol, "4hour", actualLimit)
+	return s.repo.FetchCandles(ctx, symbol, "4h", actualLimit)
 }
 
 // Fetch1dCandles fetches daily candles

@@ -2,9 +2,7 @@ package quantitativetrading
 
 import (
 	"fmt"
-	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
-	converter "j-ai-trade/quantitative_trading/converter"
 	"j-ai-trade/quantitative_trading/market_analyzer"
 	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	"j-ai-trade/quantitative_trading/scalping"
@@ -122,7 +120,7 @@ func NewStrategyHandler() *StrategyHandler {
 }
 
 // ProcessMarketCondition processes market conditions and executes suitable strategies
-func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1h []repository.BinanceCandle) ([]*Signal, error) {
+func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1h []baseCandleModel.BaseCandle) ([]*Signal, error) {
 	// Analyze market conditions
 	analysis, err := h.marketAnalyzer.AnalyzeMarket(candles5m, candles15m, candles1h)
 	if err != nil {
@@ -149,9 +147,9 @@ func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1
 	for _, strategy := range filteredStrategies {
 		// Create candles map for strategy
 		candles := map[string][]baseCandleModel.BaseCandle{
-			"5m":  converter.ConvertBinanceCandlesToBase(candles5m),
-			"15m": converter.ConvertBinanceCandlesToBase(candles15m),
-			"1h":  converter.ConvertBinanceCandlesToBase(candles1h),
+			"5m":  candles5m,
+			"15m": candles15m,
+			"1h":  candles1h,
 		}
 
 		// Get signal from strategy
@@ -314,11 +312,11 @@ func (h *StrategyHandler) RegisterStrategy(strategy Strategy) {
 	h.strategies = append(h.strategies, strategy)
 }
 
-func (h *StrategyHandler) ProcessRsiWithCandles(candles15m, candles1h []repository.BinanceCandle) (*Signal, error) {
+func (h *StrategyHandler) ProcessRsiWithCandles(candles15m, candles1h []baseCandleModel.BaseCandle) (*Signal, error) {
 	// Create candles map for strategy
 	candles := map[string][]baseCandleModel.BaseCandle{
-		"15m": converter.ConvertBinanceCandlesToBase(candles15m),
-		"1h":  converter.ConvertBinanceCandlesToBase(candles1h),
+		"15m": candles15m,
+		"1h":  candles1h,
 	}
 
 	// Process candles through RSI strategy
@@ -342,11 +340,11 @@ func (h *StrategyHandler) ProcessRsiWithCandles(candles15m, candles1h []reposito
 	}, nil
 }
 
-func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []repository.BinanceCandle) (*Signal, error) {
+func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []baseCandleModel.BaseCandle) (*Signal, error) {
 	// Create candles map for strategy
 	candles := map[string][]baseCandleModel.BaseCandle{
-		"15m": converter.ConvertBinanceCandlesToBase(candles15m),
-		"1h":  converter.ConvertBinanceCandlesToBase(candles1h),
+		"15m": candles15m,
+		"1h":  candles1h,
 	}
 
 	// Process candles through MACD strategy
@@ -371,14 +369,14 @@ func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []reposit
 }
 
 // ProcessHA1WithCandles processes candles through the HA-1 strategy
-func (h *StrategyHandler) ProcessHA1WithCandles(candles1d, candles4h, candles1h []repository.BinanceCandle) (*Signal, error) {
+func (h *StrategyHandler) ProcessHA1WithCandles(candles1d, candles4h, candles1h []baseCandleModel.BaseCandle) (*Signal, error) {
 	strategy := swing.NewHA1Strategy()
 
 	// Convert candles to map for strategy
 	candles := map[string][]baseCandleModel.BaseCandle{
-		"1d": converter.ConvertBinanceCandlesToBase(candles1d),
-		"4h": converter.ConvertBinanceCandlesToBase(candles4h),
-		"1h": converter.ConvertBinanceCandlesToBase(candles1h),
+		"1d": candles1d,
+		"4h": candles4h,
+		"1h": candles1h,
 	}
 
 	// Analyze using the strategy

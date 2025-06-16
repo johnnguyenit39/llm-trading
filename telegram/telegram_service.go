@@ -38,14 +38,14 @@ func NewTelegramService() *TelegramService {
 }
 
 func (s *TelegramService) SendMessage(message string) error {
-	return s.sendMessageToChannel(s.botToken, s.channelID, message)
+	return s.SendMessageToChannel(s.botToken, s.channelID, message)
 }
 
 func (s *TelegramService) SendMessageV1(message string) error {
-	return s.sendMessageToChannel(s.botTokenV1, s.channelIDV1, message)
+	return s.SendMessageToChannel(s.botTokenV1, s.channelIDV1, message)
 }
 
-func (s *TelegramService) sendMessageToChannel(botToken, channelID, message string) error {
+func (s *TelegramService) SendMessageToChannel(botToken, channelID, message string) error {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
 
 	reqBody := SendMessageRequest{

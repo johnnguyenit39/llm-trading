@@ -3,14 +3,15 @@ package cronjobs
 import (
 	"context"
 
-	"github.com/robfig/cron/v3"
-	"github.com/rs/zerolog/log"
-
 	backtesting "j-ai-trade/back_testing"
 	"j-ai-trade/brokers/binance"
 	"j-ai-trade/brokers/binance/repository"
 	quantitativetrading "j-ai-trade/quantitative_trading"
 	"j-ai-trade/telegram"
+	converter "j-ai-trade/utils/converter"
+
+	"github.com/robfig/cron/v3"
+	"github.com/rs/zerolog/log"
 
 	"gorm.io/gorm"
 )
@@ -173,7 +174,9 @@ func (j *BinanceCandlesJob) startRsiStrategy(symbol string) {
 		}
 
 		// Process candles through strategy handler
-		signal, err := j.strategyHandler.ProcessRsiWithCandles(candles15m, candles1h)
+		signal, err := j.strategyHandler.ProcessRsiWithCandles(
+			converter.ConvertBinanceCandlesToBase(candles15m),
+			converter.ConvertBinanceCandlesToBase(candles1h))
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to process candles through strategy")
 			return
@@ -251,7 +254,9 @@ func (j *BinanceCandlesJob) startMacdStrategy(symbol string) {
 		}
 
 		// Process candles through strategy handler
-		signal, err := j.strategyHandler.ProcessMacdWithCandles(candles15m, candles1h)
+		signal, err := j.strategyHandler.ProcessMacdWithCandles(
+			converter.ConvertBinanceCandlesToBase(candles15m),
+			converter.ConvertBinanceCandlesToBase(candles1h))
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to process candles through strategy")
 			return
@@ -344,7 +349,10 @@ func (j *BinanceCandlesJob) startHA1Strategy(symbol string) {
 		}
 
 		// Process candles through strategy handler
-		signal, err := j.strategyHandler.ProcessHA1WithCandles(candles1d, candles4h, candles1h)
+		signal, err := j.strategyHandler.ProcessHA1WithCandles(
+			converter.ConvertBinanceCandlesToBase(candles1d),
+			converter.ConvertBinanceCandlesToBase(candles4h),
+			converter.ConvertBinanceCandlesToBase(candles1h))
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to process candles through HA-1 strategy")
 			return
@@ -437,7 +445,11 @@ func (j *BinanceCandlesJob) startShortTermStrategy(symbol string) {
 		}
 
 		// Process candles through strategy handler to get market condition and signals
-		signals, err := j.strategyHandler.ProcessMarketCondition(candles5m, candles15m, candles1h)
+		signals, err := j.strategyHandler.ProcessMarketCondition(
+			converter.ConvertBinanceCandlesToBase(candles5m),
+			converter.ConvertBinanceCandlesToBase(candles15m),
+			converter.ConvertBinanceCandlesToBase(candles1h),
+		)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to process market condition")
 			return

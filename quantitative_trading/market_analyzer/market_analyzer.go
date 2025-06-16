@@ -2,8 +2,8 @@ package market_analyzer
 
 import (
 	"fmt"
-	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	"j-ai-trade/quantitative_trading/strategies"
 	"math"
 
@@ -37,7 +37,7 @@ func NewMarketAnalyzer(strategies []strategies.Strategy) *MarketAnalyzer {
 }
 
 // AnalyzeMarket analyzes the market and returns multiple conditions with confidence levels
-func (a *MarketAnalyzer) AnalyzeMarket(candles5m, candles15m, candles1h []repository.BinanceCandle) (*MarketAnalysis, error) {
+func (a *MarketAnalyzer) AnalyzeMarket(candles5m, candles15m, candles1h []baseCandleModel.BaseCandle) (*MarketAnalysis, error) {
 	if len(candles5m) < 20 || len(candles15m) < 20 || len(candles1h) < 20 {
 		return nil, fmt.Errorf("insufficient candle data")
 	}
@@ -149,7 +149,7 @@ func (a *MarketAnalyzer) AnalyzeMarket(candles5m, candles15m, candles1h []reposi
 }
 
 // Helper functions for calculating various metrics
-func calculateVolatility(candles []repository.BinanceCandle) float64 {
+func calculateVolatility(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 20 {
 		return 0.5
 	}
@@ -182,7 +182,7 @@ func calculateVolatility(candles []repository.BinanceCandle) float64 {
 	return volatility
 }
 
-func calculateTrend(candles []repository.BinanceCandle) float64 {
+func calculateTrend(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 50 {
 		return 0.0
 	}
@@ -222,7 +222,7 @@ func calculateTrend(candles []repository.BinanceCandle) float64 {
 	return trend
 }
 
-func calculateVolume(candles []repository.BinanceCandle) float64 {
+func calculateVolume(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 20 {
 		return 0.5
 	}
@@ -246,7 +246,7 @@ func calculateVolume(candles []repository.BinanceCandle) float64 {
 	return volume
 }
 
-func calculateRangeConfidence(candles []repository.BinanceCandle) float64 {
+func calculateRangeConfidence(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 20 {
 		return 0.5
 	}
@@ -291,7 +291,7 @@ func calculateRangeConfidence(candles []repository.BinanceCandle) float64 {
 	return rangeConfidence
 }
 
-func calculateAccumulationDistribution(candles []repository.BinanceCandle) float64 {
+func calculateAccumulationDistribution(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 20 {
 		return 0.5
 	}
@@ -339,7 +339,7 @@ func calculateAccumulationDistribution(candles []repository.BinanceCandle) float
 	return accumulation
 }
 
-func calculateSqueezeConfidence(candles []repository.BinanceCandle) float64 {
+func calculateSqueezeConfidence(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 20 {
 		return 0.5
 	}
@@ -394,7 +394,7 @@ func calculateSqueezeConfidence(candles []repository.BinanceCandle) float64 {
 	return squeezeConfidence
 }
 
-func calculateBreakoutConfidence(candles []repository.BinanceCandle) float64 {
+func calculateBreakoutConfidence(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 20 {
 		return 0.5
 	}
@@ -451,7 +451,7 @@ func calculateBreakoutConfidence(candles []repository.BinanceCandle) float64 {
 	return math.Min(1.0, breakoutConfidence/2)
 }
 
-func calculateReversalConfidence(candles []repository.BinanceCandle) float64 {
+func calculateReversalConfidence(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 50 {
 		return 0.5
 	}
@@ -525,7 +525,7 @@ func (a *MarketAnalyzer) GetSuitableStrategies(analysis *MarketAnalysis) []strat
 
 // Helper functions
 
-func (a *MarketAnalyzer) analyzeTrend(candles5m, candles15m, candles1h []repository.BinanceCandle) struct {
+func (a *MarketAnalyzer) analyzeTrend(candles5m, candles15m, candles1h []baseCandleModel.BaseCandle) struct {
 	Direction5m  string
 	Direction15m string
 	Direction1h  string
@@ -606,7 +606,7 @@ func (a *MarketAnalyzer) analyzeTrend(candles5m, candles15m, candles1h []reposit
 	}
 }
 
-func (a *MarketAnalyzer) analyzeVolatility(candles5m, candles15m, candles1h []repository.BinanceCandle) struct {
+func (a *MarketAnalyzer) analyzeVolatility(candles5m, candles15m, candles1h []baseCandleModel.BaseCandle) struct {
 	ATR5m  float64
 	ATR15m float64
 	ATR1h  float64
@@ -660,7 +660,7 @@ func (a *MarketAnalyzer) analyzeVolatility(candles5m, candles15m, candles1h []re
 	}
 }
 
-func (a *MarketAnalyzer) analyzeVolume(candles5m, candles15m, candles1h []repository.BinanceCandle) struct {
+func (a *MarketAnalyzer) analyzeVolume(candles5m, candles15m, candles1h []baseCandleModel.BaseCandle) struct {
 	AverageVolume5m  float64
 	AverageVolume15m float64
 	AverageVolume1h  float64
@@ -709,7 +709,7 @@ func (a *MarketAnalyzer) analyzeVolume(candles5m, candles15m, candles1h []reposi
 	}
 }
 
-func (a *MarketAnalyzer) calculateIndicators(candles5m, candles15m, candles1h []repository.BinanceCandle) struct {
+func (a *MarketAnalyzer) calculateIndicators(candles5m, candles15m, candles1h []baseCandleModel.BaseCandle) struct {
 	RSI5m  float64
 	RSI15m float64
 	RSI1h  float64
@@ -806,7 +806,7 @@ func (a *MarketAnalyzer) calculateIndicators(candles5m, candles15m, candles1h []
 	}
 }
 
-func (a *MarketAnalyzer) identifyPatterns(candles5m, candles15m, candles1h []repository.BinanceCandle) struct {
+func (a *MarketAnalyzer) identifyPatterns(candles5m, candles15m, candles1h []baseCandleModel.BaseCandle) struct {
 	CandlestickPatterns []string
 	ChartPatterns       []string
 	SupportResistance   []float64
@@ -818,7 +818,7 @@ func (a *MarketAnalyzer) identifyPatterns(candles5m, candles15m, candles1h []rep
 	}
 
 	// Identify candlestick patterns on all timeframes
-	for _, candles := range [][]repository.BinanceCandle{candles5m, candles15m, candles1h} {
+	for _, candles := range [][]baseCandleModel.BaseCandle{candles5m, candles15m, candles1h} {
 		if len(candles) >= 2 {
 			prev := candles[len(candles)-2]
 			curr := candles[len(candles)-1]
@@ -836,7 +836,7 @@ func (a *MarketAnalyzer) identifyPatterns(candles5m, candles15m, candles1h []rep
 	}
 
 	// Identify support and resistance levels using all timeframes
-	for _, candles := range [][]repository.BinanceCandle{candles5m, candles15m, candles1h} {
+	for _, candles := range [][]baseCandleModel.BaseCandle{candles5m, candles15m, candles1h} {
 		if len(candles) >= 20 {
 			highestHigh := candles[len(candles)-1].High
 			lowestLow := candles[len(candles)-1].Low
@@ -858,7 +858,7 @@ func (a *MarketAnalyzer) identifyPatterns(candles5m, candles15m, candles1h []rep
 }
 
 // determineMarketCondition determines the primary market condition based on analysis metrics
-func (ma *MarketAnalyzer) determineMarketCondition(candles []repository.BinanceCandle) common.MarketCondition {
+func (ma *MarketAnalyzer) determineMarketCondition(candles []baseCandleModel.BaseCandle) common.MarketCondition {
 	// Calculate all market metrics
 	volatility := calculateVolatility(candles)
 	trend := calculateTrend(candles)
