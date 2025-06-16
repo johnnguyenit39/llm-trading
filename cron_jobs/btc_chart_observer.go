@@ -4,25 +4,32 @@ import (
 	"context"
 	"fmt"
 	"j-ai-trade/brokers/binance"
-	"j-ai-trade/brokers/binance/repository"
+	quantitativetrading "j-ai-trade/quantitative_trading"
+	"j-ai-trade/quantitative_trading/market_analyzer"
+	strategies "j-ai-trade/quantitative_trading/strategies"
+	converter "j-ai-trade/utils/converter"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
 type BtcChartObserver struct {
-	resultChan chan string
-	stopChan   chan struct{}
-	service    *binance.BinanceService
-	symbol     string
+	resultChan      chan string
+	stopChan        chan struct{}
+	service         *binance.BinanceService
+	symbol          string
+	marketAnalyzer  *market_analyzer.MarketAnalyzer
+	strategyHandler *quantitativetrading.StrategyHandler
 }
 
 func NewBtcChartObserver(service *binance.BinanceService) *BtcChartObserver {
 	return &BtcChartObserver{
-		resultChan: make(chan string),
-		stopChan:   make(chan struct{}),
-		service:    service,
-		symbol:     "BTCUSDT",
+		resultChan:      make(chan string),
+		stopChan:        make(chan struct{}),
+		service:         service,
+		symbol:          "BTCUSDT",
+		marketAnalyzer:  market_analyzer.NewMarketAnalyzer([]strategies.Strategy{}),
+		strategyHandler: quantitativetrading.NewStrategyHandler(),
 	}
 }
 
@@ -53,80 +60,74 @@ func (o *BtcChartObserver) run() {
 	for {
 		select {
 		case <-ticker.C:
-			result := o.analyzeBtcMarket(context.Background(), o.symbol, o.service)
-			o.resultChan <- result
+			err := o.analyzeBtcMarket(context.Background(), o.symbol, o.service)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to analyze market")
+			}
 		case <-o.stopChan:
 			return
 		}
 	}
 }
 
-func (o *BtcChartObserver) analyzeBtcMarket(ctx context.Context, symbol string, service *binance.BinanceService) string {
-	// Create channels for results
-	candles5mChan := make(chan []repository.BinanceCandle)
-	candles15mChan := make(chan []repository.BinanceCandle)
-	candles1hChan := make(chan []repository.BinanceCandle)
-	errChan := make(chan error)
-
-	// Fetch candles concurrently
-	go func() {
-		candles, err := service.Fetch5mCandles(ctx, symbol, 100)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		candles5mChan <- candles
-	}()
-
-	go func() {
-		candles, err := service.Fetch15mCandles(ctx, symbol, 50)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		candles15mChan <- candles
-	}()
-
-	go func() {
-		candles, err := service.Fetch1hCandles(ctx, symbol, 50)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		candles1hChan <- candles
-	}()
-
-	// Collect results
-	var candles5m, candles15m, candles1h []repository.BinanceCandle
-	for i := 0; i < 3; i++ {
-		select {
-		case err := <-errChan:
-			log.Error().Err(err).Msg("Failed to fetch candles")
-			return ""
-		case candles := <-candles5mChan:
-			candles5m = candles
-		case candles := <-candles15mChan:
-			candles15m = candles
-		case candles := <-candles1hChan:
-			candles1h = candles
-		}
+func (o *BtcChartObserver) analyzeBtcMarket(ctx context.Context, symbol string, service *binance.BinanceService) error {
+	// Fetch candle data for different timeframes
+	candles5m, err := service.Fetch5mCandles(ctx, symbol, 100)
+	if err != nil {
+		return fmt.Errorf("failed to fetch 5m candles: %v", err)
 	}
-	message := ""
+
+	candles15m, err := service.Fetch15mCandles(ctx, symbol, 100)
+	if err != nil {
+		return fmt.Errorf("failed to fetch 15m candles: %v", err)
+	}
+
+	candles1h, err := service.Fetch1hCandles(ctx, symbol, 100)
+	if err != nil {
+		return fmt.Errorf("failed to fetch 1h candles: %v", err)
+	}
+
 	// Log the latest candles
-	if len(candles5m) > 0 && len(candles15m) > 0 && len(candles1h) > 0 {
-		latest5m := candles5m[len(candles5m)-1]
-		latest15m := candles15m[len(candles15m)-1]
-		latest1h := candles1h[len(candles1h)-1]
-
+	if len(candles5m) > 0 {
+		latest := candles5m[len(candles5m)-1]
 		log.Info().
-			Str("symbol", "BTCUSDT").
-			Time("5m_open_time", latest5m.OpenTime).
-			Float64("5m_close", latest5m.Close).
-			Time("15m_open_time", latest15m.OpenTime).
-			Float64("15m_close", latest15m.Close).
-			Time("1h_open_time", latest1h.OpenTime).
-			Float64("1h_close", latest1h.Close).
-			Msg("Latest candles")
+			Str("symbol", symbol).
+			Str("timeframe", "5m").
+			Float64("open", latest.Open).
+			Float64("high", latest.High).
+			Float64("low", latest.Low).
+			Float64("close", latest.Close).
+			Float64("volume", latest.Volume).
+			Msg("Latest 5m candle")
 	}
-	return message
+
+	// Convert Binance candles to base candles
+	baseCandles5m := converter.ConvertBinanceCandlesToBase(candles5m)
+	baseCandles15m := converter.ConvertBinanceCandlesToBase(candles15m)
+	baseCandles1h := converter.ConvertBinanceCandlesToBase(candles1h)
+
+	// Analyze market conditions
+	analysis, err := o.marketAnalyzer.AnalyzeMarket(baseCandles5m, baseCandles15m, baseCandles1h)
+	if err != nil {
+		return fmt.Errorf("failed to analyze market: %v", err)
+	}
+
+	// Get suitable strategies
+	suitableStrategies := o.marketAnalyzer.GetSuitableStrategies(analysis)
+
+	// Construct message
+	msg := fmt.Sprintf("Market Analysis for %s:\n", symbol)
+	msg += fmt.Sprintf("Primary Condition: %s\n", analysis.PrimaryCondition)
+	msg += fmt.Sprintf("Volatility: %.2f\n", analysis.Volatility)
+	msg += fmt.Sprintf("Trend: %.2f\n", analysis.Trend)
+	msg += fmt.Sprintf("Volume: %.2f\n", analysis.Volume)
+	msg += "\nSuitable Strategies:\n"
+	for _, strategy := range suitableStrategies {
+		msg += fmt.Sprintf("- %s\n", strategy.GetName())
+	}
+
+	// Send message through result channel
+	o.resultChan <- msg
+
+	return nil
 }
