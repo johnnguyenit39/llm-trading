@@ -49,7 +49,7 @@ func (j *GoldTCandlesJob) startShortTermStrategy(symbol string) {
 	log := log.With().Str("component", "GoldTCandlesJob").Logger()
 
 	// Add job that runs every 5 MINS
-	_, err := j.cron.AddFunc("@every 10s", func() {
+	_, err := j.cron.AddFunc("@every 300s", func() {
 		// Create channels for results
 		candles5mChan := make(chan []types.OKXCandle)
 		candles15mChan := make(chan []types.OKXCandle)
