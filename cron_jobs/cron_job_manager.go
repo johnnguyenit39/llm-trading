@@ -1,8 +1,13 @@
 package cronjobs
 
-import "gorm.io/gorm"
+import (
+	"j-ai-trade/brokers/binance"
+	"j-ai-trade/brokers/binance/repository"
 
-var GlobalChartObserver *ChartObserver
+	"gorm.io/gorm"
+)
+
+var GlobalChartObserver *BtcChartObserver
 
 // InitCronJobs initializes and starts all cron jobs
 func InitCronJobs(db *gorm.DB) {
@@ -20,8 +25,10 @@ func InitCronJobs(db *gorm.DB) {
 	GlobalGoldTCandlesJob.Start()
 
 	// Initialize and start the chart observer
-	GlobalChartObserver = NewChartObserver()
-	GlobalChartObserver.StartChartObserver()
+	repo := repository.NewBinanceRepository()
+	binanceService := binance.NewBinanceService(repo)
+	GlobalChartObserver = NewBtcChartObserver(binanceService)
+	GlobalChartObserver.StartBtcChartObserver()
 }
 
 // StopCronJobs stops all running cron jobs
@@ -39,6 +46,6 @@ func StopCronJobs() {
 	}
 
 	if GlobalChartObserver != nil {
-		GlobalChartObserver.StopChartObserver()
+		GlobalChartObserver.StartBtcChartObserver()
 	}
 }
