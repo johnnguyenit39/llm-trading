@@ -1,10 +1,9 @@
 package strategies
 
 import (
-	"time"
-
-	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
+	"time"
 )
 
 // Signal represents a trading signal
@@ -23,7 +22,7 @@ type Signal struct {
 // Strategy defines the interface for all trading strategies
 type Strategy interface {
 	// Analyze analyzes the market data and returns a signal if conditions are met
-	Analyze(candles map[string][]repository.BinanceCandle) (*Signal, error)
+	Analyze(candles map[string][]baseCandleModel.BaseCandle) (*Signal, error)
 
 	// GetName returns the strategy name
 	GetName() string

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
@@ -42,12 +42,12 @@ func (s *VWAPScalpingStrategy) IsSuitableForCondition(condition common.MarketCon
 	}
 }
 
-func (s *VWAPScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
+func (s *VWAPScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	return VWAPScalping(candles["5m"])
 }
 
 // VWAPScalping implements a scalping strategy based on VWAP analysis
-func VWAPScalping(candles5m []repository.BinanceCandle) (*strategies.Signal, error) {
+func VWAPScalping(candles5m []baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	// Convert to float64 arrays
 	closes := make([]float64, len(candles5m))
 	highs := make([]float64, len(candles5m))

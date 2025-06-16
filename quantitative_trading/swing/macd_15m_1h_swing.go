@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"j-ai-trade/brokers/binance/repository"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	strategies "j-ai-trade/quantitative_trading/strategies"
 	signalConfidence "j-ai-trade/utils/signal"
 
@@ -30,7 +30,7 @@ func NewMACD15m1hStrategy() *MACD15m1hStrategy {
 	}
 }
 
-func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
+func (s *MACD15m1hStrategy) Analyze(candles map[string][]baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	// Get 15m candles for main analysis
 	candles15m := candles["15m"]
 	if len(candles15m) < s.slowPeriod {

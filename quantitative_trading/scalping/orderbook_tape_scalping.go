@@ -5,15 +5,15 @@ import (
 	"math"
 	"time"
 
-	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
 )
 
 // OrderbookTapeScalping implements a scalping strategy based on orderbook tape analysis
-func OrderbookTapeScalping(candles []repository.BinanceCandle) (*strategies.Signal, error) {
+func OrderbookTapeScalping(candles []baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	if len(candles) < 20 {
 		return nil, nil
 	}
@@ -269,6 +269,6 @@ func (s *OrderbookTapeScalpingStrategy) IsSuitableForCondition(condition common.
 	}
 }
 
-func (s *OrderbookTapeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
+func (s *OrderbookTapeScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	return OrderbookTapeScalping(candles["5m"])
 }

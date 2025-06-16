@@ -2,7 +2,7 @@ package swing
 
 import (
 	"fmt"
-	"j-ai-trade/brokers/binance/repository"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	strategies "j-ai-trade/quantitative_trading/strategies"
 	"time"
 
@@ -28,7 +28,7 @@ func NewHA1Strategy() *HA1Strategy {
 	}
 }
 
-func (s *HA1Strategy) Analyze(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
+func (s *HA1Strategy) Analyze(candles map[string][]baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	// Get 1d candles for main analysis
 	candles1d := candles["1d"]
 	if len(candles1d) < s.slowPeriod {
@@ -299,7 +299,7 @@ func (s *HA1Strategy) Analyze(candles map[string][]repository.BinanceCandle) (*s
 
 // Helper functions
 
-func calculateTrendline(candles []repository.BinanceCandle) float64 {
+func calculateTrendline(candles []baseCandleModel.BaseCandle) float64 {
 	// Simple linear regression for trendline
 	if len(candles) < 2 {
 		return 0
@@ -322,7 +322,7 @@ func calculateTrendline(candles []repository.BinanceCandle) float64 {
 	return slope*float64(len(candles)-1) + intercept
 }
 
-func isBullishDivergence(candles []repository.BinanceCandle, hist []float64) bool {
+func isBullishDivergence(candles []baseCandleModel.BaseCandle, hist []float64) bool {
 	if len(candles) < 3 || len(hist) < 3 {
 		return false
 	}
@@ -336,7 +336,7 @@ func isBullishDivergence(candles []repository.BinanceCandle, hist []float64) boo
 	return priceLowerLow && histHigherLow
 }
 
-func isBearishDivergence(candles []repository.BinanceCandle, hist []float64) bool {
+func isBearishDivergence(candles []baseCandleModel.BaseCandle, hist []float64) bool {
 	if len(candles) < 3 || len(hist) < 3 {
 		return false
 	}
@@ -350,7 +350,7 @@ func isBearishDivergence(candles []repository.BinanceCandle, hist []float64) boo
 	return priceHigherHigh && histLowerHigh
 }
 
-func isTrendlineBreak(candles []repository.BinanceCandle, trendline float64, direction string) bool {
+func isTrendlineBreak(candles []baseCandleModel.BaseCandle, trendline float64, direction string) bool {
 	if len(candles) < 2 {
 		return false
 	}
@@ -365,7 +365,7 @@ func isTrendlineBreak(candles []repository.BinanceCandle, trendline float64, dir
 	}
 }
 
-func isBullishPriceAction(candles []repository.BinanceCandle) bool {
+func isBullishPriceAction(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 2 {
 		return false
 	}
@@ -380,7 +380,7 @@ func isBullishPriceAction(candles []repository.BinanceCandle) bool {
 		latestCandle.Close > prevCandle.Open
 }
 
-func isBearishPriceAction(candles []repository.BinanceCandle) bool {
+func isBearishPriceAction(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 2 {
 		return false
 	}
@@ -395,7 +395,7 @@ func isBearishPriceAction(candles []repository.BinanceCandle) bool {
 		latestCandle.Close < prevCandle.Open
 }
 
-func isHighVolume(candles []repository.BinanceCandle) bool {
+func isHighVolume(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 20 {
 		return false
 	}
@@ -411,7 +411,7 @@ func isHighVolume(candles []repository.BinanceCandle) bool {
 	return candles[len(candles)-1].Volume > avgVolume*1.5
 }
 
-func isBullishEngulfing(candles []repository.BinanceCandle) bool {
+func isBullishEngulfing(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 2 {
 		return false
 	}
@@ -425,7 +425,7 @@ func isBullishEngulfing(candles []repository.BinanceCandle) bool {
 		latestCandle.Close > prevCandle.Open
 }
 
-func isBearishEngulfing(candles []repository.BinanceCandle) bool {
+func isBearishEngulfing(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 2 {
 		return false
 	}
@@ -439,7 +439,7 @@ func isBearishEngulfing(candles []repository.BinanceCandle) bool {
 		latestCandle.Close < prevCandle.Open
 }
 
-func findSupportLevel(candles []repository.BinanceCandle) float64 {
+func findSupportLevel(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 20 {
 		return 0
 	}
@@ -455,7 +455,7 @@ func findSupportLevel(candles []repository.BinanceCandle) float64 {
 	return lowestLow * 0.99 // 1% below the lowest low
 }
 
-func findResistanceLevel(candles []repository.BinanceCandle) float64 {
+func findResistanceLevel(candles []baseCandleModel.BaseCandle) float64 {
 	if len(candles) < 20 {
 		return 0
 	}

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
@@ -43,12 +43,12 @@ func (s *VolumeImbalanceScalpingStrategy) IsSuitableForCondition(condition commo
 	}
 }
 
-func (s *VolumeImbalanceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
+func (s *VolumeImbalanceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	return VolumeImbalanceScalping(candles["5m"])
 }
 
 // VolumeImbalanceScalping implements a scalping strategy based on volume imbalance analysis
-func VolumeImbalanceScalping(candles5m []repository.BinanceCandle) (*strategies.Signal, error) {
+func VolumeImbalanceScalping(candles5m []baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	// Convert to float64 arrays
 	closes := make([]float64, len(candles5m))
 	highs := make([]float64, len(candles5m))

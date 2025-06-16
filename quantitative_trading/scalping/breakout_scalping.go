@@ -2,8 +2,8 @@ package scalping
 
 import (
 	"fmt"
-	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
@@ -37,7 +37,7 @@ func (s *BreakoutScalpingStrategy) IsSuitableForCondition(condition common.Marke
 	}
 }
 
-func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
+func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	// Get multiple timeframe candles
 	candles5m := candles["5m"]
 	candles15m := candles["15m"]

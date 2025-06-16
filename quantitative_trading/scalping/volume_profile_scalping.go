@@ -3,8 +3,8 @@ package scalping
 import (
 	"fmt"
 
-	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	"j-ai-trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
@@ -42,7 +42,7 @@ func (s *VolumeProfileScalpingStrategy) IsSuitableForCondition(condition common.
 }
 
 // VolumeProfileScalping implements a scalping strategy based on volume profile analysis
-func VolumeProfileScalping(candles5m []repository.BinanceCandle) (*strategies.Signal, error) {
+func VolumeProfileScalping(candles5m []baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	// Convert to float64 arrays
 	closes := make([]float64, len(candles5m))
 	highs := make([]float64, len(candles5m))
@@ -285,6 +285,6 @@ func VolumeProfileScalping(candles5m []repository.BinanceCandle) (*strategies.Si
 	return nil, nil
 }
 
-func (s *VolumeProfileScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
+func (s *VolumeProfileScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	return VolumeProfileScalping(candles["5m"])
 }

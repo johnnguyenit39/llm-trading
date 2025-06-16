@@ -2,8 +2,8 @@ package scalping
 
 import (
 	"fmt"
-	"j-ai-trade/brokers/binance/repository"
 	"j-ai-trade/common"
+	baseCandleModel "j-ai-trade/quantitative_trading/model"
 	"j-ai-trade/quantitative_trading/strategies"
 	utils "j-ai-trade/utils/math"
 
@@ -42,7 +42,7 @@ func (s *SRBounceScalpingStrategy) IsSuitableForCondition(condition common.Marke
 	}
 }
 
-func (s *SRBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
+func (s *SRBounceScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]baseCandleModel.BaseCandle) (*strategies.Signal, error) {
 	// Get 5m candles for quick signals
 	candles5m := candles["5m"]
 	if len(candles5m) < 20 {
