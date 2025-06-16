@@ -7,7 +7,9 @@ import (
 	quantitativetrading "j-ai-trade/quantitative_trading"
 	"j-ai-trade/quantitative_trading/market_analyzer"
 	strategies "j-ai-trade/quantitative_trading/strategies"
+	"j-ai-trade/telegram"
 	converter "j-ai-trade/utils/converter"
+	"os"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -20,6 +22,7 @@ type BtcChartObserver struct {
 	symbol          string
 	marketAnalyzer  *market_analyzer.MarketAnalyzer
 	strategyHandler *quantitativetrading.StrategyHandler
+	telegramService *telegram.TelegramService
 }
 
 func NewBtcChartObserver(service *binance.BinanceService) *BtcChartObserver {
@@ -30,6 +33,7 @@ func NewBtcChartObserver(service *binance.BinanceService) *BtcChartObserver {
 		symbol:          "BTCUSDT",
 		marketAnalyzer:  market_analyzer.NewMarketAnalyzer([]strategies.Strategy{}),
 		strategyHandler: quantitativetrading.NewStrategyHandler(),
+		telegramService: telegram.NewTelegramService(),
 	}
 }
 
@@ -42,7 +46,7 @@ func (o *BtcChartObserver) StopBtcChartObserver() {
 }
 
 func (o *BtcChartObserver) run() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1800 * time.Second)
 	defer ticker.Stop()
 
 	// Start a goroutine to listen for results
@@ -50,7 +54,13 @@ func (o *BtcChartObserver) run() {
 		for {
 			select {
 			case result := <-o.resultChan:
-				fmt.Printf("Received result: %s\n", result)
+				err := o.telegramService.SendMessageToChannel(
+					os.Getenv("JONNOZ_TOKEN"),
+					os.Getenv("JONNOZ_MARKET_TREND_CHAN"),
+					result)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to send signal to Telegram")
+				}
 			case <-o.stopChan:
 				return
 			}
@@ -112,18 +122,15 @@ func (o *BtcChartObserver) analyzeBtcMarket(ctx context.Context, symbol string, 
 		return fmt.Errorf("failed to analyze market: %v", err)
 	}
 
-	// Get suitable strategies
-	suitableStrategies := o.marketAnalyzer.GetSuitableStrategies(analysis)
-
 	// Construct message
 	msg := fmt.Sprintf("Market Analysis for %s:\n", symbol)
 	msg += fmt.Sprintf("Primary Condition: %s\n", analysis.PrimaryCondition)
 	msg += fmt.Sprintf("Volatility: %.2f\n", analysis.Volatility)
 	msg += fmt.Sprintf("Trend: %.2f\n", analysis.Trend)
 	msg += fmt.Sprintf("Volume: %.2f\n", analysis.Volume)
-	msg += "\nSuitable Strategies:\n"
-	for _, strategy := range suitableStrategies {
-		msg += fmt.Sprintf("- %s\n", strategy.GetName())
+	msg += "Conditions:\n"
+	for _, condition := range analysis.Conditions {
+		msg += fmt.Sprintf("- %s (Confidence: %.2f)\n", condition.Condition, condition.Confidence)
 	}
 
 	// Send message through result channel
