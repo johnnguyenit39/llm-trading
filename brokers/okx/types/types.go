@@ -32,3 +32,14 @@ type CurrencyPair struct {
 	QuoteSymbol string
 	Symbol      string
 }
+
+// OKXCandle represents a candlestick data point from OKX
+type OKXCandle struct {
+	Timestamp string  `json:"ts"`
+	Open      float64 `json:"o,string"`
+	High      float64 `json:"h,string"`
+	Low       float64 `json:"l,string"`
+	Close     float64 `json:"c,string"`
+	Volume    float64 `json:"vol,string"`
+	Amount    float64 `json:"volCcy,string"`
+}

@@ -19,4 +19,11 @@ type OKXRepository interface {
 	SyncTimeWithOKX() error
 	GetAdjustedTime() time.Time
 	GenerateSign(timestamp, method, requestPath, body string) string
+
+	// Candle operations
+	Fetch5mCandles(symbol string, limit int) ([]types.OKXCandle, error)
+	Fetch15mCandles(symbol string, limit int) ([]types.OKXCandle, error)
+	Fetch1hCandles(symbol string, limit int) ([]types.OKXCandle, error)
+	Fetch4hCandles(symbol string, limit int) ([]types.OKXCandle, error)
+	Fetch1dCandles(symbol string, limit int) ([]types.OKXCandle, error)
 }

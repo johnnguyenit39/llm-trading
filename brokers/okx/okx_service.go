@@ -63,3 +63,28 @@ func (s *OKXService) CancelFuturesOrder(orderID string, instId string) ([]byte, 
 func (s *OKXService) SyncTime() error {
 	return s.repo.SyncTimeWithOKX()
 }
+
+// Fetch5mCandles fetches 5-minute candles for a symbol
+func (s *OKXService) Fetch5mCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return s.repo.Fetch5mCandles(symbol, limit)
+}
+
+// Fetch15mCandles fetches 15-minute candles for a symbol
+func (s *OKXService) Fetch15mCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return s.repo.Fetch15mCandles(symbol, limit)
+}
+
+// Fetch1hCandles fetches 1-hour candles for a symbol
+func (s *OKXService) Fetch1hCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return s.repo.Fetch1hCandles(symbol, limit)
+}
+
+// Fetch4hCandles fetches 4-hour candles for a symbol
+func (s *OKXService) Fetch4hCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return s.repo.Fetch4hCandles(symbol, limit)
+}
+
+// Fetch1dCandles fetches 1-day candles for a symbol
+func (s *OKXService) Fetch1dCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return s.repo.Fetch1dCandles(symbol, limit)
+}

@@ -12,8 +12,12 @@ func InitCronJobs(db *gorm.DB) {
 	GlobalBinanceCandlesJob.Start()
 
 	// Initialize and start Gold FX job
-	InitializeGlobalGoldFXJob()
-	GlobalGoldFXCandlesJob.Start()
+	// InitializeGlobalGoldFXJob()
+	// GlobalGoldFXCandlesJob.Start()
+
+	// Initialize and start OKX Gold job
+	InitializeGlobalGoldTJob()
+	GlobalGoldTCandlesJob.Start()
 
 	// Initialize and start the chart observer
 	GlobalChartObserver = NewChartObserver()
@@ -28,6 +32,10 @@ func StopCronJobs() {
 
 	if GlobalGoldFXCandlesJob != nil {
 		GlobalGoldFXCandlesJob.Stop()
+	}
+
+	if GlobalGoldTCandlesJob != nil {
+		GlobalGoldTCandlesJob.Stop()
 	}
 
 	if GlobalChartObserver != nil {

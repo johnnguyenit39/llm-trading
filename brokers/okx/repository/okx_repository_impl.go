@@ -405,3 +405,79 @@ func (r *okxRepositoryImpl) GenerateSign(timestamp, method, requestPath, body st
 	mac.Write([]byte(message))
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
 }
+
+func (r *okxRepositoryImpl) Fetch5mCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return r.fetchCandles(symbol, "5m", limit)
+}
+
+func (r *okxRepositoryImpl) Fetch15mCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return r.fetchCandles(symbol, "15m", limit)
+}
+
+func (r *okxRepositoryImpl) Fetch1hCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return r.fetchCandles(symbol, "1H", limit)
+}
+
+func (r *okxRepositoryImpl) Fetch4hCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return r.fetchCandles(symbol, "4H", limit)
+}
+
+func (r *okxRepositoryImpl) Fetch1dCandles(symbol string, limit int) ([]types.OKXCandle, error) {
+	return r.fetchCandles(symbol, "1D", limit)
+}
+
+func (r *okxRepositoryImpl) fetchCandles(symbol, bar string, limit int) ([]types.OKXCandle, error) {
+	// For OKX API, we need to use "XAUT-USDT" for gold trading
+	url := fmt.Sprintf("%s/api/v5/market/candles?instId=%s-USDT&bar=%s&limit=%d", r.baseURL, symbol, bar, limit)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Code string     `json:"code"`
+		Msg  string     `json:"msg"`
+		Data [][]string `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	if result.Code != "0" {
+		return nil, fmt.Errorf("API error: %s", result.Msg)
+	}
+
+	candles := make([]types.OKXCandle, 0, len(result.Data))
+	for _, data := range result.Data {
+		if len(data) < 9 { // OKX returns 9 fields in the response
+			continue
+		}
+
+		open, _ := strconv.ParseFloat(data[1], 64)
+		high, _ := strconv.ParseFloat(data[2], 64)
+		low, _ := strconv.ParseFloat(data[3], 64)
+		close, _ := strconv.ParseFloat(data[4], 64)
+		vol, _ := strconv.ParseFloat(data[5], 64)
+		volCcy, _ := strconv.ParseFloat(data[6], 64)
+
+		candles = append(candles, types.OKXCandle{
+			Timestamp: data[0],
+			Open:      open,
+			High:      high,
+			Low:       low,
+			Close:     close,
+			Volume:    vol,
+			Amount:    volCcy,
+		})
+	}
+
+	return candles, nil
+}
