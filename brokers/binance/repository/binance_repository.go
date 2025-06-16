@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type Candle struct {
+type BinanceCandle struct {
 	Symbol    string
 	OpenTime  time.Time
 	Open      float64
@@ -19,5 +19,5 @@ type Candle struct {
 type BinanceRepository interface {
 	// FetchCandles fetches candles for a given symbol and interval
 	// limit is the number of candles to fetch
-	FetchCandles(ctx context.Context, symbol string, interval string, limit int) ([]Candle, error)
+	FetchCandles(ctx context.Context, symbol string, interval string, limit int) ([]BinanceCandle, error)
 }

@@ -83,7 +83,7 @@ func With1dLimit(limit int) BinanceServiceOption {
 }
 
 // Fetch1mCandles fetches 1-minute candles
-func (s *BinanceService) Fetch1mCandles(ctx context.Context, symbol string, limit ...int) ([]repository.Candle, error) {
+func (s *BinanceService) Fetch1mCandles(ctx context.Context, symbol string, limit ...int) ([]repository.BinanceCandle, error) {
 	actualLimit := s.default1mLimit
 	if len(limit) > 0 {
 		actualLimit = limit[0]
@@ -92,7 +92,7 @@ func (s *BinanceService) Fetch1mCandles(ctx context.Context, symbol string, limi
 }
 
 // Fetch5mCandles fetches 5-minute candles
-func (s *BinanceService) Fetch5mCandles(ctx context.Context, symbol string, limit ...int) ([]repository.Candle, error) {
+func (s *BinanceService) Fetch5mCandles(ctx context.Context, symbol string, limit ...int) ([]repository.BinanceCandle, error) {
 	actualLimit := s.default5mLimit
 	if len(limit) > 0 {
 		actualLimit = limit[0]
@@ -101,7 +101,7 @@ func (s *BinanceService) Fetch5mCandles(ctx context.Context, symbol string, limi
 }
 
 // Fetch15mCandles fetches 15-minute candles
-func (s *BinanceService) Fetch15mCandles(ctx context.Context, symbol string, limit ...int) ([]repository.Candle, error) {
+func (s *BinanceService) Fetch15mCandles(ctx context.Context, symbol string, limit ...int) ([]repository.BinanceCandle, error) {
 	actualLimit := s.default15mLimit
 	if len(limit) > 0 {
 		actualLimit = limit[0]
@@ -110,7 +110,7 @@ func (s *BinanceService) Fetch15mCandles(ctx context.Context, symbol string, lim
 }
 
 // Fetch1hCandles fetches 1-hour candles
-func (s *BinanceService) Fetch1hCandles(ctx context.Context, symbol string, limit ...int) ([]repository.Candle, error) {
+func (s *BinanceService) Fetch1hCandles(ctx context.Context, symbol string, limit ...int) ([]repository.BinanceCandle, error) {
 	actualLimit := s.default1hLimit
 	if len(limit) > 0 {
 		actualLimit = limit[0]
@@ -119,7 +119,7 @@ func (s *BinanceService) Fetch1hCandles(ctx context.Context, symbol string, limi
 }
 
 // Fetch4hCandles fetches 4-hour candles
-func (s *BinanceService) Fetch4hCandles(ctx context.Context, symbol string, limit ...int) ([]repository.Candle, error) {
+func (s *BinanceService) Fetch4hCandles(ctx context.Context, symbol string, limit ...int) ([]repository.BinanceCandle, error) {
 	actualLimit := s.default4hLimit
 	if len(limit) > 0 {
 		actualLimit = limit[0]
@@ -128,7 +128,7 @@ func (s *BinanceService) Fetch4hCandles(ctx context.Context, symbol string, limi
 }
 
 // Fetch1dCandles fetches daily candles
-func (s *BinanceService) Fetch1dCandles(ctx context.Context, symbol string, limit ...int) ([]repository.Candle, error) {
+func (s *BinanceService) Fetch1dCandles(ctx context.Context, symbol string, limit ...int) ([]repository.BinanceCandle, error) {
 	actualLimit := s.default1dLimit
 	if len(limit) > 0 {
 		actualLimit = limit[0]

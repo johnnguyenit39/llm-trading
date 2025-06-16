@@ -35,7 +35,7 @@ func NewRSI15m1hStrategy() *RSI15m1hStrategy {
 	}
 }
 
-func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*strategies.Signal, error) {
+func (s *RSI15m1hStrategy) Analyze(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
 	// Get 15m candles for main analysis
 	candles15m := candles["15m"]
 	if len(candles15m) < s.period {
@@ -302,7 +302,7 @@ func formatPercentage(value float64) string {
 }
 
 // calculatePriceChange calculates the percentage change in price
-func calculatePriceChange(candles []repository.Candle) float64 {
+func calculatePriceChange(candles []repository.BinanceCandle) float64 {
 	if len(candles) < 2 {
 		return 0
 	}
@@ -312,7 +312,7 @@ func calculatePriceChange(candles []repository.Candle) float64 {
 }
 
 // calculateSignalStrength calculates the confidence level of the signal
-func calculateSignalStrength(rsi15m, rsi1h, priceChange15m, priceChange1h float64, candles []repository.Candle) float64 {
+func calculateSignalStrength(rsi15m, rsi1h, priceChange15m, priceChange1h float64, candles []repository.BinanceCandle) float64 {
 	// Base confidence
 	confidence := 0.7
 
@@ -349,7 +349,7 @@ func calculateSignalStrength(rsi15m, rsi1h, priceChange15m, priceChange1h float6
 }
 
 // calculateAverageVolume calculates the average volume over the last n candles
-func calculateAverageVolume(candles []repository.Candle) float64 {
+func calculateAverageVolume(candles []repository.BinanceCandle) float64 {
 	if len(candles) == 0 {
 		return 0
 	}

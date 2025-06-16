@@ -30,7 +30,7 @@ func NewMACD15m1hStrategy() *MACD15m1hStrategy {
 	}
 }
 
-func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.Candle) (*strategies.Signal, error) {
+func (s *MACD15m1hStrategy) Analyze(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
 	// Get 15m candles for main analysis
 	candles15m := candles["15m"]
 	if len(candles15m) < s.slowPeriod {

@@ -11,7 +11,7 @@ import (
 )
 
 // MomentumScalping implements a scalping strategy based on price momentum
-func MomentumScalping(candles5m []repository.Candle) (*strategies.Signal, error) {
+func MomentumScalping(candles5m []repository.BinanceCandle) (*strategies.Signal, error) {
 	// Convert candle data to float64 arrays
 	closes := make([]float64, len(candles5m))
 	volumes := make([]float64, len(candles5m))

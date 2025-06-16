@@ -35,7 +35,7 @@ func (s *SidewaysMarketScalpingStrategy) IsSuitableForCondition(condition common
 	}
 }
 
-func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.Candle) (*strategies.Signal, error) {
+func (s *SidewaysMarketScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
 	// Get 5m candles for quick signals
 	candles5m := candles["5m"]
 	if len(candles5m) < 20 {

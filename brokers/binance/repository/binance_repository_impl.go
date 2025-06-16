@@ -26,7 +26,7 @@ func NewBinanceRepository() BinanceRepository {
 	}
 }
 
-func (r *binanceRepositoryImpl) FetchCandles(ctx context.Context, symbol string, interval string, limit int) ([]Candle, error) {
+func (r *binanceRepositoryImpl) FetchCandles(ctx context.Context, symbol string, interval string, limit int) ([]BinanceCandle, error) {
 	url := fmt.Sprintf("%s/api/v3/klines?symbol=%s&interval=%s&limit=%d", r.baseURL, symbol, interval, limit)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -49,7 +49,7 @@ func (r *binanceRepositoryImpl) FetchCandles(ctx context.Context, symbol string,
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	candles := make([]Candle, 0, len(rawCandles))
+	candles := make([]BinanceCandle, 0, len(rawCandles))
 	for _, raw := range rawCandles {
 		openTime := int64(raw[0].(float64))
 		closeTime := int64(raw[6].(float64))
@@ -60,7 +60,7 @@ func (r *binanceRepositoryImpl) FetchCandles(ctx context.Context, symbol string,
 		close, _ := strconv.ParseFloat(raw[4].(string), 64)
 		volume, _ := strconv.ParseFloat(raw[5].(string), 64)
 
-		candles = append(candles, Candle{
+		candles = append(candles, BinanceCandle{
 			Symbol:    symbol,
 			OpenTime:  time.Unix(0, openTime*int64(time.Millisecond)),
 			Open:      open,

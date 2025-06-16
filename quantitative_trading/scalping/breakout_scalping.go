@@ -37,7 +37,7 @@ func (s *BreakoutScalpingStrategy) IsSuitableForCondition(condition common.Marke
 	}
 }
 
-func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.Candle) (*strategies.Signal, error) {
+func (s *BreakoutScalpingStrategy) AnalyzeShortTermMarket(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error) {
 	// Get multiple timeframe candles
 	candles5m := candles["5m"]
 	candles15m := candles["15m"]

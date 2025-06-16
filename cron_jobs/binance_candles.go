@@ -121,8 +121,8 @@ func (j *BinanceCandlesJob) startRsiStrategy(symbol string) {
 		ctx := context.Background()
 
 		// Create channels for results
-		candles15mChan := make(chan []repository.Candle)
-		candles1hChan := make(chan []repository.Candle)
+		candles15mChan := make(chan []repository.BinanceCandle)
+		candles1hChan := make(chan []repository.BinanceCandle)
 		errChan := make(chan error)
 
 		// Fetch candles concurrently
@@ -145,7 +145,7 @@ func (j *BinanceCandlesJob) startRsiStrategy(symbol string) {
 		}()
 
 		// Collect results
-		var candles15m, candles1h []repository.Candle
+		var candles15m, candles1h []repository.BinanceCandle
 		for i := 0; i < 2; i++ {
 			select {
 			case err := <-errChan:
@@ -199,8 +199,8 @@ func (j *BinanceCandlesJob) startMacdStrategy(symbol string) {
 		ctx := context.Background()
 
 		// Create channels for results
-		candles15mChan := make(chan []repository.Candle)
-		candles1hChan := make(chan []repository.Candle)
+		candles15mChan := make(chan []repository.BinanceCandle)
+		candles1hChan := make(chan []repository.BinanceCandle)
 		errChan := make(chan error)
 
 		// Fetch candles concurrently
@@ -223,7 +223,7 @@ func (j *BinanceCandlesJob) startMacdStrategy(symbol string) {
 		}()
 
 		// Collect results
-		var candles15m, candles1h []repository.Candle
+		var candles15m, candles1h []repository.BinanceCandle
 		for i := 0; i < 2; i++ {
 			select {
 			case err := <-errChan:
@@ -277,9 +277,9 @@ func (j *BinanceCandlesJob) startHA1Strategy(symbol string) {
 		ctx := context.Background()
 
 		// Create channels for results
-		candles1dChan := make(chan []repository.Candle)
-		candles4hChan := make(chan []repository.Candle)
-		candles1hChan := make(chan []repository.Candle)
+		candles1dChan := make(chan []repository.BinanceCandle)
+		candles4hChan := make(chan []repository.BinanceCandle)
+		candles1hChan := make(chan []repository.BinanceCandle)
 		errChan := make(chan error)
 
 		// Fetch candles concurrently
@@ -311,7 +311,7 @@ func (j *BinanceCandlesJob) startHA1Strategy(symbol string) {
 		}()
 
 		// Collect results
-		var candles1d, candles4h, candles1h []repository.Candle
+		var candles1d, candles4h, candles1h []repository.BinanceCandle
 		for i := 0; i < 3; i++ {
 			select {
 			case err := <-errChan:
@@ -370,9 +370,9 @@ func (j *BinanceCandlesJob) startShortTermStrategy(symbol string) {
 		ctx := context.Background()
 
 		// Create channels for results
-		candles5mChan := make(chan []repository.Candle)
-		candles15mChan := make(chan []repository.Candle)
-		candles1hChan := make(chan []repository.Candle)
+		candles5mChan := make(chan []repository.BinanceCandle)
+		candles15mChan := make(chan []repository.BinanceCandle)
+		candles1hChan := make(chan []repository.BinanceCandle)
 		errChan := make(chan error)
 
 		// Fetch candles concurrently
@@ -404,7 +404,7 @@ func (j *BinanceCandlesJob) startShortTermStrategy(symbol string) {
 		}()
 
 		// Collect results
-		var candles5m, candles15m, candles1h []repository.Candle
+		var candles5m, candles15m, candles1h []repository.BinanceCandle
 		for i := 0; i < 3; i++ {
 			select {
 			case err := <-errChan:

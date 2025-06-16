@@ -23,7 +23,7 @@ type Signal struct {
 // Strategy defines the interface for all trading strategies
 type Strategy interface {
 	// Analyze analyzes the market data and returns a signal if conditions are met
-	Analyze(candles map[string][]repository.Candle) (*Signal, error)
+	Analyze(candles map[string][]repository.BinanceCandle) (*Signal, error)
 
 	// GetName returns the strategy name
 	GetName() string

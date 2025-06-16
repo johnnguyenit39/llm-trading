@@ -24,7 +24,7 @@ type Strategy interface {
 	IsSuitableForCondition(condition common.MarketCondition) bool
 
 	// AnalyzeShortTermMarket processes the market data and returns a trading signal
-	AnalyzeShortTermMarket(candles map[string][]repository.Candle) (*strategies.Signal, error)
+	AnalyzeShortTermMarket(candles map[string][]repository.BinanceCandle) (*strategies.Signal, error)
 }
 
 type Signal struct {
@@ -121,7 +121,7 @@ func NewStrategyHandler() *StrategyHandler {
 }
 
 // ProcessMarketCondition processes market conditions and executes suitable strategies
-func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1h []repository.Candle) ([]*Signal, error) {
+func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1h []repository.BinanceCandle) ([]*Signal, error) {
 	// Analyze market conditions
 	analysis, err := h.marketAnalyzer.AnalyzeMarket(candles5m, candles15m, candles1h)
 	if err != nil {
@@ -147,7 +147,7 @@ func (h *StrategyHandler) ProcessMarketCondition(candles5m, candles15m, candles1
 	var signals []*Signal
 	for _, strategy := range filteredStrategies {
 		// Create candles map for strategy
-		candles := map[string][]repository.Candle{
+		candles := map[string][]repository.BinanceCandle{
 			"5m":  candles5m,
 			"15m": candles15m,
 			"1h":  candles1h,
@@ -313,9 +313,9 @@ func (h *StrategyHandler) RegisterStrategy(strategy Strategy) {
 	h.strategies = append(h.strategies, strategy)
 }
 
-func (h *StrategyHandler) ProcessRsiWithCandles(candles15m, candles1h []repository.Candle) (*Signal, error) {
+func (h *StrategyHandler) ProcessRsiWithCandles(candles15m, candles1h []repository.BinanceCandle) (*Signal, error) {
 	// Create candles map for strategy
-	candles := map[string][]repository.Candle{
+	candles := map[string][]repository.BinanceCandle{
 		"15m": candles15m,
 		"1h":  candles1h,
 	}
@@ -341,9 +341,9 @@ func (h *StrategyHandler) ProcessRsiWithCandles(candles15m, candles1h []reposito
 	}, nil
 }
 
-func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []repository.Candle) (*Signal, error) {
+func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []repository.BinanceCandle) (*Signal, error) {
 	// Create candles map for strategy
-	candles := map[string][]repository.Candle{
+	candles := map[string][]repository.BinanceCandle{
 		"15m": candles15m,
 		"1h":  candles1h,
 	}
@@ -370,11 +370,11 @@ func (h *StrategyHandler) ProcessMacdWithCandles(candles15m, candles1h []reposit
 }
 
 // ProcessHA1WithCandles processes candles through the HA-1 strategy
-func (h *StrategyHandler) ProcessHA1WithCandles(candles1d, candles4h, candles1h []repository.Candle) (*Signal, error) {
+func (h *StrategyHandler) ProcessHA1WithCandles(candles1d, candles4h, candles1h []repository.BinanceCandle) (*Signal, error) {
 	strategy := swing.NewHA1Strategy()
 
 	// Convert candles to map for strategy
-	candles := map[string][]repository.Candle{
+	candles := map[string][]repository.BinanceCandle{
 		"1d": candles1d,
 		"4h": candles4h,
 		"1h": candles1h,
