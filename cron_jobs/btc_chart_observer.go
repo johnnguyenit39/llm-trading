@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"j-ai-trade/brokers/binance"
+	openai "j-ai-trade/open_ai"
 	quantitativetrading "j-ai-trade/quantitative_trading"
 	"j-ai-trade/quantitative_trading/market_analyzer"
 	strategies "j-ai-trade/quantitative_trading/strategies"
 	"j-ai-trade/telegram"
 	converter "j-ai-trade/utils/converter"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -23,9 +25,13 @@ type BtcChartObserver struct {
 	marketAnalyzer  *market_analyzer.MarketAnalyzer
 	strategyHandler *quantitativetrading.StrategyHandler
 	telegramService *telegram.TelegramService
+	openAiService   *openai.UserService
 }
 
 func NewBtcChartObserver(service *binance.BinanceService) *BtcChartObserver {
+	openAiRepo := openai.NewOpenAiRepository()
+	openAiService := openai.NewOpenAiService(openAiRepo)
+
 	return &BtcChartObserver{
 		resultChan:      make(chan string),
 		stopChan:        make(chan struct{}),
@@ -34,6 +40,7 @@ func NewBtcChartObserver(service *binance.BinanceService) *BtcChartObserver {
 		marketAnalyzer:  market_analyzer.NewMarketAnalyzer([]strategies.Strategy{}),
 		strategyHandler: quantitativetrading.NewStrategyHandler(),
 		telegramService: telegram.NewTelegramService(),
+		openAiService:   openAiService,
 	}
 }
 
@@ -54,12 +61,47 @@ func (o *BtcChartObserver) run() {
 		for {
 			select {
 			case result := <-o.resultChan:
-				err := o.telegramService.SendMessageToChannel(
-					os.Getenv("JONNOZ_TOKEN"),
-					os.Getenv("JONNOZ_MARKET_TREND_CHAN"),
-					result)
+				// Create new OpenAI thread
+				threadID, err := o.openAiService.CreateNewChatThread()
 				if err != nil {
-					log.Error().Err(err).Msg("Failed to send signal to Telegram")
+					log.Error().Err(err).Msg("Failed to create OpenAI thread")
+					continue
+				}
+
+				// Send the market analysis to OpenAI
+				err = o.openAiService.CreateNewChatMessage(*threadID, "user", result)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to send market analysis to OpenAI")
+					continue
+				}
+
+				// Create a string builder to collect the streamed response
+				var responseBuilder strings.Builder
+
+				// Stream the response from OpenAI
+				err = o.openAiService.GetStreamMessageThread(
+					*threadID,
+					&responseBuilder,
+					func(fullMessage string) {
+						// Send AI response to Telegram
+						err := o.telegramService.SendMessageToChannel(
+							os.Getenv("JONNOZ_TOKEN"),
+							os.Getenv("JONNOZ_MARKET_TREND_CHAN"),
+							fullMessage)
+						if err != nil {
+							log.Error().Err(err).Msg("Failed to send signal to Telegram")
+						}
+					},
+				)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to get OpenAI response")
+					continue
+				}
+
+				// Clean up the thread
+				err = o.openAiService.DeleteChatThread(*threadID)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to delete OpenAI thread")
 				}
 			case <-o.stopChan:
 				return
