@@ -139,20 +139,6 @@ func (o *BtcChartObserver) analyzeBtcMarket(ctx context.Context, symbol string, 
 		return fmt.Errorf("failed to fetch 1h candles: %v", err)
 	}
 
-	// Log the latest candles
-	if len(candles5m) > 0 {
-		latest := candles5m[len(candles5m)-1]
-		log.Info().
-			Str("symbol", symbol).
-			Str("timeframe", "5m").
-			Float64("open", latest.Open).
-			Float64("high", latest.High).
-			Float64("low", latest.Low).
-			Float64("close", latest.Close).
-			Float64("volume", latest.Volume).
-			Msg("Latest 5m candle")
-	}
-
 	// Convert Binance candles to base candles
 	baseCandles5m := converter.ConvertBinanceCandlesToBase(candles5m)
 	baseCandles15m := converter.ConvertBinanceCandlesToBase(candles15m)
@@ -164,16 +150,48 @@ func (o *BtcChartObserver) analyzeBtcMarket(ctx context.Context, symbol string, 
 		return fmt.Errorf("failed to analyze market: %v", err)
 	}
 
-	// Construct message
-	msg := fmt.Sprintf("Market Analysis for %s:\n", symbol)
-	msg += fmt.Sprintf("Primary Condition: %s\n", analysis.PrimaryCondition)
-	msg += fmt.Sprintf("Volatility: %.2f\n", analysis.Volatility)
-	msg += fmt.Sprintf("Trend: %.2f\n", analysis.Trend)
-	msg += fmt.Sprintf("Volume: %.2f\n", analysis.Volume)
-	msg += "Conditions:\n"
+	// Construct detailed message
+	msg := fmt.Sprintf("Detailed Market Analysis for %s:\n\n", symbol)
+
+	// Primary Market Condition
+	msg += fmt.Sprintf("Primary Market Condition: %s\n", analysis.PrimaryCondition)
+
+	// Market Metrics
+	msg += "\nMarket Metrics:\n"
+	msg += fmt.Sprintf("- Volatility: %.2f\n", analysis.Volatility)
+	msg += fmt.Sprintf("- Trend: %.2f\n", analysis.Trend)
+	msg += fmt.Sprintf("- Volume: %.2f\n", analysis.Volume)
+
+	// Market Conditions with Confidence
+	msg += "\nMarket Conditions:\n"
 	for _, condition := range analysis.Conditions {
 		msg += fmt.Sprintf("- %s (Confidence: %.2f)\n", condition.Condition, condition.Confidence)
 	}
+
+	// Latest Price Data
+	latest5m := baseCandles5m[len(baseCandles5m)-1]
+	latest15m := baseCandles15m[len(baseCandles15m)-1]
+	latest1h := baseCandles1h[len(baseCandles1h)-1]
+
+	msg += "\nLatest Price Data:\n"
+	msg += fmt.Sprintf("5m: Open=%.2f, High=%.2f, Low=%.2f, Close=%.2f, Volume=%.2f\n",
+		latest5m.Open, latest5m.High, latest5m.Low, latest5m.Close, latest5m.Volume)
+	msg += fmt.Sprintf("15m: Open=%.2f, High=%.2f, Low=%.2f, Close=%.2f, Volume=%.2f\n",
+		latest15m.Open, latest15m.High, latest15m.Low, latest15m.Close, latest15m.Volume)
+	msg += fmt.Sprintf("1h: Open=%.2f, High=%.2f, Low=%.2f, Close=%.2f, Volume=%.2f\n",
+		latest1h.Open, latest1h.High, latest1h.Low, latest1h.Close, latest1h.Volume)
+
+	// Price Changes
+	msg += "\nPrice Changes:\n"
+	msg += fmt.Sprintf("5m Change: %.2f%%\n", ((latest5m.Close-latest5m.Open)/latest5m.Open)*100)
+	msg += fmt.Sprintf("15m Change: %.2f%%\n", ((latest15m.Close-latest15m.Open)/latest15m.Open)*100)
+	msg += fmt.Sprintf("1h Change: %.2f%%\n", ((latest1h.Close-latest1h.Open)/latest1h.Open)*100)
+
+	// Volume Analysis
+	msg += "\nVolume Analysis:\n"
+	msg += fmt.Sprintf("5m Volume Change: %.2f%%\n", ((latest5m.Volume-baseCandles5m[len(baseCandles5m)-2].Volume)/baseCandles5m[len(baseCandles5m)-2].Volume)*100)
+	msg += fmt.Sprintf("15m Volume Change: %.2f%%\n", ((latest15m.Volume-baseCandles15m[len(baseCandles15m)-2].Volume)/baseCandles15m[len(baseCandles15m)-2].Volume)*100)
+	msg += fmt.Sprintf("1h Volume Change: %.2f%%\n", ((latest1h.Volume-baseCandles1h[len(baseCandles1h)-2].Volume)/baseCandles1h[len(baseCandles1h)-2].Volume)*100)
 
 	// Send message through result channel
 	o.resultChan <- msg
