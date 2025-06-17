@@ -2155,6 +2155,46 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/tool/futures/leverage": {
+            "post": {
+                "description": "Returns leverage and position size for given capital and symbol",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "futures"
+                ],
+                "summary": "Calculate required leverage for $1 profit per 0.001 price move",
+                "parameters": [
+                    {
+                        "description": "Capital, Symbol, and Price Movement",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/futures.FuturesLeverageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/futures.BaseApiResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/futures.BaseApiResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/user/create": {
             "post": {
                 "security": [
@@ -2564,6 +2604,42 @@ const docTemplate = `{
                 }
             }
         },
+        "futures.BaseApiResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "httpRequestStatus": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "futures.FuturesLeverageRequest": {
+            "type": "object",
+            "properties": {
+                "capital": {
+                    "type": "number",
+                    "example": 1000
+                },
+                "price_movement": {
+                    "type": "number",
+                    "example": 0.0001
+                },
+                "symbol": {
+                    "type": "string",
+                    "example": "ADAUSDT"
+                },
+                "target_profit": {
+                    "type": "number",
+                    "example": 1
+                }
+            }
+        },
         "j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest": {
             "type": "object"
         },
@@ -2858,7 +2934,6 @@ const docTemplate = `{
                 "currency",
                 "leverage",
                 "posSide",
-                "price",
                 "side",
                 "type"
             ],
@@ -2880,12 +2955,28 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "price": {
-                    "description": "Order price",
+                    "description": "Order price (required for limit orders)",
                     "type": "number"
                 },
                 "side": {
                     "description": "\"buy\" or \"sell\"",
                     "type": "string"
+                },
+                "slOrdPx": {
+                    "description": "Stop loss order price",
+                    "type": "number"
+                },
+                "slTriggerPx": {
+                    "description": "Stop loss trigger price",
+                    "type": "number"
+                },
+                "tpOrdPx": {
+                    "description": "Take profit order price",
+                    "type": "number"
+                },
+                "tpTriggerPx": {
+                    "description": "Take profit trigger price",
+                    "type": "number"
                 },
                 "type": {
                     "description": "\"limit\" or \"market\"",
@@ -3046,7 +3137,39 @@ const docTemplate = `{
                 "ID": {
                     "type": "string"
                 },
+                "broker": {
+                    "description": "okx, binance",
+                    "type": "string"
+                },
+                "broker_order_id": {
+                    "type": "string"
+                },
+                "close": {
+                    "type": "number"
+                },
                 "createdAt": {
+                    "type": "string"
+                },
+                "decision": {
+                    "description": "long, short, buy, sell",
+                    "type": "string"
+                },
+                "entry": {
+                    "type": "number"
+                },
+                "pair": {
+                    "description": "BTC/USDT",
+                    "type": "string"
+                },
+                "profit_n_loss": {
+                    "type": "number"
+                },
+                "strategy": {
+                    "description": "MACD",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "futures, spot",
                     "type": "string"
                 }
             }

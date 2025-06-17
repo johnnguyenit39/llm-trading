@@ -3,20 +3,20 @@ package app
 import (
 	appContext "j-ai-trade/components/app_context"
 	"j-ai-trade/middlewares"
+	ginAiExpert "j-ai-trade/modules/ai_expert/transport/gin"
 	ginApiKey "j-ai-trade/modules/api_key/transport/gin"
 	ginAuth "j-ai-trade/modules/auth/transport/gin"
+	ginFutures "j-ai-trade/modules/futures"
+	ginJbot "j-ai-trade/modules/j_bot/transport/gin"
 	ginOkx "j-ai-trade/modules/okx/transport/gin"
+	ginOrder "j-ai-trade/modules/order/transport/gin"
+	ginOtp "j-ai-trade/modules/otp/transport/gin"
 	ginPermission "j-ai-trade/modules/permission/transport/gin"
+	ginSignal "j-ai-trade/modules/signal/transport/gin"
 	ginSubscription "j-ai-trade/modules/subscription/transport/gin"
 	ginUser "j-ai-trade/modules/user/transport/gin"
 	"j-ai-trade/telegram"
 	ginTelegram "j-ai-trade/telegram/transport/gin"
-
-	ginAiExpert "j-ai-trade/modules/ai_expert/transport/gin"
-	ginJbot "j-ai-trade/modules/j_bot/transport/gin"
-	ginOrder "j-ai-trade/modules/order/transport/gin"
-	ginOtp "j-ai-trade/modules/otp/transport/gin"
-	ginSignal "j-ai-trade/modules/signal/transport/gin"
 
 	"github.com/gin-contrib/cors"
 	swaggerFiles "github.com/swaggo/files"
@@ -65,6 +65,14 @@ func InitializeApp(appContext appContext.AppContext) {
 			auth.POST("/send-forgot-password-code", ginAuth.SendForgotPasswordCode(appContext.GetMainDBConnection()))
 			auth.POST("/verify-reset-password-code", ginAuth.VerifyResetPasswordCode(appContext.GetMainDBConnection()))
 			auth.POST("/reset-password", ginAuth.ResetPassword(appContext.GetMainDBConnection()))
+
+		}
+	}
+
+	{
+		tool := v1.Group("/tool")
+		{
+			tool.POST("/futures/leverage", ginFutures.CalculateLeverageAPI())
 		}
 	}
 

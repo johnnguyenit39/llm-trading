@@ -144,6 +144,31 @@ definitions:
     - code
     - email
     type: object
+  futures.BaseApiResponse:
+    properties:
+      data: {}
+      httpRequestStatus:
+        type: integer
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  futures.FuturesLeverageRequest:
+    properties:
+      capital:
+        example: 1000
+        type: number
+      price_movement:
+        example: 0.0001
+        type: number
+      symbol:
+        example: ADAUSDT
+        type: string
+      target_profit:
+        example: 1
+        type: number
+    type: object
   j-ai-trade_modules_subscription_model_dto.SubscriptionUpdateRequest:
     type: object
   model.AccountDetail:
@@ -353,11 +378,23 @@ definitions:
         description: '"long" or "short"'
         type: string
       price:
-        description: Order price
+        description: Order price (required for limit orders)
         type: number
       side:
         description: '"buy" or "sell"'
         type: string
+      slOrdPx:
+        description: Stop loss order price
+        type: number
+      slTriggerPx:
+        description: Stop loss trigger price
+        type: number
+      tpOrdPx:
+        description: Take profit order price
+        type: number
+      tpTriggerPx:
+        description: Take profit trigger price
+        type: number
       type:
         description: '"limit" or "market"'
         type: string
@@ -366,7 +403,6 @@ definitions:
     - currency
     - leverage
     - posSide
-    - price
     - side
     - type
     type: object
@@ -473,7 +509,30 @@ definitions:
     properties:
       ID:
         type: string
+      broker:
+        description: okx, binance
+        type: string
+      broker_order_id:
+        type: string
+      close:
+        type: number
       createdAt:
+        type: string
+      decision:
+        description: long, short, buy, sell
+        type: string
+      entry:
+        type: number
+      pair:
+        description: BTC/USDT
+        type: string
+      profit_n_loss:
+        type: number
+      strategy:
+        description: MACD
+        type: string
+      type:
+        description: futures, spot
         type: string
     type: object
   model.OrderAddRequest:
@@ -2012,6 +2071,32 @@ paths:
       summary: Send a message to Telegram channel
       tags:
       - Telegram
+  /v1/tool/futures/leverage:
+    post:
+      consumes:
+      - application/json
+      description: Returns leverage and position size for given capital and symbol
+      parameters:
+      - description: Capital, Symbol, and Price Movement
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/futures.FuturesLeverageRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/futures.BaseApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/futures.BaseApiResponse'
+      summary: Calculate required leverage for $1 profit per 0.001 price move
+      tags:
+      - futures
   /v1/user/create:
     post:
       description: Create a new User
