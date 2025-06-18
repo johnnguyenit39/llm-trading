@@ -2,7 +2,6 @@ package main
 
 import (
 	"j-ai-trade/appi18n"
-	"j-ai-trade/brokers/okx"
 	appContext "j-ai-trade/components/app_context"
 	appConfig "j-ai-trade/config/app"
 	storage "j-ai-trade/config/postgres"
@@ -61,7 +60,6 @@ func main() {
 	}
 
 	// Initialize OKX service
-	_ = okx.GetInstance() // Initialize the singleton
 	log.Info().Msg("J AI Trade service initialized successfully")
 
 	db, err := storage.NewConnection()

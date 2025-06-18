@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"j-ai-trade/brokers/okx/model"
 	"j-ai-trade/brokers/okx/types"
 
 	"github.com/rs/zerolog/log"
@@ -30,14 +31,36 @@ type okxRepositoryImpl struct {
 	timeMutex  sync.RWMutex
 }
 
-func NewOKXRepository() OKXRepository {
-	return &okxRepositoryImpl{
-		apiKey:     os.Getenv("OKX_API_KEY"),
-		apiSecret:  os.Getenv("OKX_API_SECRET_KEY"),
-		passphrase: os.Getenv("OKX_API_PASSPHRASE"),
-		client:     &http.Client{Timeout: 10 * time.Second},
-		baseURL:    "https://www.okx.com",
+func NewOKXRepository(keys *model.OkxApiKeysModel) OKXRepository {
+	repo := &okxRepositoryImpl{
+		client:  &http.Client{Timeout: 10 * time.Second},
+		baseURL: "https://www.okx.com",
 	}
+
+	// Use provided keys if available, otherwise fall back to environment variables
+	if keys != nil {
+		if keys.ApiKey != "" {
+			repo.apiKey = keys.ApiKey
+		} else {
+			repo.apiKey = os.Getenv("OKX_API_KEY")
+		}
+		if keys.ApiSecret != "" {
+			repo.apiSecret = keys.ApiSecret
+		} else {
+			repo.apiSecret = os.Getenv("OKX_API_SECRET_KEY")
+		}
+		if keys.Passphrase != "" {
+			repo.passphrase = keys.Passphrase
+		} else {
+			repo.passphrase = os.Getenv("OKX_API_PASSPHRASE")
+		}
+	} else {
+		repo.apiKey = os.Getenv("OKX_API_KEY")
+		repo.apiSecret = os.Getenv("OKX_API_SECRET_KEY")
+		repo.passphrase = os.Getenv("OKX_API_PASSPHRASE")
+	}
+
+	return repo
 }
 
 func (r *okxRepositoryImpl) GetAccount(currency string) (map[string]types.Account, []byte, error) {

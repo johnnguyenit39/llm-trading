@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	utils "j-ai-trade/brokers/binance/utils"
 	"net/http"
 	"strconv"
 	"time"
@@ -27,7 +28,10 @@ func NewBinanceRepository() BinanceRepository {
 }
 
 func (r *binanceRepositoryImpl) FetchCandles(ctx context.Context, symbol string, interval string, limit int) ([]BinanceCandle, error) {
-	url := fmt.Sprintf("%s/api/v3/klines?symbol=%s&interval=%s&limit=%d", r.baseURL, symbol, interval, limit)
+
+	formatedSymbol := utils.ConvertPair(symbol)
+
+	url := fmt.Sprintf("%s/api/v3/klines?symbol=%s&interval=%s&limit=%d", r.baseURL, formatedSymbol, interval, limit)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

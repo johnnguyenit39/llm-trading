@@ -10,7 +10,7 @@ import (
 
 func (postgresStore *postgresStore) GetOkxInfo(ctx context.Context, cond map[string]interface{}) (*dto.OkxInfoResponse, error) {
 	// Get the OKX service instance
-	okxService := okx.GetInstance()
+	okxService := okx.NewOKXService(nil)
 
 	// Get account information
 	_, rawResponse, err := okxService.GetAccount("USDT")

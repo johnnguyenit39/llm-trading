@@ -1,14 +1,9 @@
 package okx
 
 import (
+	"j-ai-trade/brokers/okx/model"
 	"j-ai-trade/brokers/okx/repository"
 	"j-ai-trade/brokers/okx/types"
-	"sync"
-)
-
-var (
-	okxClient *OKXService
-	once      sync.Once
 )
 
 // OKXService represents the OKX API service
@@ -16,14 +11,11 @@ type OKXService struct {
 	repo repository.OKXRepository
 }
 
-// GetInstance returns the singleton instance of OKXService
-func GetInstance() *OKXService {
-	once.Do(func() {
-		okxClient = &OKXService{
-			repo: repository.NewOKXRepository(),
-		}
-	})
-	return okxClient
+// NewOKXService creates a new instance of OKXService with the provided keys
+func NewOKXService(keys *model.OkxApiKeysModel) *OKXService {
+	return &OKXService{
+		repo: repository.NewOKXRepository(keys),
+	}
 }
 
 // GetAccount retrieves the account information for a specific currency

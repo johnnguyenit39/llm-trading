@@ -28,7 +28,7 @@ func GetOkxAccount(db *gorm.DB) func(*gin.Context) {
 	return func(c *gin.Context) {
 		log := logger.GetLogger("GetOkxAccount", c.GetString(middlewares.RequestIDKey))
 
-		okxService := okx.GetInstance()
+		okxService := okx.NewOKXService(nil)
 		business := biz.NewGetAccountBiz(okxService)
 
 		response, err := business.GetAccount(c.Request.Context())

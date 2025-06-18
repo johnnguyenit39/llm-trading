@@ -2,10 +2,12 @@ package backtesting
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"j-ai-trade/brokers/okx"
+	okxmodel "j-ai-trade/brokers/okx/model"
 	"j-ai-trade/brokers/okx/types"
-	"j-ai-trade/modules/order/model"
+	ordermodel "j-ai-trade/modules/order/model"
 	"strings"
 
 	"gorm.io/gorm"
@@ -22,9 +24,15 @@ func NewBackTesting(db *gorm.DB) *BackTesting {
 }
 
 // ExecuteFuturesOrder executes a futures order and records it in the database
-func (b *BackTesting) ExecuteFuturesOrder(symbol string, amount, price float64, decision string, strategy string, takeProfit, stopLoss float64) error {
+func (b *BackTesting) ExecuteFuturesOrder(symbol string, amount, price float64, decision string, strategy string, takeProfit, stopLoss float64, keys *okxmodel.OkxApiKeysModel) error {
 	// Initialize OKX service
-	okxService := okx.GetInstance()
+	okxService := okx.NewOKXService(keys) // Using nil to use environment variables
+
+	parts := strings.Split(symbol, "/")
+
+	if len(parts) != 2 {
+		return errors.New("invalid symbol")
+	}
 
 	// Sync time with OKX server before making the request
 	if err := okxService.SyncTime(); err != nil {
@@ -32,7 +40,7 @@ func (b *BackTesting) ExecuteFuturesOrder(symbol string, amount, price float64, 
 	}
 
 	// Create currency pair
-	currencyPair := okxService.NewCurrencyPair("ADA", "USDT")
+	currencyPair := okxService.NewCurrencyPair(parts[0], parts[1])
 
 	// Determine order side based on decision
 	var side types.OrderSide
@@ -87,7 +95,7 @@ func (b *BackTesting) ExecuteFuturesOrder(symbol string, amount, price float64, 
 	}
 
 	// Create order record
-	order := &model.Order{
+	order := &ordermodel.Order{
 		Broker:        "okx",
 		BrokerOrderID: orderID,
 		Decision:      decision,

@@ -42,7 +42,7 @@ func CancelOkxSpotOrder(db *gorm.DB) func(*gin.Context) {
 			return
 		}
 
-		okxService := okx.GetInstance()
+		okxService := okx.NewOKXService(nil)
 		business := biz.NewCancelOrderBiz(okxService)
 
 		response, err := business.CancelSpotOrder(c.Request.Context(), &req)

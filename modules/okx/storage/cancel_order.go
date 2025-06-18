@@ -9,7 +9,7 @@ import (
 
 func (postgresStore *postgresStore) CancelSpotOrder(ctx context.Context, req *dto.CancelOrderRequest) ([]byte, error) {
 	// Get the OKX service instance
-	okxService := okx.GetInstance()
+	okxService := okx.NewOKXService(nil)
 
 	// Create currency pair (always with USDT)
 	pair := okxService.NewCurrencyPair(req.Currency, "USDT")

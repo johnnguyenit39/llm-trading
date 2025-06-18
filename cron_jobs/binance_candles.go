@@ -2,6 +2,7 @@ package cronjobs
 
 import (
 	"context"
+	"os"
 
 	backtesting "j-ai-trade/back_testing"
 	"j-ai-trade/brokers/binance"
@@ -10,25 +11,27 @@ import (
 	"j-ai-trade/telegram"
 	converter "j-ai-trade/utils/converter"
 
+	okxmodel "j-ai-trade/brokers/okx/model"
+
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
-
 	"gorm.io/gorm"
 )
 
 var symbols = []string{
-	"BTCUSDT",
-	"ETHUSDT",
-	"ADAUSDT",
-	"XRPUSDT",
-	"SOLUSDT",
-	"ATOMUSDT",
-	"ARBUSDT",
-	"XLMUSDT",
-	"SUIUSDT",
-	"TRXUSDT",
-	"LINKUSDT",
-	"OMUSDT"}
+	"BTC/USDT",
+	"ETH/USDT",
+	"ADA/USDT",
+	"XRP/USDT",
+	"SOL/USDT",
+	"ATOM/USDT",
+	"ARB/USDT",
+	"XLM/USDT",
+	"SUI/USDT",
+	"TRX/USDT",
+	"LINK/USDT",
+	"OM/USDT",
+}
 var (
 	// Global instance of BinanceCandlesJob
 	GlobalBinanceCandlesJob *BinanceCandlesJob
@@ -86,18 +89,36 @@ func (j *BinanceCandlesJob) handleSignal(signal *quantitativetrading.Signal, sym
 
 	// Initialize backtesting service and execute order
 	backTesting := backtesting.NewBackTesting(j.db)
-	err = backTesting.ExecuteFuturesOrder(
-		symbol,
-		1000, // Fixed amount of 1000 ADA
-		signal.Price,
-		signal.Type,
-		strategyName,
-		signal.TakeProfit,
-		signal.StopLoss,
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to execute futures order")
+
+	apiKeys := []*okxmodel.OkxApiKeysModel{
+		{
+			ApiKey:     os.Getenv("OKX_API_KEY"),
+			ApiSecret:  os.Getenv("OKX_API_SECRET_KEY"),
+			Passphrase: os.Getenv("OKX_API_PASSPHRASE"),
+		},
+		{
+			ApiKey:     "aae2ecad-9769-4054-a1d0-85ed40ab78b1",
+			ApiSecret:  "28E251ADE9EC925866E745FA9C14E08B",
+			Passphrase: "Vertivcookta5@",
+		},
 	}
+
+	for _, apiKey := range apiKeys {
+		err = backTesting.ExecuteFuturesOrder(
+			symbol,
+			1,
+			signal.Price,
+			signal.Type,
+			strategyName,
+			signal.TakeProfit,
+			signal.StopLoss,
+			apiKey,
+		)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to execute futures order")
+		}
+	}
+
 }
 
 func (j *BinanceCandlesJob) Start() {

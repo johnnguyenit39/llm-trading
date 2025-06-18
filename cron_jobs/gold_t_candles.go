@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"j-ai-trade/brokers/okx"
+	okxmodel "j-ai-trade/brokers/okx/model"
 	"j-ai-trade/brokers/okx/types"
 	quantitativetrading "j-ai-trade/quantitative_trading"
 	"j-ai-trade/quantitative_trading/model"
@@ -33,13 +34,19 @@ func InitializeGlobalGoldTJob() {
 }
 
 func NewGoldTCandlesJob() *GoldTCandlesJob {
-	service := okx.GetInstance()
+	apiKey := okxmodel.OkxApiKeysModel{
+		ApiKey:     os.Getenv("OKX_API_KEY"),
+		ApiSecret:  os.Getenv("OKX_API_SECRET_KEY"),
+		Passphrase: os.Getenv("OKX_API_PASSPHRASE"),
+	}
+
+	okxService := okx.NewOKXService(&apiKey)
 	strategyHandler := quantitativetrading.NewStrategyHandler()
 	telegramService := telegram.NewTelegramService()
 
 	return &GoldTCandlesJob{
 		cron:            cron.New(cron.WithSeconds()),
-		service:         service,
+		service:         okxService,
 		strategyHandler: strategyHandler,
 		telegramService: telegramService,
 	}
