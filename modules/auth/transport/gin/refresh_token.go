@@ -4,6 +4,7 @@ import (
 	"j-ai-trade/common"
 	"j-ai-trade/modules/auth/biz"
 	dto "j-ai-trade/modules/auth/model/dto"
+	"j-ai-trade/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,6 @@ import (
 // @Router /v1/auth/refresh-token [post]
 func RefreshToken() func(*gin.Context) {
 	return func(c *gin.Context) {
-		userID, _ := c.Get("userID")
 
 		var input dto.RefreshTokenRequest
 
@@ -38,8 +38,20 @@ func RefreshToken() func(*gin.Context) {
 			return
 		}
 
+		userId, err := utils.GetUserIDromJWT(input.Token)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
+				HttpRequestStatus: http.StatusBadRequest,
+				Success:           false,
+				Message:           err.Error(),
+				Data:              nil,
+			})
+			c.Abort()
+			return
+		}
+
 		business := biz.NewRefreshTokenBiz()
-		accessToken, refreshToken, err := business.RefreshToken(userID.(string))
+		accessToken, refreshToken, err := business.RefreshToken(userId)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{

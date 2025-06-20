@@ -66,6 +66,9 @@ func InitializeApp(appContext appContext.AppContext) {
 			auth.POST("/verify-reset-password-code", ginAuth.VerifyResetPasswordCode(appContext.GetMainDBConnection()))
 			auth.POST("/reset-password", ginAuth.ResetPassword(appContext.GetMainDBConnection()))
 
+			// Refresh Token (no authentication required)
+			auth.POST("/refresh-token", ginAuth.RefreshToken())
+
 		}
 	}
 
@@ -89,13 +92,6 @@ func InitializeApp(appContext appContext.AppContext) {
 	protected.Use(middlewares.AuthMiddleware())
 
 	//Protected Auth
-	{
-		auth := v1.Group("/auth")
-		{
-			auth.POST("/refresh-token", ginAuth.RefreshToken())
-		}
-	}
-
 	// User API
 	{
 		{
