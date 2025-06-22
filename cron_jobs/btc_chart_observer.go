@@ -53,7 +53,7 @@ func (o *BtcChartObserver) StopBtcChartObserver() {
 }
 
 func (o *BtcChartObserver) run() {
-	ticker := time.NewTicker(1800 * time.Second)
+	ticker := time.NewTicker(900 * time.Second)
 	defer ticker.Stop()
 
 	// Start a goroutine to listen for results
