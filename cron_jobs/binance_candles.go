@@ -21,16 +21,6 @@ import (
 var symbols = []string{
 	"BTC/USDT",
 	"ETH/USDT",
-	"ADA/USDT",
-	"XRP/USDT",
-	"SOL/USDT",
-	"ATOM/USDT",
-	"ARB/USDT",
-	"XLM/USDT",
-	"SUI/USDT",
-	"TRX/USDT",
-	"LINK/USDT",
-	"OM/USDT",
 }
 var (
 	// Global instance of BinanceCandlesJob
