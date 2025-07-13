@@ -189,7 +189,14 @@ func (s *Scalping1Strategy) detect2Bears(candles []baseCandleModel.BaseCandle) b
 // ==== Signal Formatting Helper ====
 
 func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []float64) string {
-	result := fmt.Sprintf("Signal: %s\nSymbol: %s\nEntry: %.2f\n\n", strings.ToUpper(side), strings.ToUpper(symbol), entry)
+	var icon string
+	if side == "BUY" {
+		icon = "🟢" // Green circle for BUY
+	} else {
+		icon = "🔴" // Red circle for SELL
+	}
+
+	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.2f\n\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry)
 	riskPercent := 0.01 // 1% risk
 
 	for _, rr := range rrList {
