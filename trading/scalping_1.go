@@ -171,17 +171,22 @@ func (s *Scalping1Strategy) detect2Bears(candles []baseCandleModel.BaseCandle) b
 
 func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []float64) string {
 	result := fmt.Sprintf("Signal: %s\nSymbol: %s\nEntry: %.2f\n\n", strings.ToUpper(side), strings.ToUpper(symbol), entry)
-	riskPercent := 1.0
+	riskPercent := 0.01 // 1% risk
+
 	for _, rr := range rrList {
 		var sl, tp float64
 		rrStr := fmt.Sprintf("1:%.0f", rr)
+
 		if side == "BUY" {
-			sl = entry * (1 - riskPercent)
-			tp = entry * (1 + riskPercent*rr)
+			// For BUY: SL below entry, TP above entry
+			sl = entry * (1 - riskPercent)    // 1% below entry
+			tp = entry * (1 + riskPercent*rr) // RR% above entry
 		} else {
-			sl = entry * (1 + riskPercent)
-			tp = entry * (1 - riskPercent*rr)
+			// For SELL: SL above entry, TP below entry
+			sl = entry * (1 + riskPercent)    // 1% above entry
+			tp = entry * (1 - riskPercent*rr) // RR% below entry
 		}
+
 		result += fmt.Sprintf("RR: %s\nStop Loss: %.2f\nTake Profit: %.2f\n\n", rrStr, sl, tp)
 	}
 	return strings.TrimSpace(result)
