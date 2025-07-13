@@ -41,15 +41,15 @@ func Scalping1Strategy(binanceService *binance.BinanceService) {
 				}, M15Candles[0].Symbol)
 
 				if err != nil {
-					// Handle error
+					// // Handle error
 					return
 				}
 
 				// Handle signal
 				if signal != nil {
 					err := telegramService.SendMessageToChannel(
-						os.Getenv("JONNOZ_TOKEN"),
-						os.Getenv("JONNOZ_MARKET_TREND_CHAN"),
+						os.Getenv("J_AI_TRADE_BOT_V1"),
+						os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
 						*signal) // dereference signal
 					if err != nil {
 						// log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
