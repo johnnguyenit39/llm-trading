@@ -5,7 +5,7 @@ import (
 	"math"
 	"strings"
 
-	"j_ai_trade/brokers/binance/repository"
+	baseCandleModel "j_ai_trade/common"
 
 	"github.com/markcheno/go-talib"
 )
@@ -13,8 +13,8 @@ import (
 // ==== Structs and Constructor ====
 
 type Scalping1Input struct {
-	M15Candles []repository.BinanceCandle // 300 M15 candles for EMA 200
-	M1Candles  []repository.BinanceCandle // 100 M1 candles for RSI 7 and patterns
+	M15Candles []baseCandleModel.BaseCandle // 300 M15 candles for EMA 200
+	M1Candles  []baseCandleModel.BaseCandle // 100 M1 candles for RSI 7 and patterns
 }
 
 type Scalping1Signal string
@@ -103,7 +103,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 
 // ==== Pattern Detection Helpers ====
 
-func (s *Scalping1Strategy) detectBullishEngulfing(candles []repository.BinanceCandle) bool {
+func (s *Scalping1Strategy) detectBullishEngulfing(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 2 {
 		return false
 	}
@@ -115,7 +115,7 @@ func (s *Scalping1Strategy) detectBullishEngulfing(candles []repository.BinanceC
 		curr.Close > prev.Open
 }
 
-func (s *Scalping1Strategy) detectBearishEngulfing(candles []repository.BinanceCandle) bool {
+func (s *Scalping1Strategy) detectBearishEngulfing(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 2 {
 		return false
 	}
@@ -127,7 +127,7 @@ func (s *Scalping1Strategy) detectBearishEngulfing(candles []repository.BinanceC
 		curr.Close < prev.Open
 }
 
-func (s *Scalping1Strategy) detectHammer(candles []repository.BinanceCandle, maxBodyRatio float64) bool {
+func (s *Scalping1Strategy) detectHammer(candles []baseCandleModel.BaseCandle, maxBodyRatio float64) bool {
 	if len(candles) < 1 {
 		return false
 	}
@@ -138,7 +138,7 @@ func (s *Scalping1Strategy) detectHammer(candles []repository.BinanceCandle, max
 	return total > 0 && body/total < maxBodyRatio && lowerWick > body
 }
 
-func (s *Scalping1Strategy) detectShootingStar(candles []repository.BinanceCandle, maxBodyRatio float64) bool {
+func (s *Scalping1Strategy) detectShootingStar(candles []baseCandleModel.BaseCandle, maxBodyRatio float64) bool {
 	if len(candles) < 1 {
 		return false
 	}
@@ -149,7 +149,7 @@ func (s *Scalping1Strategy) detectShootingStar(candles []repository.BinanceCandl
 	return total > 0 && body/total < maxBodyRatio && upperWick > body
 }
 
-func (s *Scalping1Strategy) detect2Bulls(candles []repository.BinanceCandle) bool {
+func (s *Scalping1Strategy) detect2Bulls(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 2 {
 		return false
 	}
@@ -158,7 +158,7 @@ func (s *Scalping1Strategy) detect2Bulls(candles []repository.BinanceCandle) boo
 	return c1.Close > c1.Open && c2.Close > c2.Open
 }
 
-func (s *Scalping1Strategy) detect2Bears(candles []repository.BinanceCandle) bool {
+func (s *Scalping1Strategy) detect2Bears(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 2 {
 		return false
 	}

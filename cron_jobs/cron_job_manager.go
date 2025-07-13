@@ -4,7 +4,10 @@ import (
 	"context"
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
+	"j_ai_trade/telegram"
 	"j_ai_trade/trading"
+	utilsConverter "j_ai_trade/utils/converter"
+	"os"
 	"time"
 
 	"gorm.io/gorm"
@@ -18,6 +21,7 @@ func InitCronJobs(db *gorm.DB) {
 }
 
 func Scalping1Strategy(binanceService *binance.BinanceService) {
+	telegramService := telegram.NewTelegramService()
 	symbols := []string{"BTCUSDT", "ADAUSDT", "AVAXUSDT", "SOLUSDT", "SUIUSDT", "DOGEUSDT", "ETHUSDT", "NEARUSDT"}
 
 	for {
@@ -32,8 +36,8 @@ func Scalping1Strategy(binanceService *binance.BinanceService) {
 				// Analyze strategy cho từng coin
 				scalping1Strategy := trading.NewScalping1Strategy()
 				signal, err := scalping1Strategy.AnalyzeWithSignalString(trading.Scalping1Input{
-					M15Candles: M15Candles,
-					M1Candles:  M1Candles,
+					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles),
+					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles),
 				}, M15Candles[0].Symbol)
 
 				if err != nil {
@@ -43,7 +47,13 @@ func Scalping1Strategy(binanceService *binance.BinanceService) {
 
 				// Handle signal
 				if signal != nil {
-					// Execute trade cho coin này
+					err := telegramService.SendMessageToChannel(
+						os.Getenv("JONNOZ_TOKEN"),
+						os.Getenv("JONNOZ_MARKET_TREND_CHAN"),
+						*signal) // dereference signal
+					if err != nil {
+						// log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
+					}
 				}
 			}(symbol)
 		}
