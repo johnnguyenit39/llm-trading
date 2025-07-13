@@ -2,11 +2,11 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/common"
-	"j-ai-trade/modules/auth/model/dto"
-	otpModel "j-ai-trade/modules/otp/model"
-	"j-ai-trade/modules/user/model"
-	userModel "j-ai-trade/modules/user/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/auth/model/dto"
+	otpModel "j_ai_trade/modules/otp/model"
+	"j_ai_trade/modules/user/model"
+	userModel "j_ai_trade/modules/user/model"
 	"time"
 
 	"gorm.io/gorm"

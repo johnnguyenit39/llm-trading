@@ -2,10 +2,10 @@ package biz
 
 import (
 	"context"
-	"j-ai-trade/common"
-	"j-ai-trade/modules/user/model"
-	requestModel "j-ai-trade/modules/user/model/requests"
-	"j-ai-trade/utils"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/user/model"
+	requestModel "j_ai_trade/modules/user/model/requests"
+	"j_ai_trade/utils"
 )
 
 type UpdateUserPasswordStorage interface {

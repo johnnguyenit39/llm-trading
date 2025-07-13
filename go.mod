@@ -1,4 +1,4 @@
-module j-ai-trade
+module j_ai_trade
 
 go 1.23.4
 

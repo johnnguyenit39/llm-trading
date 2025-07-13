@@ -1,9 +1,9 @@
 package okx
 
 import (
-	"j-ai-trade/brokers/okx/model"
-	"j-ai-trade/brokers/okx/repository"
-	"j-ai-trade/brokers/okx/types"
+	"j_ai_trade/brokers/okx/model"
+	"j_ai_trade/brokers/okx/repository"
+	"j_ai_trade/brokers/okx/types"
 )
 
 // OKXService represents the OKX API service

@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"j-ai-trade/appi18n"
+	"j_ai_trade/appi18n"
 	"net/http"
 	"strings"
 )

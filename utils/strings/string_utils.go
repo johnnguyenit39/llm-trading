@@ -2,7 +2,7 @@ package strings
 
 import (
 	"fmt"
-	"j-ai-trade/helpers/email/model"
+	"j_ai_trade/helpers/email/model"
 	"path"
 	"strings"
 )

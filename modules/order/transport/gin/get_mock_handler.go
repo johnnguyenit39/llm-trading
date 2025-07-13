@@ -1,10 +1,10 @@
 package ginOrder
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/order/biz"
-	dto "j-ai-trade/modules/order/model/dto"
-	"j-ai-trade/modules/order/storage"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/order/biz"
+	dto "j_ai_trade/modules/order/model/dto"
+	"j_ai_trade/modules/order/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

@@ -1,9 +1,9 @@
 package ginSubscription
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/subscription/biz"
-	"j-ai-trade/modules/subscription/storage"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/subscription/biz"
+	"j_ai_trade/modules/subscription/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

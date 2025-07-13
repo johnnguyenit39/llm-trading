@@ -2,8 +2,8 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/common"
-	"j-ai-trade/modules/signal/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/signal/model"
 )
 
 func (postgresStore *postgresStore) GetSignals(ctx context.Context, paging *common.Pagination) ([]model.Signal, error) {

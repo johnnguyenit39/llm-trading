@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"j-ai-trade/brokers/okx/types"
+	"j_ai_trade/brokers/okx/types"
 	"time"
 )
 

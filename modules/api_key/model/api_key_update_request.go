@@ -1,6 +1,6 @@
 package model
 
-import "j-ai-trade/common"
+import "j_ai_trade/common"
 
 type ApiKeyUpdateRequest struct {
 	Broker common.Broker `json:"broker" example:"okx" binding:"required" swaggertype:"string" enums:"okx"`

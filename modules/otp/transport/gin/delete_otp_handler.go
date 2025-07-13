@@ -1,9 +1,9 @@
 package ginOtp
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/otp/biz"
-	"j-ai-trade/modules/otp/storage"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/otp/biz"
+	"j_ai_trade/modules/otp/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

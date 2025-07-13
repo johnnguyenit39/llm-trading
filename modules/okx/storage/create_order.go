@@ -3,9 +3,9 @@ package storage
 import (
 	"context"
 	"fmt"
-	"j-ai-trade/brokers/okx"
-	okxTypes "j-ai-trade/brokers/okx/types"
-	dto "j-ai-trade/modules/okx/model/dto"
+	"j_ai_trade/brokers/okx"
+	okxTypes "j_ai_trade/brokers/okx/types"
+	dto "j_ai_trade/modules/okx/model/dto"
 )
 
 func (postgresStore *postgresStore) CreateSpotOrder(ctx context.Context, req *dto.CreateOrderRequest) ([]byte, error) {

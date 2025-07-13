@@ -1,8 +1,8 @@
 package model
 
 import (
-	"j-ai-trade/common"
-	userModel "j-ai-trade/modules/user/model"
+	"j_ai_trade/common"
+	userModel "j_ai_trade/modules/user/model"
 	"log"
 
 	"github.com/google/uuid"

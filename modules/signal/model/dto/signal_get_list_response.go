@@ -1,8 +1,8 @@
 package model
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/signal/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/signal/model"
 )
 
 type SignalGetListResponse struct {

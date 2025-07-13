@@ -1,9 +1,9 @@
 package model
 
 import (
-	binanceRepository "j-ai-trade/brokers/binance/repository"
-	twelveRepository "j-ai-trade/brokers/twelve/repository"
-	baseCandleModel "j-ai-trade/quantitative_trading/model"
+	binanceRepository "j_ai_trade/brokers/binance/repository"
+	twelveRepository "j_ai_trade/brokers/twelve/repository"
+	baseCandleModel "j_ai_trade/quantitative_trading/model"
 )
 
 // ConvertBinanceCandleToBase converts a Binance candle to a base candle

@@ -2,8 +2,8 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/common"
-	"j-ai-trade/modules/otp/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/otp/model"
 )
 
 func (postgresStore *postgresStore) GetOtps(ctx context.Context, paging *common.Pagination) ([]model.Otp, error) {

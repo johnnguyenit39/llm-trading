@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"j-ai-trade/brokers/okx/model"
-	"j-ai-trade/brokers/okx/types"
+	"j_ai_trade/brokers/okx/model"
+	"j_ai_trade/brokers/okx/types"
 
 	"github.com/rs/zerolog/log"
 )

@@ -5,12 +5,12 @@ import (
 	"strconv"
 	"time"
 
-	"j-ai-trade/brokers/okx"
-	okxmodel "j-ai-trade/brokers/okx/model"
-	"j-ai-trade/brokers/okx/types"
-	quantitativetrading "j-ai-trade/quantitative_trading"
-	"j-ai-trade/quantitative_trading/model"
-	"j-ai-trade/telegram"
+	"j_ai_trade/brokers/okx"
+	okxmodel "j_ai_trade/brokers/okx/model"
+	"j_ai_trade/brokers/okx/types"
+	quantitativetrading "j_ai_trade/quantitative_trading"
+	"j_ai_trade/quantitative_trading/model"
+	"j_ai_trade/telegram"
 
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"

@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/modules/permission/model"
+	"j_ai_trade/modules/permission/model"
 )
 
 func (postgresStore *postgresStore) CreatePermission(ctx context.Context, data *model.Permission) error {

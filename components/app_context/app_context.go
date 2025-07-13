@@ -1,7 +1,7 @@
 package appcontext
 
 import (
-	"j-ai-trade/config/pubsub"
+	"j_ai_trade/config/pubsub"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"

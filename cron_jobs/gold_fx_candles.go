@@ -4,11 +4,11 @@ import (
 	"context"
 	"os"
 
-	"j-ai-trade/brokers/twelve"
-	"j-ai-trade/brokers/twelve/repository"
-	quantitativetrading "j-ai-trade/quantitative_trading"
-	"j-ai-trade/quantitative_trading/model"
-	"j-ai-trade/telegram"
+	"j_ai_trade/brokers/twelve"
+	"j_ai_trade/brokers/twelve/repository"
+	quantitativetrading "j_ai_trade/quantitative_trading"
+	"j_ai_trade/quantitative_trading/model"
+	"j_ai_trade/telegram"
 
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"

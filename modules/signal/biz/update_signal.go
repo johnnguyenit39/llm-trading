@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	"j-ai-trade/modules/signal/model"
+	"j_ai_trade/modules/signal/model"
 )
 
 type UpdateSignalStorage interface {

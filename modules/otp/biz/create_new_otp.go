@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	"j-ai-trade/modules/otp/model"
+	"j_ai_trade/modules/otp/model"
 )
 
 type OtpStorage interface {

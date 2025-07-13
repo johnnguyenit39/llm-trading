@@ -1,9 +1,9 @@
 package ginJbot
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/j_bot/biz"
-	"j-ai-trade/modules/j_bot/storage"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/j_bot/biz"
+	"j_ai_trade/modules/j_bot/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

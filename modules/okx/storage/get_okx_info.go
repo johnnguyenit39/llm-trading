@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"j-ai-trade/brokers/okx"
-	dto "j-ai-trade/modules/okx/model/dto"
+	"j_ai_trade/brokers/okx"
+	dto "j_ai_trade/modules/okx/model/dto"
 )
 
 func (postgresStore *postgresStore) GetOkxInfo(ctx context.Context, cond map[string]interface{}) (*dto.OkxInfoResponse, error) {

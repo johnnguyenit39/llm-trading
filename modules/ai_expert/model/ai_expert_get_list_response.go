@@ -1,8 +1,8 @@
 package model
 
-import "j-ai-trade/common"
+import "j_ai_trade/common"
 
 type AiExpertGetListResponse struct {
 	Paging common.Pagination `json:"Paging"`
-	List   []AiExpert           `json:"List"`
+	List   []AiExpert        `json:"List"`
 }

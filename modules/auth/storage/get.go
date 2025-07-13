@@ -3,8 +3,8 @@ package storage
 import (
 	"context"
 	"errors"
-	"j-ai-trade/common"
-	"j-ai-trade/modules/user/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/user/model"
 
 	"gorm.io/gorm"
 )

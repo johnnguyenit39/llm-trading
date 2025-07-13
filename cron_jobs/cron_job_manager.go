@@ -1,8 +1,8 @@
 package cronjobs
 
 import (
-	"j-ai-trade/brokers/binance"
-	"j-ai-trade/brokers/binance/repository"
+	"j_ai_trade/brokers/binance"
+	"j_ai_trade/brokers/binance/repository"
 
 	"gorm.io/gorm"
 )

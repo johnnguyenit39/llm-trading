@@ -2,8 +2,8 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/common"
-	"j-ai-trade/modules/permission/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/permission/model"
 
 	"gorm.io/gorm"
 )

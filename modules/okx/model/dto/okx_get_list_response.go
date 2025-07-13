@@ -1,8 +1,8 @@
 package model
 
 import (
-	"j-ai-trade/common"
-	model "j-ai-trade/modules/okx/model"
+	"j_ai_trade/common"
+	model "j_ai_trade/modules/okx/model"
 )
 
 type SubscriptionGetListResponse struct {

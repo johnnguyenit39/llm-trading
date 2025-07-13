@@ -2,12 +2,12 @@ package quantitativetrading
 
 import (
 	"fmt"
-	"j-ai-trade/common"
-	"j-ai-trade/quantitative_trading/market_analyzer"
-	baseCandleModel "j-ai-trade/quantitative_trading/model"
-	"j-ai-trade/quantitative_trading/scalping"
-	strategies "j-ai-trade/quantitative_trading/strategies"
-	"j-ai-trade/quantitative_trading/swing"
+	"j_ai_trade/common"
+	"j_ai_trade/quantitative_trading/market_analyzer"
+	baseCandleModel "j_ai_trade/quantitative_trading/model"
+	"j_ai_trade/quantitative_trading/scalping"
+	strategies "j_ai_trade/quantitative_trading/strategies"
+	"j_ai_trade/quantitative_trading/swing"
 	"time"
 )
 

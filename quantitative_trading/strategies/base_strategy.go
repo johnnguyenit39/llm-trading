@@ -1,8 +1,8 @@
 package strategies
 
 import (
-	"j-ai-trade/common"
-	baseCandleModel "j-ai-trade/quantitative_trading/model"
+	"j_ai_trade/common"
+	baseCandleModel "j_ai_trade/quantitative_trading/model"
 	"time"
 )
 

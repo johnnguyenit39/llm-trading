@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	"j-ai-trade/modules/api_key/model"
+	"j_ai_trade/modules/api_key/model"
 )
 
 type DeleteNewApiKeyStorage interface {
