@@ -2,7 +2,6 @@ package trading
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	baseCandleModel "j_ai_trade/common"
@@ -13,8 +12,8 @@ import (
 // ==== Structs and Constructor ====
 
 type Scalping1Input struct {
-	M15Candles []baseCandleModel.BaseCandle // 300 M15 candles for EMA 200
-	M1Candles  []baseCandleModel.BaseCandle // 100 M1 candles for RSI 7 and patterns
+	M15Candles []baseCandleModel.BaseCandle // M15 candles for EMA 200 trend filter
+	M1Candles  []baseCandleModel.BaseCandle // M1 candles for RSI and patterns (matching TradingView)
 }
 
 type Scalping1Signal string
@@ -34,7 +33,7 @@ type Scalping1Strategy struct {
 func NewScalping1Strategy() *Scalping1Strategy {
 	return &Scalping1Strategy{
 		emaPeriod:     200,
-		rsiPeriod:     7,
+		rsiPeriod:     14, // Match TradingView default
 		rsiOversold:   30,
 		rsiOverbought: 70,
 	}
@@ -48,6 +47,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 		return nil, fmt.Errorf("insufficient data: need at least %d M15 candles and %d M1 candles", s.emaPeriod, s.rsiPeriod)
 	}
 
+	// Calculate EMA 200 on M15 for trend filter
 	closePrices := make([]float64, len(input.M15Candles))
 	for i, candle := range input.M15Candles {
 		closePrices[i] = candle.Close
@@ -64,6 +64,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 	currentEMA := ema200[len(ema200)-1]
 	isPriceAboveEMA := currentPrice > currentEMA
 
+	// RSI conditions matching TradingView: (rsiOS or rsiOS[1]) and (rsiOB or rsiOB[1])
 	lenRSI := len(rsi7)
 	isRSIOversold := false
 	isRSIOverbought := false
@@ -75,6 +76,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 		isRSIOverbought = rsi7[0] > s.rsiOverbought
 	}
 
+	// Pattern detection matching TradingView logic
 	hasBullishEngulfing := s.detectBullishEngulfing(input.M1Candles)
 	hasBearishEngulfing := s.detectBearishEngulfing(input.M1Candles)
 	hasHammer := s.detectHammer(input.M1Candles, 0.333)
@@ -84,6 +86,8 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 
 	rrList := []float64{1, 2}
 
+	// TradingView logic + EMA trend filter
+	// BUY: Price above EMA 200 + RSI oversold + bullish patterns
 	if isPriceAboveEMA && isRSIOversold && (hasBullishEngulfing || hasHammer || has2Bulls) {
 		side := "BUY"
 		entry := currentPrice
@@ -91,6 +95,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 		return &signalStr, nil
 	}
 
+	// SELL: Price below EMA 200 + RSI overbought + bearish patterns
 	if !isPriceAboveEMA && isRSIOverbought && (hasBearishEngulfing || hasShootingStar || has2Bears) {
 		side := "SELL"
 		entry := currentPrice
@@ -109,10 +114,9 @@ func (s *Scalping1Strategy) detectBullishEngulfing(candles []baseCandleModel.Bas
 	}
 	prev := candles[len(candles)-2]
 	curr := candles[len(candles)-1]
-	return prev.Close < prev.Open &&
-		curr.Close > curr.Open &&
-		curr.Open < prev.Close &&
-		curr.Close > prev.Open
+	// TradingView: close > open[1] and close[1] < open[1]
+	// Current candle is green (close > open) and previous candle is red (close < open)
+	return curr.Close > curr.Open && prev.Close < prev.Open
 }
 
 func (s *Scalping1Strategy) detectBearishEngulfing(candles []baseCandleModel.BaseCandle) bool {
@@ -121,10 +125,9 @@ func (s *Scalping1Strategy) detectBearishEngulfing(candles []baseCandleModel.Bas
 	}
 	prev := candles[len(candles)-2]
 	curr := candles[len(candles)-1]
-	return prev.Close > prev.Open &&
-		curr.Close < curr.Open &&
-		curr.Open > prev.Close &&
-		curr.Close < prev.Open
+	// TradingView: close < open[1] and close[1] > open[1]
+	// Current candle is red (close < open) and previous candle is green (close > open)
+	return curr.Close < curr.Open && prev.Close > prev.Open
 }
 
 func (s *Scalping1Strategy) detectHammer(candles []baseCandleModel.BaseCandle, maxBodyRatio float64) bool {
@@ -132,10 +135,18 @@ func (s *Scalping1Strategy) detectHammer(candles []baseCandleModel.BaseCandle, m
 		return false
 	}
 	c := candles[len(candles)-1]
-	body := math.Abs(c.Close - c.Open)
-	total := c.High - c.Low
-	lowerWick := math.Min(c.Open, c.Close) - c.Low
-	return total > 0 && body/total < maxBodyRatio && lowerWick > body
+
+	// TradingView: bullFib = (low - high) * fibLevel + high
+	// bearCandle = close < open ? close : open
+	// hammer = (bearCandle >= bullFib) and rsiOS
+
+	bullFib := (c.Low-c.High)*maxBodyRatio + c.High
+	bearCandle := c.Close
+	if c.Close > c.Open {
+		bearCandle = c.Open
+	}
+
+	return bearCandle >= bullFib
 }
 
 func (s *Scalping1Strategy) detectShootingStar(candles []baseCandleModel.BaseCandle, maxBodyRatio float64) bool {
@@ -143,10 +154,18 @@ func (s *Scalping1Strategy) detectShootingStar(candles []baseCandleModel.BaseCan
 		return false
 	}
 	c := candles[len(candles)-1]
-	body := math.Abs(c.Close - c.Open)
-	total := c.High - c.Low
-	upperWick := c.High - math.Max(c.Open, c.Close)
-	return total > 0 && body/total < maxBodyRatio && upperWick > body
+
+	// TradingView: bearFib = (high - low) * fibLevel + low
+	// bullCandle = close > open ? close : open
+	// shooting = (bullCandle <= bearFib) and rsiOB
+
+	bearFib := (c.High-c.Low)*maxBodyRatio + c.Low
+	bullCandle := c.Close
+	if c.Close < c.Open {
+		bullCandle = c.Open
+	}
+
+	return bullCandle <= bearFib
 }
 
 func (s *Scalping1Strategy) detect2Bulls(candles []baseCandleModel.BaseCandle) bool {
