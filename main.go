@@ -81,8 +81,6 @@ func main() {
 
 	// Initialize and start cron jobs
 	cronjobsManager.InitCronJobs(db)
-	defer cronjobsManager.StopCronJobs()
-
 	// Start the application on port 8080
 	if err := app.Run(":8080"); err != nil {
 		log.Fatal().Err(err).Msg("failed to start the application")
