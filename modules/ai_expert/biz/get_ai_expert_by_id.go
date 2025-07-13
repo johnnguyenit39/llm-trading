@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	"j-ai-trade/modules/ai_expert/model"
+	"j_ai_trade/modules/ai_expert/model"
 )
 
 type GetAiExpertByIdStorage interface {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math"
 
-	"j-ai-trade/common"
-	baseCandleModel "j-ai-trade/quantitative_trading/model"
-	"j-ai-trade/quantitative_trading/strategies"
+	"j_ai_trade/common"
+	baseCandleModel "j_ai_trade/quantitative_trading/model"
+	"j_ai_trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
 )

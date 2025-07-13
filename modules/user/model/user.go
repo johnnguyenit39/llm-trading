@@ -1,10 +1,10 @@
 package model
 
 import (
-	"j-ai-trade/common"
+	"j_ai_trade/common"
 	"log"
 
-	subscriptionModel "j-ai-trade/modules/subscription/model"
+	subscriptionModel "j_ai_trade/modules/subscription/model"
 
 	"github.com/google/uuid"
 	"gorm.io/datatypes"

@@ -1,8 +1,8 @@
 package ginTelegram
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/telegram"
+	"j_ai_trade/common"
+	"j_ai_trade/telegram"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

@@ -1,10 +1,10 @@
 package ginApiKey
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/api_key/biz"
-	"j-ai-trade/modules/api_key/model"
-	"j-ai-trade/modules/api_key/storage"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/api_key/biz"
+	"j_ai_trade/modules/api_key/model"
+	"j_ai_trade/modules/api_key/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

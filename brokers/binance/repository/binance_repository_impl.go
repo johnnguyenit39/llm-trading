@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	utils "j-ai-trade/brokers/binance/utils"
+	utils "j_ai_trade/brokers/binance/utils"
 	"net/http"
 	"strconv"
 	"time"

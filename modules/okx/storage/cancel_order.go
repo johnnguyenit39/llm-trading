@@ -3,8 +3,8 @@ package storage
 import (
 	"context"
 	"fmt"
-	"j-ai-trade/brokers/okx"
-	dto "j-ai-trade/modules/okx/model/dto"
+	"j_ai_trade/brokers/okx"
+	dto "j_ai_trade/modules/okx/model/dto"
 )
 
 func (postgresStore *postgresStore) CancelSpotOrder(ctx context.Context, req *dto.CancelOrderRequest) ([]byte, error) {

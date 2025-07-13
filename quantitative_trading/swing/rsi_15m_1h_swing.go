@@ -2,9 +2,9 @@ package swing
 
 import (
 	"fmt"
-	baseCandleModel "j-ai-trade/quantitative_trading/model"
-	strategies "j-ai-trade/quantitative_trading/strategies"
-	signalConfidence "j-ai-trade/utils/signal"
+	baseCandleModel "j_ai_trade/quantitative_trading/model"
+	strategies "j_ai_trade/quantitative_trading/strategies"
+	signalConfidence "j_ai_trade/utils/signal"
 	"time"
 
 	"github.com/markcheno/go-talib"

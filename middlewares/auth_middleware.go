@@ -1,8 +1,8 @@
 package middlewares
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/utils"
+	"j_ai_trade/common"
+	"j_ai_trade/utils"
 	"net/http"
 
 	"github.com/dgrijalva/jwt-go"

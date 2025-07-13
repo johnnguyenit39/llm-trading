@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	"j-ai-trade/modules/order/model"
+	"j_ai_trade/modules/order/model"
 )
 
 type DeleteNewOrderStorage interface {

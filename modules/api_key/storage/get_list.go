@@ -2,8 +2,8 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/common"
-	"j-ai-trade/modules/api_key/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/api_key/model"
 )
 
 func (postgresStore *postgresStore) GetApiKeys(ctx context.Context, paging *common.Pagination) ([]model.ApiKey, error) {

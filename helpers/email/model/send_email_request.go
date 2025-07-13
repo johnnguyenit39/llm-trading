@@ -1,7 +1,7 @@
 package model
 
 import (
-	emailType "j-ai-trade/common"
+	emailType "j_ai_trade/common"
 )
 
 type SendEmailRequest struct {

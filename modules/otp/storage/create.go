@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/modules/otp/model"
+	"j_ai_trade/modules/otp/model"
 )
 
 func (postgresStore *postgresStore) CreateOtp(ctx context.Context, data *model.Otp) error {

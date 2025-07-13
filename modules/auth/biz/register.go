@@ -3,12 +3,12 @@ package biz
 import (
 	"context"
 	"fmt"
-	common "j-ai-trade/common"
-	emailHelper "j-ai-trade/helpers/email"
-	dto "j-ai-trade/modules/auth/model/dto"
-	otpModel "j-ai-trade/modules/otp/model"
-	userModel "j-ai-trade/modules/user/model"
-	"j-ai-trade/utils"
+	common "j_ai_trade/common"
+	emailHelper "j_ai_trade/helpers/email"
+	dto "j_ai_trade/modules/auth/model/dto"
+	otpModel "j_ai_trade/modules/otp/model"
+	userModel "j_ai_trade/modules/user/model"
+	"j_ai_trade/utils"
 	"log"
 	"time"
 

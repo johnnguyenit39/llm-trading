@@ -1,8 +1,8 @@
 package model
 
 import (
-	"j-ai-trade/common"
-	model "j-ai-trade/modules/user/model"
+	"j_ai_trade/common"
+	model "j_ai_trade/modules/user/model"
 )
 
 type UserGetListResponse struct {

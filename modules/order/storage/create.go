@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/modules/order/model"
+	"j_ai_trade/modules/order/model"
 )
 
 func (postgresStore *postgresStore) CreateOrder(ctx context.Context, data *model.Order) error {

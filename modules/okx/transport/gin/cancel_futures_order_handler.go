@@ -1,12 +1,12 @@
 package ginOkx
 
 import (
-	"j-ai-trade/brokers/okx"
-	"j-ai-trade/common"
-	"j-ai-trade/logger"
-	"j-ai-trade/middlewares"
-	"j-ai-trade/modules/okx/biz"
-	dto "j-ai-trade/modules/okx/model/dto"
+	"j_ai_trade/brokers/okx"
+	"j_ai_trade/common"
+	"j_ai_trade/logger"
+	"j_ai_trade/middlewares"
+	"j_ai_trade/modules/okx/biz"
+	dto "j_ai_trade/modules/okx/model/dto"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

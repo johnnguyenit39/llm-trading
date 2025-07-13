@@ -1,14 +1,14 @@
 package ginUser
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/logger"
-	"j-ai-trade/middlewares"
-	"j-ai-trade/modules/user/biz"
-	model "j-ai-trade/modules/user/model"
-	requestModel "j-ai-trade/modules/user/model/requests"
-	"j-ai-trade/modules/user/storage"
-	"j-ai-trade/utils"
+	"j_ai_trade/common"
+	"j_ai_trade/logger"
+	"j_ai_trade/middlewares"
+	"j_ai_trade/modules/user/biz"
+	model "j_ai_trade/modules/user/model"
+	requestModel "j_ai_trade/modules/user/model/requests"
+	"j_ai_trade/modules/user/storage"
+	"j_ai_trade/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

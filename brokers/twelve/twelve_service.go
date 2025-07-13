@@ -3,7 +3,7 @@ package twelve
 import (
 	"context"
 
-	"j-ai-trade/brokers/twelve/repository"
+	"j_ai_trade/brokers/twelve/repository"
 )
 
 type TwelveService struct {

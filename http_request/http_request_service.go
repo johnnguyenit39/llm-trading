@@ -1,7 +1,7 @@
 package httprequest
 
 import (
-	httpclient "j-ai-trade/common"
+	httpclient "j_ai_trade/common"
 	"net/http"
 )
 

@@ -1,6 +1,6 @@
 package model
 
-import "j-ai-trade/common"
+import "j_ai_trade/common"
 
 type ApiKeyGetListResponse struct {
 	Paging common.Pagination `json:"Paging"`

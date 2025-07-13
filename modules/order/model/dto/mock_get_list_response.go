@@ -1,8 +1,8 @@
 package model
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/order/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/order/model"
 )
 
 type OrderGetListResponse struct {

@@ -2,8 +2,8 @@ package biz
 
 import (
 	"context"
-	"j-ai-trade/brokers/okx"
-	dto "j-ai-trade/modules/okx/model/dto"
+	"j_ai_trade/brokers/okx"
+	dto "j_ai_trade/modules/okx/model/dto"
 )
 
 type CancelFuturesOrderBiz struct {

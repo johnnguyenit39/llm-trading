@@ -4,14 +4,14 @@ import (
 	"context"
 	"os"
 
-	backtesting "j-ai-trade/back_testing"
-	"j-ai-trade/brokers/binance"
-	"j-ai-trade/brokers/binance/repository"
-	quantitativetrading "j-ai-trade/quantitative_trading"
-	"j-ai-trade/telegram"
-	converter "j-ai-trade/utils/converter"
+	backtesting "j_ai_trade/back_testing"
+	"j_ai_trade/brokers/binance"
+	"j_ai_trade/brokers/binance/repository"
+	quantitativetrading "j_ai_trade/quantitative_trading"
+	"j_ai_trade/telegram"
+	converter "j_ai_trade/utils/converter"
 
-	okxmodel "j-ai-trade/brokers/okx/model"
+	okxmodel "j_ai_trade/brokers/okx/model"
 
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"

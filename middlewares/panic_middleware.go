@@ -2,7 +2,7 @@ package middlewares
 
 import (
 	"fmt"
-	"j-ai-trade/common"
+	"j_ai_trade/common"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

@@ -2,8 +2,8 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/common"
-	"j-ai-trade/modules/subscription/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/subscription/model"
 	"time"
 
 	"gorm.io/gorm"

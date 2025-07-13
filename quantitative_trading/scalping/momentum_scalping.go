@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math"
 
-	"j-ai-trade/brokers/binance/repository"
-	"j-ai-trade/quantitative_trading/strategies"
+	"j_ai_trade/brokers/binance/repository"
+	"j_ai_trade/quantitative_trading/strategies"
 
 	"github.com/markcheno/go-talib"
 )

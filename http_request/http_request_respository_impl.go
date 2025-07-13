@@ -2,7 +2,7 @@ package httprequest
 
 import (
 	"bytes"
-	"j-ai-trade/common"
+	"j_ai_trade/common"
 	"net/http"
 	"net/url"
 )

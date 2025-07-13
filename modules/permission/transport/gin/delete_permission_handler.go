@@ -1,9 +1,9 @@
 package ginPermission
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/permission/biz"
-	"j-ai-trade/modules/permission/storage"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/permission/biz"
+	"j_ai_trade/modules/permission/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

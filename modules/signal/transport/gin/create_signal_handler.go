@@ -1,11 +1,11 @@
 package ginSignal
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/signal/biz"
-	"j-ai-trade/modules/signal/model"
-	dto "j-ai-trade/modules/signal/model/dto"
-	"j-ai-trade/modules/signal/storage"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/signal/biz"
+	"j_ai_trade/modules/signal/model"
+	dto "j_ai_trade/modules/signal/model/dto"
+	"j_ai_trade/modules/signal/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

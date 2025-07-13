@@ -3,7 +3,7 @@ package binance
 import (
 	"context"
 
-	"j-ai-trade/brokers/binance/repository"
+	"j_ai_trade/brokers/binance/repository"
 )
 
 type BinanceService struct {

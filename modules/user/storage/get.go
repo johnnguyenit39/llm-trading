@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/modules/user/model"
+	"j_ai_trade/modules/user/model"
 )
 
 func (postgresStore *postgresStore) GetUserById(ctx context.Context, cond map[string]interface{}) (*model.User, error) {

@@ -2,10 +2,10 @@ package scalping
 
 import (
 	"fmt"
-	"j-ai-trade/common"
-	baseCandleModel "j-ai-trade/quantitative_trading/model"
-	"j-ai-trade/quantitative_trading/strategies"
-	utils "j-ai-trade/utils/math"
+	"j_ai_trade/common"
+	baseCandleModel "j_ai_trade/quantitative_trading/model"
+	"j_ai_trade/quantitative_trading/strategies"
+	utils "j_ai_trade/utils/math"
 
 	"math"
 

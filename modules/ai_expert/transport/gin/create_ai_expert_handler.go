@@ -1,10 +1,10 @@
 package ginAiExpert
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/ai_expert/biz"
-	"j-ai-trade/modules/ai_expert/model"
-	"j-ai-trade/modules/ai_expert/storage"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/ai_expert/biz"
+	"j_ai_trade/modules/ai_expert/model"
+	"j_ai_trade/modules/ai_expert/storage"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

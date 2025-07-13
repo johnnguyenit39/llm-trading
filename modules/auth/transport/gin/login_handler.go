@@ -1,13 +1,13 @@
 package transport
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/logger"
-	"j-ai-trade/middlewares"
-	"j-ai-trade/modules/auth/biz"
-	dto "j-ai-trade/modules/auth/model/dto"
-	"j-ai-trade/modules/auth/storage"
-	userModel "j-ai-trade/modules/user/model"
+	"j_ai_trade/common"
+	"j_ai_trade/logger"
+	"j_ai_trade/middlewares"
+	"j_ai_trade/modules/auth/biz"
+	dto "j_ai_trade/modules/auth/model/dto"
+	"j_ai_trade/modules/auth/storage"
+	userModel "j_ai_trade/modules/user/model"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

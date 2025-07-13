@@ -2,10 +2,10 @@ package biz
 
 import (
 	"context"
-	common "j-ai-trade/common"
-	dto "j-ai-trade/modules/auth/model/dto"
-	userModel "j-ai-trade/modules/user/model"
-	"j-ai-trade/utils"
+	common "j_ai_trade/common"
+	dto "j_ai_trade/modules/auth/model/dto"
+	userModel "j_ai_trade/modules/user/model"
+	"j_ai_trade/utils"
 )
 
 type LoginStorage interface {

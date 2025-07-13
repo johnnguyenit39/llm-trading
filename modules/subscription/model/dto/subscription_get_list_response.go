@@ -1,8 +1,8 @@
 package model
 
 import (
-	"j-ai-trade/common"
-	"j-ai-trade/modules/subscription/model"
+	"j_ai_trade/common"
+	"j_ai_trade/modules/subscription/model"
 )
 
 type SubscriptionGetListResponse struct {

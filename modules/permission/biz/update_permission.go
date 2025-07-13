@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	"j-ai-trade/modules/permission/model"
+	"j_ai_trade/modules/permission/model"
 )
 
 type UpdatePermissionStorage interface {

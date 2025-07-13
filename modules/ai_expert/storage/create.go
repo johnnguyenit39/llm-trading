@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"j-ai-trade/modules/ai_expert/model"
+	"j_ai_trade/modules/ai_expert/model"
 )
 
 func (postgresStore *postgresStore) CreateAiExpert(ctx context.Context, data *model.AiExpert) error {

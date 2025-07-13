@@ -2,7 +2,7 @@ package biz
 
 import (
 	"context"
-	"j-ai-trade/modules/subscription/model"
+	"j_ai_trade/modules/subscription/model"
 )
 
 type SubscriptionStorage interface {

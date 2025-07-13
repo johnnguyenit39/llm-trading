@@ -1,15 +1,15 @@
 package main
 
 import (
-	"j-ai-trade/appi18n"
-	appContext "j-ai-trade/components/app_context"
-	appConfig "j-ai-trade/config/app"
-	storage "j-ai-trade/config/postgres"
-	"j-ai-trade/config/pubsub"
-	"j-ai-trade/config/redis"
-	cronjobsManager "j-ai-trade/cron_jobs"
-	_ "j-ai-trade/docs"
-	"j-ai-trade/logger"
+	"j_ai_trade/appi18n"
+	appContext "j_ai_trade/components/app_context"
+	appConfig "j_ai_trade/config/app"
+	storage "j_ai_trade/config/postgres"
+	"j_ai_trade/config/pubsub"
+	"j_ai_trade/config/redis"
+	cronjobsManager "j_ai_trade/cron_jobs"
+	_ "j_ai_trade/docs"
+	"j_ai_trade/logger"
 	"os"
 
 	"github.com/rs/zerolog/log"
