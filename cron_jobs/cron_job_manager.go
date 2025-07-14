@@ -57,27 +57,27 @@ func ScalpingStrategy(binanceService *binance.BinanceService) {
 				}
 
 				// Analyze Twin Range Filter strategy cho từng coin
-				M1Candles200, _ := binanceService.Fetch1mCandles(context.Background(), sym, 200)
-				twinRangeStrategy := trading.NewScalping2Strategy()
-				twinRangeSignal, err := twinRangeStrategy.AnalyzeWithSignalString(trading.TwinRangeFilterInput{
-					Candles: utilsConverter.ConvertBinanceCandlesToBase(M1Candles200), // Sử dụng M1 candles cho scalping
-				}, M1Candles200[0].Symbol)
+				// M1Candles200, _ := binanceService.Fetch1mCandles(context.Background(), sym, 200)
+				// twinRangeStrategy := trading.NewScalping2Strategy()
+				// twinRangeSignal, err := twinRangeStrategy.AnalyzeWithSignalString(trading.TwinRangeFilterInput{
+				// 	Candles: utilsConverter.ConvertBinanceCandlesToBase(M1Candles200), // Sử dụng M1 candles cho scalping
+				// }, M1Candles200[0].Symbol)
 
-				if err != nil {
-					// // Handle error
-					return
-				}
+				// if err != nil {
+				// 	// // Handle error
+				// 	return
+				// }
 
-				// Handle Twin Range Filter signal
-				if twinRangeSignal != nil {
-					err := telegramService.SendMessageToChannel(
-						os.Getenv("J_AI_TRADE_BOT_V1"),
-						os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
-						*twinRangeSignal) // dereference signal
-					if err != nil {
-						// log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
-					}
-				}
+				// // Handle Twin Range Filter signal
+				// if twinRangeSignal != nil {
+				// 	err := telegramService.SendMessageToChannel(
+				// 		os.Getenv("J_AI_TRADE_BOT_V1"),
+				// 		os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
+				// 		*twinRangeSignal) // dereference signal
+				// 	if err != nil {
+				// 		// log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
+				// 	}
+				// }
 
 			}(symbol)
 		}
