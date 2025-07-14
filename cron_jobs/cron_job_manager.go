@@ -17,10 +17,10 @@ import (
 func InitCronJobs(db *gorm.DB) {
 	repo := repository.NewBinanceRepository()
 	binanceService := binance.NewBinanceService(repo)
-	go Scalping1Strategy(binanceService)
+	go ScalpingStrategy(binanceService)
 }
 
-func Scalping1Strategy(binanceService *binance.BinanceService) {
+func ScalpingStrategy(binanceService *binance.BinanceService) {
 	telegramService := telegram.NewTelegramService()
 	symbols := []string{"BTCUSDT", "ADAUSDT", "AVAXUSDT", "SOLUSDT", "SUIUSDT", "DOGEUSDT", "ETHUSDT", "NEARUSDT"}
 
@@ -30,15 +30,15 @@ func Scalping1Strategy(binanceService *binance.BinanceService) {
 		for _, symbol := range symbols {
 			go func(sym string) {
 				// Fetch data cho từng coin
-				M15Candles, _ := binanceService.Fetch15mCandles(context.Background(), sym, 300)
-				M1Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 100)
+				M15Candles300, _ := binanceService.Fetch15mCandles(context.Background(), sym, 300)
+				M1Candles100, _ := binanceService.Fetch1mCandles(context.Background(), sym, 100)
 
 				// Analyze strategy cho từng coin
-				scalping1Strategy := trading.NewScalping1Strategy()
-				signal, err := scalping1Strategy.AnalyzeWithSignalString(trading.Scalping1Input{
-					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles),
-					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles),
-				}, M15Candles[0].Symbol)
+				scalping2Strategy := trading.NewScalping1Strategy()
+				signal, err := scalping2Strategy.AnalyzeWithSignalString(trading.Scalping1Input{
+					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles300),
+					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles100),
+				}, M15Candles300[0].Symbol)
 
 				if err != nil {
 					// // Handle error
@@ -55,6 +55,30 @@ func Scalping1Strategy(binanceService *binance.BinanceService) {
 						// log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
 					}
 				}
+
+				// Analyze Twin Range Filter strategy cho từng coin
+				M1Candles200, _ := binanceService.Fetch1mCandles(context.Background(), sym, 200)
+				twinRangeStrategy := trading.NewScalping2Strategy()
+				twinRangeSignal, err := twinRangeStrategy.AnalyzeWithSignalString(trading.TwinRangeFilterInput{
+					Candles: utilsConverter.ConvertBinanceCandlesToBase(M1Candles200), // Sử dụng M1 candles cho scalping
+				}, M1Candles200[0].Symbol)
+
+				if err != nil {
+					// // Handle error
+					return
+				}
+
+				// Handle Twin Range Filter signal
+				if twinRangeSignal != nil {
+					err := telegramService.SendMessageToChannel(
+						os.Getenv("J_AI_TRADE_BOT_V1"),
+						os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
+						*twinRangeSignal) // dereference signal
+					if err != nil {
+						// log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
+					}
+				}
+
 			}(symbol)
 		}
 		// Tính thời gian còn lại đến đầu phút tiếp theo
