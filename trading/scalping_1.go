@@ -2,6 +2,7 @@ package trading
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	baseCandleModel "j_ai_trade/common"
@@ -91,7 +92,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 	if isPriceAboveEMA && isRSIOversold && (hasBullishEngulfing || hasHammer || has2Bulls) {
 		side := "BUY"
 		entry := currentPrice
-		signalStr := genMultiRRSignalStringPercent(symbol, side, entry, rrList)
+		signalStr := genMultiRRSignalStringPercent(symbol, side, entry, rrList, input.M1Candles) // Placeholder for equity
 		return &signalStr, nil
 	}
 
@@ -99,7 +100,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 	if !isPriceAboveEMA && isRSIOverbought && (hasBearishEngulfing || hasShootingStar || has2Bears) {
 		side := "SELL"
 		entry := currentPrice
-		signalStr := genMultiRRSignalStringPercent(symbol, side, entry, rrList)
+		signalStr := genMultiRRSignalStringPercent(symbol, side, entry, rrList, input.M1Candles) // Placeholder for equity
 		return &signalStr, nil
 	}
 
@@ -188,7 +189,50 @@ func (s *Scalping1Strategy) detect2Bears(candles []baseCandleModel.BaseCandle) b
 
 // ==== Signal Formatting Helper ====
 
-func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []float64) string {
+// Tính ATR đơn giản cho volatility
+func calcATR(candles []baseCandleModel.BaseCandle, period int) float64 {
+	if len(candles) < period+1 {
+		return 0
+	}
+	atr := 0.0
+	for i := len(candles) - period; i < len(candles); i++ {
+		high := candles[i].High
+		low := candles[i].Low
+		prevClose := candles[i-1].Close
+		tr := high - low
+		if abs := math.Abs(high - prevClose); abs > tr {
+			tr = abs
+		}
+		if abs := math.Abs(low - prevClose); abs > tr {
+			tr = abs
+		}
+		atr += tr
+	}
+	return atr / float64(period)
+}
+
+// Tính volatility trung bình theo % (ATR%)
+func calcATRPercent(candles []baseCandleModel.BaseCandle, period int) float64 {
+	if len(candles) < period+1 {
+		return 0
+	}
+	atr := calcATR(candles, period)
+	close := candles[len(candles)-1].Close
+	if close == 0 {
+		return 0
+	}
+	return atr / close
+}
+
+// Hàm gợi ý đòn bẩy tự động dựa trên volatility thực tế và target lãi ký quỹ
+func suggestLeverageByVolatility(atrPercent float64, targetProfitPercent float64) float64 {
+	if atrPercent == 0 {
+		return 1 // fallback, không thể chia cho 0
+	}
+	return targetProfitPercent / atrPercent
+}
+
+func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []float64, m1Candles []baseCandleModel.BaseCandle) string {
 	var icon string
 	if side == "BUY" {
 		icon = "🟢" // Green circle for BUY
@@ -196,24 +240,32 @@ func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []
 		icon = "🔴" // Red circle for SELL
 	}
 
-	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.2f\n\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry)
-	riskPercent := 0.01 // 1% risk
+	atrPercent := calcATRPercent(m1Candles, 20) // ATR% 20 nến M1
+	targetProfitPercent := 1.0                  // 100% ký quỹ
+	leverage := suggestLeverageByVolatility(atrPercent, targetProfitPercent)
+
+	// Giả sử ký quỹ mặc định là 10 USD (có thể truyền từ ngoài vào nếu cần)
+	margin := 10.0
+
+	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.4f\nLeverage: %.1fx\nATR%%(20): %.4f\n\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, atrPercent*100)
 
 	for _, rr := range rrList {
 		var sl, tp float64
 		rrStr := fmt.Sprintf("1:%.0f", rr)
+		// Reward = margin * RR
+		reward := margin * rr
 
 		if side == "BUY" {
-			// For BUY: SL below entry, TP above entry
-			sl = entry * (1 - riskPercent)    // 1% below entry
-			tp = entry * (1 + riskPercent*rr) // RR% above entry
+			// SL = liquidation price, TP = đạt đúng reward USD
+			sl = entry * (1 - 1/leverage)
+			tp = entry + (reward*entry)/(margin*leverage)
 		} else {
-			// For SELL: SL above entry, TP below entry
-			sl = entry * (1 + riskPercent)    // 1% above entry
-			tp = entry * (1 - riskPercent*rr) // RR% below entry
+			// SL = liquidation price, TP = đạt đúng reward USD
+			sl = entry * (1 + 1/leverage)
+			tp = entry - (reward*entry)/(margin*leverage)
 		}
 
-		result += fmt.Sprintf("RR: %s\nStop Loss: %.2f\nTake Profit: %.2f\n\n", rrStr, sl, tp)
+		result += fmt.Sprintf("RR: %s\nStop Loss: %.4f\nTake Profit: %.4f\n\n", rrStr, sl, tp)
 	}
 	return strings.TrimSpace(result)
 }
