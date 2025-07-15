@@ -49,46 +49,47 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 				}
 
 				// Handle signal
-				if signalStr != nil {
+				if signalStr != nil && signalModel != nil {
+					// Send to Telegram
 					err := telegramService.SendMessageToChannel(
 						os.Getenv("J_AI_TRADE_BOT_V1"),
 						os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
-						*signalStr) // dereference signal
+						*signalStr)
 					if err != nil {
-						// log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
+						log.Error().Err(err).Msg("Failed to send signal to Telegram")
 					}
-				}
 
-				// Initialize backtesting service and execute order
-				backTesting := backtesting.NewBackTesting(db)
+					// Execute order
+					backTesting := backtesting.NewBackTesting(db)
 
-				apiKeys := []*okxmodel.OkxApiKeysModel{
-					{
-						ApiKey:     os.Getenv("OKX_API_KEY"),
-						ApiSecret:  os.Getenv("OKX_API_SECRET_KEY"),
-						Passphrase: os.Getenv("OKX_API_PASSPHRASE"),
-					},
-					{
-						ApiKey:     "aae2ecad-9769-4054-a1d0-85ed40ab78b1",
-						ApiSecret:  "28E251ADE9EC925866E745FA9C14E08B",
-						Passphrase: "Vertivcookta5@",
-					},
-				}
+					apiKeys := []*okxmodel.OkxApiKeysModel{
+						{
+							ApiKey:     os.Getenv("OKX_API_KEY"),
+							ApiSecret:  os.Getenv("OKX_API_SECRET_KEY"),
+							Passphrase: os.Getenv("OKX_API_PASSPHRASE"),
+						},
+						{
+							ApiKey:     "aae2ecad-9769-4054-a1d0-85ed40ab78b1",
+							ApiSecret:  "28E251ADE9EC925866E745FA9C14E08B",
+							Passphrase: "Vertivcookta5@",
+						},
+					}
 
-				for _, apiKey := range apiKeys {
-					err = backTesting.ExecuteFuturesOrder(
-						symbol,
-						signalModel.AmountUSD,
-						signalModel.Entry,
-						signalModel.Side,
-						"Scapling 1",
-						signalModel.TakeProfit,
-						signalModel.StopLoss,
-						signalModel.Leverage,
-						apiKey,
-					)
-					if err != nil {
-						log.Error().Err(err).Msg("Failed to execute futures order")
+					for _, apiKey := range apiKeys {
+						err = backTesting.ExecuteFuturesOrder(
+							sym, // Use sym instead of symbol
+							signalModel.AmountUSD,
+							signalModel.Entry,
+							signalModel.Side,
+							"Scalping 1", // Fixed typo
+							signalModel.TakeProfit,
+							signalModel.StopLoss,
+							signalModel.Leverage,
+							apiKey,
+						)
+						if err != nil {
+							log.Error().Err(err).Msg("Failed to execute futures order")
+						}
 					}
 				}
 
