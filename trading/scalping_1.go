@@ -35,7 +35,7 @@ const (
 	RSI_OVERSOLD   = 30
 	RSI_OVERBOUGHT = 70
 	ATR_PERIOD     = 20
-	MAX_LEVERAGE   = 100.0
+	MAX_LEVERAGE   = 50.0
 	MIN_LEVERAGE   = 1.0
 )
 
@@ -48,10 +48,10 @@ const (
 
 // Target profit percentages based on volatility
 const (
-	HIGH_VOLATILITY_TARGET   = 0.8 // 80% ký quỹ
-	MEDIUM_VOLATILITY_TARGET = 1.0 // 100% ký quỹ
-	LOW_VOLATILITY_TARGET    = 0.7 // 70% ký quỹ
-	MIN_VOLATILITY_TARGET    = 0.6 // 60% ký quỹ
+	HIGH_VOLATILITY_TARGET   = 0.4 // 40% ký quỹ
+	MEDIUM_VOLATILITY_TARGET = 0.5 // 50% ký quỹ
+	LOW_VOLATILITY_TARGET    = 0.3 // 30% ký quỹ
+	MIN_VOLATILITY_TARGET    = 0.2 // 20% ký quỹ
 )
 
 // SL/TP multipliers based on volatility
