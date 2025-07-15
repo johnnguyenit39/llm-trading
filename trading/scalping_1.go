@@ -10,19 +10,57 @@ import (
 	"github.com/markcheno/go-talib"
 )
 
-// ==== Structs and Constructor ====
-
-type Scalping1Input struct {
-	M15Candles []baseCandleModel.BaseCandle // M15 candles for EMA 200 trend filter
-	M1Candles  []baseCandleModel.BaseCandle // M1 candles for RSI and patterns (matching TradingView)
-}
-
-type Scalping1Signal string
+// ==== Constants ====
 
 const (
 	BUY  Scalping1Signal = "BUY"
 	SELL Scalping1Signal = "SELL"
 )
+
+// Strategy configuration constants
+const (
+	EMA_PERIOD     = 200
+	RSI_PERIOD     = 14
+	RSI_OVERSOLD   = 30
+	RSI_OVERBOUGHT = 70
+	ATR_PERIOD     = 20
+	MAX_LEVERAGE   = 100.0
+	MIN_LEVERAGE   = 1.0
+)
+
+// Volatility thresholds for target profit adjustment
+const (
+	HIGH_VOLATILITY_THRESHOLD   = 0.025 // 2.5%
+	MEDIUM_VOLATILITY_THRESHOLD = 0.015 // 1.5%
+	LOW_VOLATILITY_THRESHOLD    = 0.008 // 0.8%
+)
+
+// Target profit percentages based on volatility
+const (
+	HIGH_VOLATILITY_TARGET   = 0.8 // 80% ký quỹ
+	MEDIUM_VOLATILITY_TARGET = 1.0 // 100% ký quỹ
+	LOW_VOLATILITY_TARGET    = 0.7 // 70% ký quỹ
+	MIN_VOLATILITY_TARGET    = 0.6 // 60% ký quỹ
+)
+
+// SL/TP multipliers based on volatility
+const (
+	HIGH_VOL_SL_MULT = 1.2
+	HIGH_VOL_TP_MULT = 0.6
+	MED_VOL_SL_MULT  = 1.5
+	MED_VOL_TP_MULT  = 0.8
+	LOW_VOL_SL_MULT  = 2.0
+	LOW_VOL_TP_MULT  = 1.0
+)
+
+// ==== Types ====
+
+type Scalping1Signal string
+
+type Scalping1Input struct {
+	M15Candles []baseCandleModel.BaseCandle // M15 candles for EMA 200 trend filter
+	M1Candles  []baseCandleModel.BaseCandle // M1 candles for RSI and patterns
+}
 
 type Scalping1Strategy struct {
 	emaPeriod     int
@@ -31,83 +69,153 @@ type Scalping1Strategy struct {
 	rsiOverbought float64
 }
 
+// ==== Constructor ====
+
 func NewScalping1Strategy() *Scalping1Strategy {
 	return &Scalping1Strategy{
-		emaPeriod:     200,
-		rsiPeriod:     14, // Match TradingView default
-		rsiOversold:   30,
-		rsiOverbought: 70,
+		emaPeriod:     EMA_PERIOD,
+		rsiPeriod:     RSI_PERIOD,
+		rsiOversold:   RSI_OVERSOLD,
+		rsiOverbought: RSI_OVERBOUGHT,
 	}
 }
 
-// ==== Main Analyze Logic ====
+// ==== Main Analysis Logic ====
 
-// AnalyzeWithSignalString analyzes the input and returns a formatted signal string (risk percent version)
+// AnalyzeWithSignalString analyzes the input and returns a formatted signal string
 func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol string) (*string, error) {
-	if len(input.M15Candles) < s.emaPeriod || len(input.M1Candles) < s.rsiPeriod {
-		return nil, fmt.Errorf("insufficient data: need at least %d M15 candles and %d M1 candles", s.emaPeriod, s.rsiPeriod)
+	if err := s.validateInput(input); err != nil {
+		return nil, err
 	}
 
-	// Calculate EMA 200 on M15 for trend filter
-	closePrices := make([]float64, len(input.M15Candles))
-	for i, candle := range input.M15Candles {
-		closePrices[i] = candle.Close
+	// Calculate technical indicators
+	indicators := s.calculateIndicators(input)
+
+	// Check signal conditions
+	signal := s.checkSignalConditions(input, indicators)
+	if signal == nil {
+		return nil, nil // No signal
 	}
+
+	// Generate signal string
+	signalStr := s.generateSignalString(symbol, *signal, input)
+	return &signalStr, nil
+}
+
+// ==== Helper Methods ====
+
+func (s *Scalping1Strategy) validateInput(input Scalping1Input) error {
+	if len(input.M15Candles) < s.emaPeriod || len(input.M1Candles) < s.rsiPeriod {
+		return fmt.Errorf("insufficient data: need at least %d M15 candles and %d M1 candles", s.emaPeriod, s.rsiPeriod)
+	}
+	return nil
+}
+
+type TechnicalIndicators struct {
+	ema200          []float64
+	rsi14           []float64
+	currentPrice    float64
+	currentEMA      float64
+	isPriceAboveEMA bool
+	isRSIOversold   bool
+	isRSIOverbought bool
+}
+
+func (s *Scalping1Strategy) calculateIndicators(input Scalping1Input) TechnicalIndicators {
+	// Calculate EMA 200 on M15
+	closePrices := extractClosePrices(input.M15Candles)
 	ema200 := talib.Ema(closePrices, s.emaPeriod)
 
-	m1ClosePrices := make([]float64, len(input.M1Candles))
-	for i, candle := range input.M1Candles {
-		m1ClosePrices[i] = candle.Close
-	}
-	rsi7 := talib.Rsi(m1ClosePrices, s.rsiPeriod)
+	// Calculate RSI on M1
+	m1ClosePrices := extractClosePrices(input.M1Candles)
+	rsi14 := talib.Rsi(m1ClosePrices, s.rsiPeriod)
 
+	// Get current values
 	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
 	currentEMA := ema200[len(ema200)-1]
 	isPriceAboveEMA := currentPrice > currentEMA
 
-	// RSI conditions matching TradingView: (rsiOS or rsiOS[1]) and (rsiOB or rsiOB[1])
-	lenRSI := len(rsi7)
-	isRSIOversold := false
-	isRSIOverbought := false
-	if lenRSI >= 2 {
-		isRSIOversold = rsi7[lenRSI-1] < s.rsiOversold || rsi7[lenRSI-2] < s.rsiOversold
-		isRSIOverbought = rsi7[lenRSI-1] > s.rsiOverbought || rsi7[lenRSI-2] > s.rsiOverbought
-	} else if lenRSI == 1 {
-		isRSIOversold = rsi7[0] < s.rsiOversold
-		isRSIOverbought = rsi7[0] > s.rsiOverbought
+	// RSI conditions
+	isRSIOversold, isRSIOverbought := s.checkRSIConditions(rsi14)
+
+	return TechnicalIndicators{
+		ema200:          ema200,
+		rsi14:           rsi14,
+		currentPrice:    currentPrice,
+		currentEMA:      currentEMA,
+		isPriceAboveEMA: isPriceAboveEMA,
+		isRSIOversold:   isRSIOversold,
+		isRSIOverbought: isRSIOverbought,
 	}
+}
 
-	// Pattern detection matching TradingView logic
-	hasBullishEngulfing := s.detectBullishEngulfing(input.M1Candles)
-	hasBearishEngulfing := s.detectBearishEngulfing(input.M1Candles)
-	hasHammer := s.detectHammer(input.M1Candles, 0.333)
-	hasShootingStar := s.detectShootingStar(input.M1Candles, 0.333)
-	has2Bulls := s.detect2Bulls(input.M1Candles)
-	has2Bears := s.detect2Bears(input.M1Candles)
+func (s *Scalping1Strategy) checkRSIConditions(rsi []float64) (bool, bool) {
+	lenRSI := len(rsi)
+	if lenRSI >= 2 {
+		return rsi[lenRSI-1] < s.rsiOversold || rsi[lenRSI-2] < s.rsiOversold,
+			rsi[lenRSI-1] > s.rsiOverbought || rsi[lenRSI-2] > s.rsiOverbought
+	} else if lenRSI == 1 {
+		return rsi[0] < s.rsiOversold, rsi[0] > s.rsiOverbought
+	}
+	return false, false
+}
 
-	rrList := []float64{1, 2}
+type SignalInfo struct {
+	side  string
+	entry float64
+}
 
-	// TradingView logic + EMA trend filter
+func (s *Scalping1Strategy) checkSignalConditions(input Scalping1Input, indicators TechnicalIndicators) *SignalInfo {
+	// Detect patterns
+	patterns := s.detectPatterns(input.M1Candles)
+
 	// BUY: Price above EMA 200 + RSI oversold + bullish patterns
-	if isPriceAboveEMA && isRSIOversold && (hasBullishEngulfing || hasHammer || has2Bulls) {
-		side := "BUY"
-		entry := currentPrice
-		signalStr := genMultiRRSignalStringPercent(symbol, side, entry, rrList, input.M1Candles) // Placeholder for equity
-		return &signalStr, nil
+	if indicators.isPriceAboveEMA && indicators.isRSIOversold &&
+		(patterns.hasBullishEngulfing || patterns.hasHammer || patterns.has2Bulls) {
+		return &SignalInfo{
+			side:  "BUY",
+			entry: indicators.currentPrice,
+		}
 	}
 
 	// SELL: Price below EMA 200 + RSI overbought + bearish patterns
-	if !isPriceAboveEMA && isRSIOverbought && (hasBearishEngulfing || hasShootingStar || has2Bears) {
-		side := "SELL"
-		entry := currentPrice
-		signalStr := genMultiRRSignalStringPercent(symbol, side, entry, rrList, input.M1Candles) // Placeholder for equity
-		return &signalStr, nil
+	if !indicators.isPriceAboveEMA && indicators.isRSIOverbought &&
+		(patterns.hasBearishEngulfing || patterns.hasShootingStar || patterns.has2Bears) {
+		return &SignalInfo{
+			side:  "SELL",
+			entry: indicators.currentPrice,
+		}
 	}
 
-	return nil, nil // No signal
+	return nil
 }
 
-// ==== Pattern Detection Helpers ====
+type PatternInfo struct {
+	hasBullishEngulfing bool
+	hasBearishEngulfing bool
+	hasHammer           bool
+	hasShootingStar     bool
+	has2Bulls           bool
+	has2Bears           bool
+}
+
+func (s *Scalping1Strategy) detectPatterns(candles []baseCandleModel.BaseCandle) PatternInfo {
+	return PatternInfo{
+		hasBullishEngulfing: s.detectBullishEngulfing(candles),
+		hasBearishEngulfing: s.detectBearishEngulfing(candles),
+		hasHammer:           s.detectHammer(candles, 0.333),
+		hasShootingStar:     s.detectShootingStar(candles, 0.333),
+		has2Bulls:           s.detect2Bulls(candles),
+		has2Bears:           s.detect2Bears(candles),
+	}
+}
+
+func (s *Scalping1Strategy) generateSignalString(symbol string, signal SignalInfo, input Scalping1Input) string {
+	rrList := []float64{1, 2}
+	return genMultiRRSignalStringPercent(symbol, signal.side, signal.entry, rrList, input.M15Candles)
+}
+
+// ==== Pattern Detection Methods ====
 
 func (s *Scalping1Strategy) detectBullishEngulfing(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 2 {
@@ -115,8 +223,6 @@ func (s *Scalping1Strategy) detectBullishEngulfing(candles []baseCandleModel.Bas
 	}
 	prev := candles[len(candles)-2]
 	curr := candles[len(candles)-1]
-	// TradingView: close > open[1] and close[1] < open[1]
-	// Current candle is green (close > open) and previous candle is red (close < open)
 	return curr.Close > curr.Open && prev.Close < prev.Open
 }
 
@@ -126,8 +232,6 @@ func (s *Scalping1Strategy) detectBearishEngulfing(candles []baseCandleModel.Bas
 	}
 	prev := candles[len(candles)-2]
 	curr := candles[len(candles)-1]
-	// TradingView: close < open[1] and close[1] > open[1]
-	// Current candle is red (close < open) and previous candle is green (close > open)
 	return curr.Close < curr.Open && prev.Close > prev.Open
 }
 
@@ -136,17 +240,11 @@ func (s *Scalping1Strategy) detectHammer(candles []baseCandleModel.BaseCandle, m
 		return false
 	}
 	c := candles[len(candles)-1]
-
-	// TradingView: bullFib = (low - high) * fibLevel + high
-	// bearCandle = close < open ? close : open
-	// hammer = (bearCandle >= bullFib) and rsiOS
-
 	bullFib := (c.Low-c.High)*maxBodyRatio + c.High
 	bearCandle := c.Close
 	if c.Close > c.Open {
 		bearCandle = c.Open
 	}
-
 	return bearCandle >= bullFib
 }
 
@@ -155,17 +253,11 @@ func (s *Scalping1Strategy) detectShootingStar(candles []baseCandleModel.BaseCan
 		return false
 	}
 	c := candles[len(candles)-1]
-
-	// TradingView: bearFib = (high - low) * fibLevel + low
-	// bullCandle = close > open ? close : open
-	// shooting = (bullCandle <= bearFib) and rsiOB
-
 	bearFib := (c.High-c.Low)*maxBodyRatio + c.Low
 	bullCandle := c.Close
 	if c.Close < c.Open {
 		bullCandle = c.Open
 	}
-
 	return bullCandle <= bearFib
 }
 
@@ -187,9 +279,18 @@ func (s *Scalping1Strategy) detect2Bears(candles []baseCandleModel.BaseCandle) b
 	return c1.Close < c1.Open && c2.Close < c2.Open
 }
 
-// ==== Signal Formatting Helper ====
+// ==== Utility Functions ====
 
-// Tính ATR đơn giản cho volatility
+func extractClosePrices(candles []baseCandleModel.BaseCandle) []float64 {
+	closePrices := make([]float64, len(candles))
+	for i, candle := range candles {
+		closePrices[i] = candle.Close
+	}
+	return closePrices
+}
+
+// ==== ATR and Volatility Calculations ====
+
 func calcATR(candles []baseCandleModel.BaseCandle, period int) float64 {
 	if len(candles) < period+1 {
 		return 0
@@ -211,7 +312,6 @@ func calcATR(candles []baseCandleModel.BaseCandle, period int) float64 {
 	return atr / float64(period)
 }
 
-// Tính volatility trung bình theo % (ATR%)
 func calcATRPercent(candles []baseCandleModel.BaseCandle, period int) float64 {
 	if len(candles) < period+1 {
 		return 0
@@ -224,48 +324,95 @@ func calcATRPercent(candles []baseCandleModel.BaseCandle, period int) float64 {
 	return atr / close
 }
 
-// Hàm gợi ý đòn bẩy tự động dựa trên volatility thực tế và target lãi ký quỹ
-func suggestLeverageByVolatility(atrPercent float64, targetProfitPercent float64) float64 {
-	if atrPercent == 0 {
-		return 1 // fallback, không thể chia cho 0
-	}
-	return targetProfitPercent / atrPercent
+// ==== Leverage and Risk Management ====
+
+type LeverageConfig struct {
+	leverage            float64
+	targetProfitPercent float64
 }
 
-func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []float64, m1Candles []baseCandleModel.BaseCandle) string {
-	var icon string
-	if side == "BUY" {
-		icon = "🟢" // Green circle for BUY
-	} else {
-		icon = "🔴" // Red circle for SELL
+func suggestLeverageByVolatility(atrPercent float64) LeverageConfig {
+	if atrPercent == 0 {
+		return LeverageConfig{leverage: MIN_LEVERAGE, targetProfitPercent: MIN_VOLATILITY_TARGET}
 	}
 
-	atrPercent := calcATRPercent(m1Candles, 20) // ATR% 20 nến M1
-	targetProfitPercent := 1.0                  // 100% ký quỹ
-	leverage := suggestLeverageByVolatility(atrPercent, targetProfitPercent)
+	targetProfitPercent := getTargetProfitByVolatility(atrPercent)
+	theoreticalLeverage := targetProfitPercent / atrPercent
 
-	// Giả sử ký quỹ mặc định là 10 USD (có thể truyền từ ngoài vào nếu cần)
-	margin := 10.0
+	// Apply leverage limits
+	if theoreticalLeverage > MAX_LEVERAGE {
+		return LeverageConfig{leverage: MAX_LEVERAGE, targetProfitPercent: targetProfitPercent}
+	}
+	if theoreticalLeverage < MIN_LEVERAGE {
+		return LeverageConfig{leverage: MIN_LEVERAGE, targetProfitPercent: targetProfitPercent}
+	}
 
-	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.4f\nLeverage: %.1fx\nATR%%(20): %.4f\n\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, atrPercent*100)
+	return LeverageConfig{leverage: theoreticalLeverage, targetProfitPercent: targetProfitPercent}
+}
+
+func getTargetProfitByVolatility(atrPercent float64) float64 {
+	switch {
+	case atrPercent > HIGH_VOLATILITY_THRESHOLD:
+		return HIGH_VOLATILITY_TARGET
+	case atrPercent > MEDIUM_VOLATILITY_THRESHOLD:
+		return MEDIUM_VOLATILITY_TARGET
+	case atrPercent > LOW_VOLATILITY_THRESHOLD:
+		return LOW_VOLATILITY_TARGET
+	default:
+		return MIN_VOLATILITY_TARGET
+	}
+}
+
+type SLTPConfig struct {
+	slMultiplier float64
+	tpMultiplier float64
+}
+
+func getSLTPMultipliers(atrPercent float64) SLTPConfig {
+	switch {
+	case atrPercent > 0.02: // High volatility
+		return SLTPConfig{slMultiplier: HIGH_VOL_SL_MULT, tpMultiplier: HIGH_VOL_TP_MULT}
+	case atrPercent > 0.01: // Medium volatility
+		return SLTPConfig{slMultiplier: MED_VOL_SL_MULT, tpMultiplier: MED_VOL_TP_MULT}
+	default: // Low volatility
+		return SLTPConfig{slMultiplier: LOW_VOL_SL_MULT, tpMultiplier: LOW_VOL_TP_MULT}
+	}
+}
+
+// ==== Signal Formatting ====
+
+func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []float64, m15Candles []baseCandleModel.BaseCandle) string {
+	icon := getSignalIcon(side)
+	atrPercent := calcATRPercent(m15Candles, ATR_PERIOD)
+	leverageConfig := suggestLeverageByVolatility(atrPercent)
+
+	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.4f\nLeverage: %.1fx\nATR%%(20): %.4f\n\n",
+		icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverageConfig.leverage, atrPercent*100)
 
 	for _, rr := range rrList {
-		var sl, tp float64
+		sl, tp := calculateSLTP(entry, side, rr, m15Candles, atrPercent)
 		rrStr := fmt.Sprintf("1:%.0f", rr)
-		// Reward = margin * RR
-		reward := margin * rr
-
-		if side == "BUY" {
-			// SL = liquidation price, TP = đạt đúng reward USD
-			sl = entry * (1 - 1/leverage)
-			tp = entry + (reward*entry)/(margin*leverage)
-		} else {
-			// SL = liquidation price, TP = đạt đúng reward USD
-			sl = entry * (1 + 1/leverage)
-			tp = entry - (reward*entry)/(margin*leverage)
-		}
-
 		result += fmt.Sprintf("RR: %s\nStop Loss: %.4f\nTake Profit: %.4f\n\n", rrStr, sl, tp)
 	}
 	return strings.TrimSpace(result)
+}
+
+func getSignalIcon(side string) string {
+	if side == "BUY" {
+		return "🟢"
+	}
+	return "🔴"
+}
+
+func calculateSLTP(entry float64, side string, rr float64, m15Candles []baseCandleModel.BaseCandle, atrPercent float64) (float64, float64) {
+	atr := calcATR(m15Candles, ATR_PERIOD)
+	sltpConfig := getSLTPMultipliers(atrPercent)
+
+	slDistance := atr * sltpConfig.slMultiplier
+	tpDistance := atr * sltpConfig.tpMultiplier * rr
+
+	if side == "BUY" {
+		return entry - slDistance, entry + tpDistance
+	}
+	return entry + slDistance, entry - tpDistance
 }
