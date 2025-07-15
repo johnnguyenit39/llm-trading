@@ -2,14 +2,17 @@ package cronjobs
 
 import (
 	"context"
+	backtesting "j_ai_trade/back_testing"
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
+	okxmodel "j_ai_trade/brokers/okx/model"
 	"j_ai_trade/telegram"
 	"j_ai_trade/trading"
 	utilsConverter "j_ai_trade/utils/converter"
 	"os"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
 )
 
@@ -17,10 +20,10 @@ import (
 func InitCronJobs(db *gorm.DB) {
 	repo := repository.NewBinanceRepository()
 	binanceService := binance.NewBinanceService(repo)
-	go ScalpingStrategy(binanceService)
+	go ScalpingStrategy(binanceService, db)
 }
 
-func ScalpingStrategy(binanceService *binance.BinanceService) {
+func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 	telegramService := telegram.NewTelegramService()
 	symbols := []string{"BTCUSDT", "ADAUSDT", "AVAXUSDT", "SOLUSDT", "SUIUSDT", "DOGEUSDT", "ETHUSDT", "NEARUSDT"}
 
@@ -35,7 +38,7 @@ func ScalpingStrategy(binanceService *binance.BinanceService) {
 
 				// Analyze strategy cho từng coin
 				scalping2Strategy := trading.NewScalping1Strategy()
-				signal, err := scalping2Strategy.AnalyzeWithSignalString(trading.Scalping1Input{
+				signalModel, signalStr, err := scalping2Strategy.AnalyzeWithSignalString(trading.Scalping1Input{
 					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles300),
 					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles100),
 				}, M15Candles300[0].Symbol)
@@ -46,13 +49,46 @@ func ScalpingStrategy(binanceService *binance.BinanceService) {
 				}
 
 				// Handle signal
-				if signal != nil {
+				if signalStr != nil {
 					err := telegramService.SendMessageToChannel(
 						os.Getenv("J_AI_TRADE_BOT_V1"),
 						os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
-						*signal) // dereference signal
+						*signalStr) // dereference signal
 					if err != nil {
 						// log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
+					}
+				}
+
+				// Initialize backtesting service and execute order
+				backTesting := backtesting.NewBackTesting(db)
+
+				apiKeys := []*okxmodel.OkxApiKeysModel{
+					{
+						ApiKey:     os.Getenv("OKX_API_KEY"),
+						ApiSecret:  os.Getenv("OKX_API_SECRET_KEY"),
+						Passphrase: os.Getenv("OKX_API_PASSPHRASE"),
+					},
+					{
+						ApiKey:     "aae2ecad-9769-4054-a1d0-85ed40ab78b1",
+						ApiSecret:  "28E251ADE9EC925866E745FA9C14E08B",
+						Passphrase: "Vertivcookta5@",
+					},
+				}
+
+				for _, apiKey := range apiKeys {
+					err = backTesting.ExecuteFuturesOrder(
+						symbol,
+						signalModel.AmountUSD,
+						signalModel.Entry,
+						signalModel.Side,
+						"Scapling 1",
+						signalModel.TakeProfit,
+						signalModel.StopLoss,
+						signalModel.Leverage,
+						apiKey,
+					)
+					if err != nil {
+						log.Error().Err(err).Msg("Failed to execute futures order")
 					}
 				}
 

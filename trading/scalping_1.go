@@ -10,6 +10,17 @@ import (
 	"github.com/markcheno/go-talib"
 )
 
+type Scalping1SignalModel struct {
+	Symbol     string  `json:"symbol"`
+	Side       string  `json:"side"`
+	Entry      float64 `json:"entry"`
+	TakeProfit float64 `json:"take_profit"`
+	StopLoss   float64 `json:"stop_loss"`
+	Leverage   float64 `json:"leverage"`
+	AmountUSD  float64 `json:"amount_usd"`
+	ATRPercent float64 `json:"atr_percent"`
+}
+
 // ==== Constants ====
 
 const (
@@ -83,9 +94,9 @@ func NewScalping1Strategy() *Scalping1Strategy {
 // ==== Main Analysis Logic ====
 
 // AnalyzeWithSignalString analyzes the input and returns a formatted signal string
-func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol string) (*string, error) {
+func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol string) (*Scalping1SignalModel, *string, error) {
 	if err := s.validateInput(input); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Calculate technical indicators
@@ -94,12 +105,12 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 	// Check signal conditions
 	signal := s.checkSignalConditions(input, indicators)
 	if signal == nil {
-		return nil, nil // No signal
+		return nil, nil, nil // No signal
 	}
 
 	// Generate signal string
-	signalStr := s.generateSignalString(symbol, *signal, input)
-	return &signalStr, nil
+	signalModel, signalStr := s.generateSignalString(symbol, *signal, input)
+	return &signalModel, &signalStr, nil
 }
 
 // ==== Helper Methods ====
@@ -210,7 +221,7 @@ func (s *Scalping1Strategy) detectPatterns(candles []baseCandleModel.BaseCandle)
 	}
 }
 
-func (s *Scalping1Strategy) generateSignalString(symbol string, signal SignalInfo, input Scalping1Input) string {
+func (s *Scalping1Strategy) generateSignalString(symbol string, signal SignalInfo, input Scalping1Input) (Scalping1SignalModel, string) {
 	rrList := []float64{1, 2}
 	return genMultiRRSignalStringPercent(symbol, signal.side, signal.entry, rrList, input.M15Candles)
 }
@@ -381,11 +392,27 @@ func getSLTPMultipliers(atrPercent float64) SLTPConfig {
 
 // ==== Signal Formatting ====
 
-func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []float64, m15Candles []baseCandleModel.BaseCandle) string {
+func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []float64, m15Candles []baseCandleModel.BaseCandle) (Scalping1SignalModel, string) {
 	icon := getSignalIcon(side)
 	atrPercent := calcATRPercent(m15Candles, ATR_PERIOD)
 	leverageConfig := suggestLeverageByVolatility(atrPercent)
 
+	// Calculate SL/TP for RR 1:1 (primary signal)
+	sl, tp := calculateSLTP(entry, side, 1.0, m15Candles, atrPercent)
+
+	// Create signal model
+	signalModel := Scalping1SignalModel{
+		Symbol:     symbol,
+		Side:       side,
+		Entry:      entry,
+		TakeProfit: tp,
+		StopLoss:   sl,
+		Leverage:   leverageConfig.leverage,
+		AmountUSD:  10.0, // Default $10 margin
+		ATRPercent: atrPercent * 100,
+	}
+
+	// Generate formatted string
 	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.4f\nLeverage: %.1fx\nATR%%(20): %.4f\n\n",
 		icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverageConfig.leverage, atrPercent*100)
 
@@ -394,7 +421,7 @@ func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []
 		rrStr := fmt.Sprintf("1:%.0f", rr)
 		result += fmt.Sprintf("RR: %s\nStop Loss: %.4f\nTake Profit: %.4f\n\n", rrStr, sl, tp)
 	}
-	return strings.TrimSpace(result)
+	return signalModel, strings.TrimSpace(result)
 }
 
 func getSignalIcon(side string) string {
