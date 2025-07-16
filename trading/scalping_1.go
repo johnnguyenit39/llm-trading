@@ -46,16 +46,8 @@ const (
 
 // ==== Types ====
 
-type Scalping1SignalModel struct {
-	Symbol     string  `json:"symbol"`
-	Side       string  `json:"side"`
-	Entry      float64 `json:"entry"`
-	TakeProfit float64 `json:"take_profit"`
-	StopLoss   float64 `json:"stop_loss"`
-	Leverage   float64 `json:"leverage"`
-	AmountUSD  float64 `json:"amount_usd"`
-	ATRPercent float64 `json:"atr_percent"`
-}
+// Scalping1SignalModel is deprecated - use BaseSignalModel instead
+type Scalping1SignalModel = BaseSignalModel
 
 type Scalping1Input struct {
 	H1Candles  []baseCandleModel.BaseCandle // For trend analysis (higher timeframe)
@@ -117,7 +109,7 @@ func NewScalping1Strategy() *Scalping1Strategy {
 
 // ==== Main Analysis Logic ====
 
-func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol string) (*Scalping1SignalModel, *string, error) {
+func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol string) (*BaseSignalModel, *string, error) {
 	if err := s.validateInput(input); err != nil {
 		return nil, nil, err
 	}
@@ -624,12 +616,12 @@ func calculateSLTPByVolatility(entry float64, side string, m15Candles []baseCand
 
 // ==== Signal Generation ====
 
-func (s *Scalping1Strategy) generateSignalString(symbol string, signal SignalInfo, input Scalping1Input) (Scalping1SignalModel, string) {
+func (s *Scalping1Strategy) generateSignalString(symbol string, signal SignalInfo, input Scalping1Input) (BaseSignalModel, string) {
 	rrList := []float64{1, 2} // Not used in current implementation
 	return genMultiRRSignalStringPercent(symbol, signal.side, signal.entry, rrList, input.M15Candles)
 }
 
-func genMultiRRSignalStringPercent(symbol, side string, entry float64, _ []float64, m15Candles []baseCandleModel.BaseCandle) (Scalping1SignalModel, string) {
+func genMultiRRSignalStringPercent(symbol, side string, entry float64, _ []float64, m15Candles []baseCandleModel.BaseCandle) (BaseSignalModel, string) {
 	icon := getSignalIcon(side)
 	atrPercent := calcATRPercent(m15Candles, ATR_PERIOD)
 	leverageConfig := suggestLeverageByVolatility(atrPercent)
@@ -638,7 +630,7 @@ func genMultiRRSignalStringPercent(symbol, side string, entry float64, _ []float
 	sl, tp := calculateSLTPByVolatility(entry, side, m15Candles, atrPercent)
 
 	// Create signal model
-	signalModel := Scalping1SignalModel{
+	signalModel := BaseSignalModel{
 		Symbol:     symbol,
 		Side:       side,
 		Entry:      entry,
