@@ -120,7 +120,7 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 			time.Sleep(500 * time.Millisecond) // 500ms delay between symbols
 
 			// Declare variables outside retry loop
-			var M15Candles300, M1Candles100, H1Candles20, H4Candles20, M30Candles60, M5Candles20, D1Candles20 []repository.BinanceCandle
+			var M15Candles300, M1Candles100, H1Candles20, H4Candles20, M30Candles60, M5Candles20, M5Candles150, D1Candles20 []repository.BinanceCandle
 			var err error
 
 			// Add retry mechanism for robustness
@@ -192,7 +192,7 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 
 				time.Sleep(100 * time.Millisecond)
 
-				M5Candles20, err = binanceService.Fetch5mCandles(context.Background(), symbol, 20)
+				M5Candles20, err = binanceService.Fetch5mCandles(context.Background(), symbol, 150) // Increased to 150 for Twin Range Filter
 				if err != nil || len(M5Candles20) == 0 {
 					log.Error().Err(err).Msgf("Failed to fetch M5 candles for %s (attempt %d)", symbol, retry+1)
 					if retry == maxRetries {
@@ -205,6 +205,16 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 
 				// Fetch data cho Scalping3 strategy
 				D1Candles20, err = binanceService.Fetch1dCandles(context.Background(), symbol, 20)
+				if err != nil || len(D1Candles20) == 0 {
+					log.Error().Err(err).Msgf("Failed to fetch D1 candles for %s (attempt %d)", symbol, retry+1)
+					if retry == maxRetries {
+						continue // Skip to next symbol
+					}
+					continue
+				}
+
+				// Fetch data cho Scalping3 strategy
+				M5Candles150, err = binanceService.Fetch15mCandles(context.Background(), symbol, 150)
 				if err != nil || len(D1Candles20) == 0 {
 					log.Error().Err(err).Msgf("Failed to fetch D1 candles for %s (attempt %d)", symbol, retry+1)
 					if retry == maxRetries {
@@ -289,6 +299,29 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					log.Info().Str("symbol", symbol).Str("strategy", "Scalping3").Str("side", signal3Model.Side).Msg("Skipping duplicate signal")
 				} else {
 					log.Warn().Str("symbol", symbol).Str("strategy", "Scalping3").Str("side", signal3Model.Side).Msg("Signal quality check failed")
+				}
+			}
+
+			// Analyze Scalping4 strategy (Twin Range Filter)
+			scalping4Strategy := trading.NewScalping4Strategy()
+			signal4Model, signal4Str, err := scalping4Strategy.AnalyzeWithSignalString(trading.Scalping4Input{
+				Candles: utilsConverter.ConvertBinanceCandlesToBase(M5Candles150), // Using 150 M5 candles for Twin Range Filter
+			}, symbol)
+
+			if err != nil {
+				log.Error().Err(err).Str("symbol", symbol).Msg("Scalping4 analysis failed")
+			}
+
+			// Handle Scalping4 signal with deduplication and quality check
+			if signal4Str != nil && signal4Model != nil {
+				if !isDuplicateSignal(symbol, "Scalping4", signal4Model.Side) && isSignalQualityAcceptable(signal4Model) {
+					handleSignal(signal4Model, signal4Str, telegramService, db, symbol, "Scalping4")
+					recordSignalSent(symbol, "Scalping4", signal4Model.Side)
+					log.Info().Str("symbol", symbol).Str("strategy", "Scalping4").Str("side", signal4Model.Side).Msg("Signal sent successfully")
+				} else if isDuplicateSignal(symbol, "Scalping4", signal4Model.Side) {
+					log.Info().Str("symbol", symbol).Str("strategy", "Scalping4").Str("side", signal4Model.Side).Msg("Skipping duplicate signal")
+				} else {
+					log.Warn().Str("symbol", symbol).Str("strategy", "Scalping4").Str("side", signal4Model.Side).Msg("Signal quality check failed")
 				}
 			}
 		}
