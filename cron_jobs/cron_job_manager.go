@@ -42,6 +42,9 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 				M30Candles60, _ := binanceService.Fetch30mCandles(context.Background(), sym, 60)
 				M5Candles20, _ := binanceService.Fetch5mCandles(context.Background(), sym, 20)
 
+				// Fetch data cho Scalping3 strategy
+				D1Candles20, _ := binanceService.Fetch1dCandles(context.Background(), sym, 20)
+
 				// Analyze Scalping1 strategy
 				scalping1Strategy := trading.NewScalping1Strategy()
 				signal1Model, signal1Str, err := scalping1Strategy.AnalyzeWithSignalString(trading.Scalping1Input{
@@ -74,6 +77,23 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 				// Handle Scalping2 signal
 				if signal2Str != nil && signal2Model != nil {
 					handleSignal(signal2Model, signal2Str, telegramService, db, sym, "Scalping2")
+				}
+
+				// Analyze Scalping3 strategy
+				scalping3Strategy := trading.NewScalping3Strategy()
+				signal3Model, signal3Str, err := scalping3Strategy.AnalyzeWithSignalString(trading.Scalping3Input{
+					D1Candles: utilsConverter.ConvertBinanceCandlesToBase(D1Candles20),
+					H1Candles: utilsConverter.ConvertBinanceCandlesToBase(H1Candles20),
+					M5Candles: utilsConverter.ConvertBinanceCandlesToBase(M5Candles20),
+				}, M5Candles20[0].Symbol)
+
+				if err != nil {
+					log.Error().Err(err).Msg("Scalping3 analysis failed")
+				}
+
+				// Handle Scalping3 signal
+				if signal3Str != nil && signal3Model != nil {
+					handleSignal(signal3Model, signal3Str, telegramService, db, sym, "Scalping3")
 				}
 
 			}(symbol)

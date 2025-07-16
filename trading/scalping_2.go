@@ -157,22 +157,50 @@ func (s *Scalping2Strategy) validateInput(input Scalping2Input) error {
 func (s *Scalping2Strategy) calculateIndicators(input Scalping2Input) Scalping2Indicators {
 	// Calculate SMA 50 on M30
 	closePrices := extractClosePrices(input.M30Candles)
-	sma50 := talib.Sma(closePrices, s.smaPeriod)
+	var sma50 []float64
+	if len(closePrices) >= s.smaPeriod {
+		sma50 = talib.Sma(closePrices, s.smaPeriod)
+	} else {
+		sma50 = []float64{}
+	}
 
 	// Calculate Stochastic on M5
 	m5High := extractHighPrices(input.M5Candles)
 	m5Low := extractLowPrices(input.M5Candles)
 	m5Close := extractClosePrices(input.M5Candles)
 
-	stochK, stochD := talib.Stoch(m5High, m5Low, m5Close, s.stochKPeriod, s.stochDPeriod, talib.SMA, s.stochDPeriod, talib.SMA)
+	var stochK, stochD []float64
+	if len(m5High) >= s.stochKPeriod && len(m5Low) >= s.stochKPeriod && len(m5Close) >= s.stochKPeriod {
+		stochK, stochD = talib.Stoch(m5High, m5Low, m5Close, s.stochKPeriod, s.stochDPeriod, talib.SMA, s.stochDPeriod, talib.SMA)
+	} else {
+		stochK, stochD = []float64{}, []float64{}
+	}
 
 	// Calculate MACD on M5
-	macd, macdSignal, macdHistogram := talib.Macd(m5Close, s.macdFast, s.macdSlow, s.macdSignal)
+	var macd, macdSignal, macdHistogram []float64
+	if len(m5Close) >= s.macdSlow {
+		macd, macdSignal, macdHistogram = talib.Macd(m5Close, s.macdFast, s.macdSlow, s.macdSignal)
+	} else {
+		macd, macdSignal, macdHistogram = []float64{}, []float64{}, []float64{}
+	}
 
-	// Get current values
-	currentPrice := input.M5Candles[len(input.M5Candles)-1].Close
-	currentSMA := sma50[len(sma50)-1]
-	isPriceAboveSMA := currentPrice > currentSMA
+	// Get current values with safety checks
+	var currentPrice, currentSMA float64
+	var isPriceAboveSMA bool
+
+	if len(input.M5Candles) > 0 {
+		currentPrice = input.M5Candles[len(input.M5Candles)-1].Close
+	} else {
+		currentPrice = 0
+	}
+
+	if len(sma50) > 0 {
+		currentSMA = sma50[len(sma50)-1]
+		isPriceAboveSMA = currentPrice > currentSMA
+	} else {
+		currentSMA = 0
+		isPriceAboveSMA = false
+	}
 
 	// Stochastic conditions
 	isStochOversold, isStochOverbought := s.checkStochConditions(stochK, stochD)
@@ -275,11 +303,13 @@ func (s *Scalping2Strategy) detectBreakout(candles []baseCandleModel.BaseCandle)
 	low := candles[len(candles)-10].Low
 
 	for i := len(candles) - 9; i < len(candles)-1; i++ {
-		if candles[i].High > high {
-			high = candles[i].High
-		}
-		if candles[i].Low < low {
-			low = candles[i].Low
+		if i >= 0 && i < len(candles) {
+			if candles[i].High > high {
+				high = candles[i].High
+			}
+			if candles[i].Low < low {
+				low = candles[i].Low
+			}
 		}
 	}
 
@@ -287,12 +317,14 @@ func (s *Scalping2Strategy) detectBreakout(candles []baseCandleModel.BaseCandle)
 	rangeSize := high - low
 
 	// Check for breakout above range
-	if currentPrice > high && (currentPrice-high)/rangeSize > 0.1 { // 10% breakout
+	if currentPrice > high && rangeSize > 0 && (currentPrice-high)/rangeSize > 0.1 { // 10% breakout
 		// Check volume confirmation
-		avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
-		currentVolume := candles[len(candles)-1].Volume
+		if len(candles) >= 5 {
+			avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
+			currentVolume := candles[len(candles)-1].Volume
 
-		return currentVolume > avgVolume*BREAKOUT_VOLUME_MULTIPLIER
+			return currentVolume > avgVolume*BREAKOUT_VOLUME_MULTIPLIER
+		}
 	}
 
 	return false
@@ -308,11 +340,13 @@ func (s *Scalping2Strategy) detectBreakdown(candles []baseCandleModel.BaseCandle
 	low := candles[len(candles)-10].Low
 
 	for i := len(candles) - 9; i < len(candles)-1; i++ {
-		if candles[i].High > high {
-			high = candles[i].High
-		}
-		if candles[i].Low < low {
-			low = candles[i].Low
+		if i >= 0 && i < len(candles) {
+			if candles[i].High > high {
+				high = candles[i].High
+			}
+			if candles[i].Low < low {
+				low = candles[i].Low
+			}
 		}
 	}
 
@@ -320,12 +354,14 @@ func (s *Scalping2Strategy) detectBreakdown(candles []baseCandleModel.BaseCandle
 	rangeSize := high - low
 
 	// Check for breakdown below range
-	if currentPrice < low && (low-currentPrice)/rangeSize > 0.1 { // 10% breakdown
+	if currentPrice < low && rangeSize > 0 && (low-currentPrice)/rangeSize > 0.1 { // 10% breakdown
 		// Check volume confirmation
-		avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
-		currentVolume := candles[len(candles)-1].Volume
+		if len(candles) >= 5 {
+			avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
+			currentVolume := candles[len(candles)-1].Volume
 
-		return currentVolume > avgVolume*BREAKOUT_VOLUME_MULTIPLIER
+			return currentVolume > avgVolume*BREAKOUT_VOLUME_MULTIPLIER
+		}
 	}
 
 	return false
@@ -370,11 +406,13 @@ func (s *Scalping2Strategy) detectTriangle(candles []baseCandleModel.BaseCandle)
 	flatHighs := true
 
 	for i := len(candles) - 8; i < len(candles)-1; i++ {
-		if candles[i].Low >= candles[i-1].Low {
-			higherLows = false
-		}
-		if math.Abs(candles[i].High-candles[i-1].High) > candles[i-1].High*0.02 {
-			flatHighs = false
+		if i > 0 && i < len(candles) {
+			if candles[i].Low >= candles[i-1].Low {
+				higherLows = false
+			}
+			if candles[i-1].High > 0 && math.Abs(candles[i].High-candles[i-1].High) > candles[i-1].High*0.02 {
+				flatHighs = false
+			}
 		}
 	}
 
@@ -392,11 +430,13 @@ func (s *Scalping2Strategy) detectDescendingTriangle(candles []baseCandleModel.B
 	flatLows := true
 
 	for i := len(candles) - 8; i < len(candles)-1; i++ {
-		if candles[i].High <= candles[i-1].High {
-			lowerHighs = false
-		}
-		if math.Abs(candles[i].Low-candles[i-1].Low) > candles[i-1].Low*0.02 {
-			flatLows = false
+		if i > 0 && i < len(candles) {
+			if candles[i].High <= candles[i-1].High {
+				lowerHighs = false
+			}
+			if candles[i-1].Low > 0 && math.Abs(candles[i].Low-candles[i-1].Low) > candles[i-1].Low*0.02 {
+				flatLows = false
+			}
 		}
 	}
 
@@ -414,8 +454,13 @@ func (s *Scalping2Strategy) detectChannel(candles []baseCandleModel.BaseCandle) 
 	lows := make([]float64, 4)
 
 	for i := 0; i < 4; i++ {
-		highs[i] = candles[len(candles)-8+i*2].High
-		lows[i] = candles[len(candles)-8+i*2].Low
+		index := len(candles) - 8 + i*2
+		if index >= 0 && index < len(candles) {
+			highs[i] = candles[index].High
+			lows[i] = candles[index].Low
+		} else {
+			return false // Invalid index
+		}
 	}
 
 	// Check if highs and lows are roughly parallel
@@ -436,8 +481,13 @@ func (s *Scalping2Strategy) detectWedge(candles []baseCandleModel.BaseCandle) bo
 	lows := make([]float64, 4)
 
 	for i := 0; i < 4; i++ {
-		highs[i] = candles[len(candles)-8+i*2].High
-		lows[i] = candles[len(candles)-8+i*2].Low
+		index := len(candles) - 8 + i*2
+		if index >= 0 && index < len(candles) {
+			highs[i] = candles[index].High
+			lows[i] = candles[index].Low
+		} else {
+			return false // Invalid index
+		}
 	}
 
 	// Check if highs are decreasing and lows are increasing (rising wedge)
@@ -697,22 +747,28 @@ func (s *Scalping2Strategy) validateSignalQuality(input Scalping2Input, signal *
 }
 
 func (s *Scalping2Strategy) checkBreakoutStrength(candles []baseCandleModel.BaseCandle, side string) bool {
-	if len(candles) < 5 {
+	if len(candles) < 10 {
 		return false
 	}
 
 	// Check if recent price movement is strong
 	recentMove := math.Abs(candles[len(candles)-1].Close - candles[len(candles)-5].Close)
 	avgMove := 0.0
+	count := 0
 
 	for i := len(candles) - 10; i < len(candles)-5; i++ {
-		if i > 0 {
+		if i > 0 && i < len(candles) {
 			avgMove += math.Abs(candles[i].Close - candles[i-1].Close)
+			count++
 		}
 	}
-	avgMove /= 5.0
 
-	return recentMove > avgMove*2.0 // Recent move is 2x average
+	if count > 0 {
+		avgMove /= float64(count)
+		return recentMove > avgMove*2.0 // Recent move is 2x average
+	}
+
+	return false
 }
 
 func (s *Scalping2Strategy) checkVolumeConfirmation(candles []baseCandleModel.BaseCandle) bool {

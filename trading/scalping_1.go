@@ -194,16 +194,39 @@ func (s *Scalping1Strategy) validateInput(input Scalping1Input) error {
 func (s *Scalping1Strategy) calculateIndicators(input Scalping1Input) TechnicalIndicators {
 	// Calculate EMA 200 on M15
 	closePrices := extractClosePrices(input.M15Candles)
-	ema200 := talib.Ema(closePrices, s.emaPeriod)
+	var ema200 []float64
+	if len(closePrices) >= s.emaPeriod {
+		ema200 = talib.Ema(closePrices, s.emaPeriod)
+	} else {
+		ema200 = []float64{}
+	}
 
 	// Calculate RSI on M1
 	m1ClosePrices := extractClosePrices(input.M1Candles)
-	rsi14 := talib.Rsi(m1ClosePrices, s.rsiPeriod)
+	var rsi14 []float64
+	if len(m1ClosePrices) >= s.rsiPeriod {
+		rsi14 = talib.Rsi(m1ClosePrices, s.rsiPeriod)
+	} else {
+		rsi14 = []float64{}
+	}
 
-	// Get current values
-	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
-	currentEMA := ema200[len(ema200)-1]
-	isPriceAboveEMA := currentPrice > currentEMA
+	// Get current values with safety checks
+	var currentPrice, currentEMA float64
+	var isPriceAboveEMA bool
+
+	if len(input.M1Candles) > 0 {
+		currentPrice = input.M1Candles[len(input.M1Candles)-1].Close
+	} else {
+		currentPrice = 0
+	}
+
+	if len(ema200) > 0 {
+		currentEMA = ema200[len(ema200)-1]
+		isPriceAboveEMA = currentPrice > currentEMA
+	} else {
+		currentEMA = 0
+		isPriceAboveEMA = false
+	}
 
 	// RSI conditions
 	isRSIOversold, isRSIOverbought := s.checkRSIConditions(rsi14)
