@@ -9,11 +9,19 @@ import (
 	"j_ai_trade/telegram"
 	"j_ai_trade/trading"
 	utilsConverter "j_ai_trade/utils/converter"
+	"math"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
+)
+
+// Signal deduplication map to prevent spam
+var (
+	signalHistory = make(map[string]time.Time) // key: "symbol_strategy_side"
+	signalMutex   sync.RWMutex
 )
 
 // InitCronJobs initializes and starts all cron jobs
@@ -21,6 +29,82 @@ func InitCronJobs(db *gorm.DB) {
 	repo := repository.NewBinanceRepository()
 	binanceService := binance.NewBinanceService(repo)
 	go ScalpingStrategy(binanceService, db)
+
+	// Start cleanup routine to prevent memory leaks
+	go cleanupSignalHistory()
+}
+
+// cleanupSignalHistory removes old entries from signal history to prevent memory leaks
+func cleanupSignalHistory() {
+	ticker := time.NewTicker(1 * time.Hour) // Cleanup every hour
+	defer ticker.Stop()
+
+	for range ticker.C {
+		signalMutex.Lock()
+		now := time.Now()
+		cutoffTime := now.Add(-30 * time.Minute) // Remove entries older than 30 minutes
+
+		for key, timestamp := range signalHistory {
+			if timestamp.Before(cutoffTime) {
+				delete(signalHistory, key)
+			}
+		}
+		signalMutex.Unlock()
+
+		log.Info().Int("entries_cleaned", len(signalHistory)).Msg("Signal history cleanup completed")
+	}
+}
+
+// isDuplicateSignal checks if a similar signal was sent recently
+func isDuplicateSignal(symbol, strategyName, side string) bool {
+	key := symbol + "_" + strategyName + "_" + side
+	signalMutex.RLock()
+	lastSent, exists := signalHistory[key]
+	signalMutex.RUnlock()
+
+	if !exists {
+		return false
+	}
+
+	// Prevent duplicate signals within 15 minutes for same symbol/strategy/side
+	cooldownPeriod := 15 * time.Minute
+	return time.Since(lastSent) < cooldownPeriod
+}
+
+// isSignalQualityAcceptable checks if the signal meets minimum quality standards
+func isSignalQualityAcceptable(signal *trading.BaseSignalModel) bool {
+	// Check if entry price is reasonable (not zero or negative)
+	if signal.Entry <= 0 {
+		return false
+	}
+
+	// Check if stop loss and take profit are reasonable
+	if signal.StopLoss <= 0 || signal.TakeProfit <= 0 {
+		return false
+	}
+
+	// Check if risk/reward ratio is acceptable (minimum 1:1.5)
+	risk := math.Abs(signal.Entry - signal.StopLoss)
+	reward := math.Abs(signal.TakeProfit - signal.Entry)
+
+	if risk == 0 || reward/risk < 1.5 {
+		return false
+	}
+
+	// Check if leverage is reasonable (not too high)
+	if signal.Leverage > 10 {
+		return false
+	}
+
+	return true
+}
+
+// recordSignalSent records that a signal was sent
+func recordSignalSent(symbol, strategyName, side string) {
+	key := symbol + "_" + strategyName + "_" + side
+	signalMutex.Lock()
+	signalHistory[key] = time.Now()
+	signalMutex.Unlock()
 }
 
 func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
@@ -29,7 +113,8 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 
 	for {
 		now := time.Now()
-		// Chạy logic ngay lập tức
+
+		// Process symbols with controlled concurrency
 		for _, symbol := range symbols {
 			go func(sym string) {
 				// Declare variables outside retry loop
@@ -126,9 +211,17 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					log.Error().Err(err).Str("symbol", sym).Msg("Scalping1 analysis failed")
 				}
 
-				// Handle Scalping1 signal
+				// Handle Scalping1 signal with deduplication and quality check
 				if signal1Str != nil && signal1Model != nil {
-					handleSignal(signal1Model, signal1Str, telegramService, db, sym, "Scalping1")
+					if !isDuplicateSignal(sym, "Scalping1", signal1Model.Side) && isSignalQualityAcceptable(signal1Model) {
+						handleSignal(signal1Model, signal1Str, telegramService, db, sym, "Scalping1")
+						recordSignalSent(sym, "Scalping1", signal1Model.Side)
+						log.Info().Str("symbol", sym).Str("strategy", "Scalping1").Str("side", signal1Model.Side).Msg("Signal sent successfully")
+					} else if isDuplicateSignal(sym, "Scalping1", signal1Model.Side) {
+						log.Info().Str("symbol", sym).Str("strategy", "Scalping1").Str("side", signal1Model.Side).Msg("Skipping duplicate signal")
+					} else {
+						log.Warn().Str("symbol", sym).Str("strategy", "Scalping1").Str("side", signal1Model.Side).Msg("Signal quality check failed")
+					}
 				}
 
 				// Analyze Scalping2 strategy
@@ -143,9 +236,17 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					log.Error().Err(err).Str("symbol", sym).Msg("Scalping2 analysis failed")
 				}
 
-				// Handle Scalping2 signal
+				// Handle Scalping2 signal with deduplication and quality check
 				if signal2Str != nil && signal2Model != nil {
-					handleSignal(signal2Model, signal2Str, telegramService, db, sym, "Scalping2")
+					if !isDuplicateSignal(sym, "Scalping2", signal2Model.Side) && isSignalQualityAcceptable(signal2Model) {
+						handleSignal(signal2Model, signal2Str, telegramService, db, sym, "Scalping2")
+						recordSignalSent(sym, "Scalping2", signal2Model.Side)
+						log.Info().Str("symbol", sym).Str("strategy", "Scalping2").Str("side", signal2Model.Side).Msg("Signal sent successfully")
+					} else if isDuplicateSignal(sym, "Scalping2", signal2Model.Side) {
+						log.Info().Str("symbol", sym).Str("strategy", "Scalping2").Str("side", signal2Model.Side).Msg("Skipping duplicate signal")
+					} else {
+						log.Warn().Str("symbol", sym).Str("strategy", "Scalping2").Str("side", signal2Model.Side).Msg("Signal quality check failed")
+					}
 				}
 
 				// Analyze Scalping3 strategy
@@ -160,9 +261,17 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					log.Error().Err(err).Str("symbol", sym).Msg("Scalping3 analysis failed")
 				}
 
-				// Handle Scalping3 signal
+				// Handle Scalping3 signal with deduplication and quality check
 				if signal3Str != nil && signal3Model != nil {
-					handleSignal(signal3Model, signal3Str, telegramService, db, sym, "Scalping3")
+					if !isDuplicateSignal(sym, "Scalping3", signal3Model.Side) && isSignalQualityAcceptable(signal3Model) {
+						handleSignal(signal3Model, signal3Str, telegramService, db, sym, "Scalping3")
+						recordSignalSent(sym, "Scalping3", signal3Model.Side)
+						log.Info().Str("symbol", sym).Str("strategy", "Scalping3").Str("side", signal3Model.Side).Msg("Signal sent successfully")
+					} else if isDuplicateSignal(sym, "Scalping3", signal3Model.Side) {
+						log.Info().Str("symbol", sym).Str("strategy", "Scalping3").Str("side", signal3Model.Side).Msg("Skipping duplicate signal")
+					} else {
+						log.Warn().Str("symbol", sym).Str("strategy", "Scalping3").Str("side", signal3Model.Side).Msg("Signal quality check failed")
+					}
 				}
 
 			}(symbol)
