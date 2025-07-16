@@ -32,18 +32,87 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 		// Chạy logic ngay lập tức
 		for _, symbol := range symbols {
 			go func(sym string) {
-				// Fetch data cho Scalping1 strategy
-				M15Candles300, _ := binanceService.Fetch15mCandles(context.Background(), sym, 300)
-				M1Candles100, _ := binanceService.Fetch1mCandles(context.Background(), sym, 100)
-				H1Candles20, _ := binanceService.Fetch1hCandles(context.Background(), sym, 20)
+				// Declare variables outside retry loop
+				var M15Candles300, M1Candles100, H1Candles20, H4Candles20, M30Candles60, M5Candles20, D1Candles20 []repository.BinanceCandle
+				var err error
 
-				// Fetch data cho Scalping2 strategy
-				H4Candles20, _ := binanceService.Fetch4hCandles(context.Background(), sym, 20)
-				M30Candles60, _ := binanceService.Fetch30mCandles(context.Background(), sym, 60)
-				M5Candles20, _ := binanceService.Fetch5mCandles(context.Background(), sym, 20)
+				// Add retry mechanism for robustness
+				maxRetries := 2
+				for retry := 0; retry <= maxRetries; retry++ {
+					if retry > 0 {
+						log.Info().Str("symbol", sym).Int("retry", retry).Msg("Retrying data fetch")
+						time.Sleep(time.Duration(retry) * time.Second) // Exponential backoff
+					}
 
-				// Fetch data cho Scalping3 strategy
-				D1Candles20, _ := binanceService.Fetch1dCandles(context.Background(), sym, 20)
+					// Fetch data cho Scalping1 strategy
+					M15Candles300, err = binanceService.Fetch15mCandles(context.Background(), sym, 300)
+					if err != nil || len(M15Candles300) == 0 {
+						log.Error().Err(err).Msgf("Failed to fetch M15 candles for %s (attempt %d)", sym, retry+1)
+						if retry == maxRetries {
+							return
+						}
+						continue
+					}
+
+					M1Candles100, err = binanceService.Fetch1mCandles(context.Background(), sym, 100)
+					if err != nil || len(M1Candles100) == 0 {
+						log.Error().Err(err).Msgf("Failed to fetch M1 candles for %s (attempt %d)", sym, retry+1)
+						if retry == maxRetries {
+							return
+						}
+						continue
+					}
+
+					H1Candles20, err = binanceService.Fetch1hCandles(context.Background(), sym, 20)
+					if err != nil || len(H1Candles20) == 0 {
+						log.Error().Err(err).Msgf("Failed to fetch H1 candles for %s (attempt %d)", sym, retry+1)
+						if retry == maxRetries {
+							return
+						}
+						continue
+					}
+
+					// Fetch data cho Scalping2 strategy
+					H4Candles20, err = binanceService.Fetch4hCandles(context.Background(), sym, 20)
+					if err != nil || len(H4Candles20) == 0 {
+						log.Error().Err(err).Msgf("Failed to fetch H4 candles for %s (attempt %d)", sym, retry+1)
+						if retry == maxRetries {
+							return
+						}
+						continue
+					}
+
+					M30Candles60, err = binanceService.Fetch30mCandles(context.Background(), sym, 60)
+					if err != nil || len(M30Candles60) == 0 {
+						log.Error().Err(err).Msgf("Failed to fetch M30 candles for %s (attempt %d)", sym, retry+1)
+						if retry == maxRetries {
+							return
+						}
+						continue
+					}
+
+					M5Candles20, err = binanceService.Fetch5mCandles(context.Background(), sym, 20)
+					if err != nil || len(M5Candles20) == 0 {
+						log.Error().Err(err).Msgf("Failed to fetch M5 candles for %s (attempt %d)", sym, retry+1)
+						if retry == maxRetries {
+							return
+						}
+						continue
+					}
+
+					// Fetch data cho Scalping3 strategy
+					D1Candles20, err = binanceService.Fetch1dCandles(context.Background(), sym, 20)
+					if err != nil || len(D1Candles20) == 0 {
+						log.Error().Err(err).Msgf("Failed to fetch D1 candles for %s (attempt %d)", sym, retry+1)
+						if retry == maxRetries {
+							return
+						}
+						continue
+					}
+
+					// All data fetched successfully, proceed with analysis
+					break
+				}
 
 				// Analyze Scalping1 strategy
 				scalping1Strategy := trading.NewScalping1Strategy()
@@ -51,10 +120,10 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles300),
 					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles100),
 					H1Candles:  utilsConverter.ConvertBinanceCandlesToBase(H1Candles20),
-				}, M15Candles300[0].Symbol)
+				}, sym)
 
 				if err != nil {
-					log.Error().Err(err).Msg("Scalping1 analysis failed")
+					log.Error().Err(err).Str("symbol", sym).Msg("Scalping1 analysis failed")
 				}
 
 				// Handle Scalping1 signal
@@ -68,10 +137,10 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					H4Candles:  utilsConverter.ConvertBinanceCandlesToBase(H4Candles20),
 					M30Candles: utilsConverter.ConvertBinanceCandlesToBase(M30Candles60),
 					M5Candles:  utilsConverter.ConvertBinanceCandlesToBase(M5Candles20),
-				}, M5Candles20[0].Symbol)
+				}, sym)
 
 				if err != nil {
-					log.Error().Err(err).Msg("Scalping2 analysis failed")
+					log.Error().Err(err).Str("symbol", sym).Msg("Scalping2 analysis failed")
 				}
 
 				// Handle Scalping2 signal
@@ -85,10 +154,10 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					D1Candles: utilsConverter.ConvertBinanceCandlesToBase(D1Candles20),
 					H1Candles: utilsConverter.ConvertBinanceCandlesToBase(H1Candles20),
 					M5Candles: utilsConverter.ConvertBinanceCandlesToBase(M5Candles20),
-				}, M5Candles20[0].Symbol)
+				}, sym)
 
 				if err != nil {
-					log.Error().Err(err).Msg("Scalping3 analysis failed")
+					log.Error().Err(err).Str("symbol", sym).Msg("Scalping3 analysis failed")
 				}
 
 				// Handle Scalping3 signal

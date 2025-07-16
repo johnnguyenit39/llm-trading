@@ -155,6 +155,25 @@ func (s *Scalping2Strategy) validateInput(input Scalping2Input) error {
 // ==== Technical Indicators ====
 
 func (s *Scalping2Strategy) calculateIndicators(input Scalping2Input) Scalping2Indicators {
+	// Additional safety check for race conditions
+	if len(input.M30Candles) == 0 || len(input.M5Candles) == 0 {
+		return Scalping2Indicators{
+			sma50:             []float64{},
+			stochK:            []float64{},
+			stochD:            []float64{},
+			macd:              []float64{},
+			macdSignal:        []float64{},
+			macdHistogram:     []float64{},
+			currentPrice:      0,
+			currentSMA:        0,
+			isPriceAboveSMA:   false,
+			isStochOversold:   false,
+			isStochOverbought: false,
+			isMACDBullish:     false,
+			isMACDBearish:     false,
+		}
+	}
+
 	// Calculate SMA 50 on M30
 	closePrices := extractClosePrices(input.M30Candles)
 	var sma50 []float64

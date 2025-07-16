@@ -192,6 +192,19 @@ func (s *Scalping1Strategy) validateInput(input Scalping1Input) error {
 // ==== Technical Indicators ====
 
 func (s *Scalping1Strategy) calculateIndicators(input Scalping1Input) TechnicalIndicators {
+	// Additional safety check for race conditions
+	if len(input.M15Candles) == 0 || len(input.M1Candles) == 0 {
+		return TechnicalIndicators{
+			ema200:          []float64{},
+			rsi14:           []float64{},
+			currentPrice:    0,
+			currentEMA:      0,
+			isPriceAboveEMA: false,
+			isRSIOversold:   false,
+			isRSIOverbought: false,
+		}
+	}
+
 	// Calculate EMA 200 on M15
 	closePrices := extractClosePrices(input.M15Candles)
 	var ema200 []float64

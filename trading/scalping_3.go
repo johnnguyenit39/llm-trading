@@ -170,6 +170,26 @@ func (s *Scalping3Strategy) validateInput(input Scalping3Input) error {
 // ==== Technical Indicators ====
 
 func (s *Scalping3Strategy) calculateIndicators(input Scalping3Input) Scalping3Indicators {
+	// Additional safety check for race conditions
+	if len(input.H1Candles) == 0 || len(input.M5Candles) == 0 {
+		return Scalping3Indicators{
+			bbUpper:              []float64{},
+			bbMiddle:             []float64{},
+			bbLower:              []float64{},
+			williamsR:            []float64{},
+			adx:                  []float64{},
+			volumeProfile:        []float64{},
+			pivotPoints:          PivotPoints{},
+			currentPrice:         0,
+			isBBOversold:         false,
+			isBBOverbought:       false,
+			isWilliamsOversold:   false,
+			isWilliamsOverbought: false,
+			isStrongTrend:        false,
+			volumeSpike:          false,
+		}
+	}
+
 	// Calculate Bollinger Bands on H1
 	closePrices := extractClosePrices(input.H1Candles)
 	var bbUpper, bbMiddle, bbLower []float64
