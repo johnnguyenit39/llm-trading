@@ -221,65 +221,242 @@ func (s *Scalping1Strategy) detectPatterns(candles []baseCandleModel.BaseCandle)
 }
 
 func (s *Scalping1Strategy) detectBullishEngulfing(candles []baseCandleModel.BaseCandle) bool {
-	if len(candles) < 2 {
+	if len(candles) < 3 {
 		return false
 	}
+
 	prev := candles[len(candles)-2]
 	curr := candles[len(candles)-1]
-	return curr.Close > curr.Open && prev.Close < prev.Open
+
+	// Basic engulfing condition
+	if !(curr.Close > curr.Open && prev.Close < prev.Open) {
+		return false
+	}
+
+	// Validate body sizes
+	prevBody := math.Abs(prev.Close - prev.Open)
+	currBody := math.Abs(curr.Close - curr.Open)
+
+	// Current body should be larger than previous body (at least 1.2x)
+	if currBody < prevBody*1.2 {
+		return false
+	}
+
+	// Current candle should completely engulf previous candle
+	if curr.Open > prev.Close || curr.Close < prev.Open {
+		return false
+	}
+
+	// Check for volume confirmation (if available)
+	if len(candles) >= 5 {
+		avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
+		if curr.Volume > 0 && curr.Volume < avgVolume*1.5 {
+			return false // Volume should be above average
+		}
+	}
+
+	// Enhanced trend validation for bullish reversal
+	return s.validateTrendForPattern(candles, "bullish_reversal")
 }
 
 func (s *Scalping1Strategy) detectBearishEngulfing(candles []baseCandleModel.BaseCandle) bool {
-	if len(candles) < 2 {
+	if len(candles) < 3 {
 		return false
 	}
+
 	prev := candles[len(candles)-2]
 	curr := candles[len(candles)-1]
-	return curr.Close < curr.Open && prev.Close > prev.Open
+
+	// Basic engulfing condition
+	if !(curr.Close < curr.Open && prev.Close > prev.Open) {
+		return false
+	}
+
+	// Validate body sizes
+	prevBody := math.Abs(prev.Close - prev.Open)
+	currBody := math.Abs(curr.Close - curr.Open)
+
+	// Current body should be larger than previous body (at least 1.2x)
+	if currBody < prevBody*1.2 {
+		return false
+	}
+
+	// Current candle should completely engulf previous candle
+	if curr.Open < prev.Close || curr.Close > prev.Open {
+		return false
+	}
+
+	// Check for volume confirmation (if available)
+	if len(candles) >= 5 {
+		avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
+		if curr.Volume > 0 && curr.Volume < avgVolume*1.5 {
+			return false // Volume should be above average
+		}
+	}
+
+	// Enhanced trend validation for bearish reversal
+	return s.validateTrendForPattern(candles, "bearish_reversal")
 }
 
 func (s *Scalping1Strategy) detectHammer(candles []baseCandleModel.BaseCandle, maxBodyRatio float64) bool {
-	if len(candles) < 1 {
+	if len(candles) < 3 {
 		return false
 	}
+
 	c := candles[len(candles)-1]
-	bullFib := (c.Low-c.High)*maxBodyRatio + c.High
-	bearCandle := c.Close
-	if c.Close > c.Open {
-		bearCandle = c.Open
+
+	// Calculate body and shadow sizes
+	bodySize := math.Abs(c.Close - c.Open)
+	totalRange := c.High - c.Low
+	lowerShadow := math.Min(c.Open, c.Close) - c.Low
+	upperShadow := c.High - math.Max(c.Open, c.Close)
+
+	// Body should be small relative to total range
+	if bodySize > totalRange*maxBodyRatio {
+		return false
 	}
-	return bearCandle >= bullFib
+
+	// Lower shadow should be at least 2x body size
+	if lowerShadow < bodySize*2 {
+		return false
+	}
+
+	// Upper shadow should be small (less than body size)
+	if upperShadow > bodySize*0.5 {
+		return false
+	}
+
+	// Enhanced trend validation for bullish reversal (hammer)
+	return s.validateTrendForPattern(candles, "bullish_reversal")
 }
 
 func (s *Scalping1Strategy) detectShootingStar(candles []baseCandleModel.BaseCandle, maxBodyRatio float64) bool {
-	if len(candles) < 1 {
+	if len(candles) < 3 {
 		return false
 	}
+
 	c := candles[len(candles)-1]
-	bearFib := (c.High-c.Low)*maxBodyRatio + c.Low
-	bullCandle := c.Close
-	if c.Close < c.Open {
-		bullCandle = c.Open
+
+	// Calculate body and shadow sizes
+	bodySize := math.Abs(c.Close - c.Open)
+	totalRange := c.High - c.Low
+	lowerShadow := math.Min(c.Open, c.Close) - c.Low
+	upperShadow := c.High - math.Max(c.Open, c.Close)
+
+	// Body should be small relative to total range
+	if bodySize > totalRange*maxBodyRatio {
+		return false
 	}
-	return bullCandle <= bearFib
+
+	// Upper shadow should be at least 2x body size
+	if upperShadow < bodySize*2 {
+		return false
+	}
+
+	// Lower shadow should be small (less than body size)
+	if lowerShadow > bodySize*0.5 {
+		return false
+	}
+
+	// Enhanced trend validation for bearish reversal (shooting star)
+	return s.validateTrendForPattern(candles, "bearish_reversal")
 }
 
 func (s *Scalping1Strategy) detect2Bulls(candles []baseCandleModel.BaseCandle) bool {
-	if len(candles) < 2 {
+	if len(candles) < 3 {
 		return false
 	}
-	c1 := candles[len(candles)-2]
-	c2 := candles[len(candles)-1]
-	return c1.Close > c1.Open && c2.Close > c2.Open
+
+	c2 := candles[len(candles)-2]
+	c3 := candles[len(candles)-1]
+
+	// Check for 2 consecutive bullish candles
+	if !(c2.Close > c2.Open && c3.Close > c3.Open) {
+		return false
+	}
+
+	// Second candle should be stronger (larger body)
+	body2 := math.Abs(c2.Close - c2.Open)
+	body3 := math.Abs(c3.Close - c3.Open)
+	if body3 < body2*1.1 {
+		return false
+	}
+
+	// Check for momentum - second candle should close higher
+	if c3.Close <= c2.Close {
+		return false
+	}
+
+	// Check for volume confirmation (if available)
+	if len(candles) >= 5 {
+		avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
+		if c3.Volume > 0 && c3.Volume < avgVolume*1.3 {
+			return false
+		}
+	}
+
+	// Enhanced trend validation for bullish continuation
+	return s.validateTrendForPattern(candles, "bullish_continuation")
 }
 
 func (s *Scalping1Strategy) detect2Bears(candles []baseCandleModel.BaseCandle) bool {
-	if len(candles) < 2 {
+	if len(candles) < 3 {
 		return false
 	}
-	c1 := candles[len(candles)-2]
-	c2 := candles[len(candles)-1]
-	return c1.Close < c1.Open && c2.Close < c2.Open
+
+	c2 := candles[len(candles)-2]
+	c3 := candles[len(candles)-1]
+
+	// Check for 2 consecutive bearish candles
+	if !(c2.Close < c2.Open && c3.Close < c3.Open) {
+		return false
+	}
+
+	// Second candle should be stronger (larger body)
+	body2 := math.Abs(c2.Close - c2.Open)
+	body3 := math.Abs(c3.Close - c3.Open)
+	if body3 < body2*1.1 {
+		return false
+	}
+
+	// Check for momentum - second candle should close lower
+	if c3.Close >= c2.Close {
+		return false
+	}
+
+	// Check for volume confirmation (if available)
+	if len(candles) >= 5 {
+		avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
+		if c3.Volume > 0 && c3.Volume < avgVolume*1.3 {
+			return false
+		}
+	}
+
+	// Enhanced trend validation for bearish continuation
+	return s.validateTrendForPattern(candles, "bearish_continuation")
+}
+
+// Helper function to calculate average volume
+func (s *Scalping1Strategy) calculateAverageVolume(candles []baseCandleModel.BaseCandle) float64 {
+	if len(candles) == 0 {
+		return 0
+	}
+
+	totalVolume := 0.0
+	validCount := 0
+
+	for _, candle := range candles {
+		if candle.Volume > 0 {
+			totalVolume += candle.Volume
+			validCount++
+		}
+	}
+
+	if validCount == 0 {
+		return 0
+	}
+
+	return totalVolume / float64(validCount)
 }
 
 // ==== ATR and Volatility Calculations ====
@@ -456,4 +633,231 @@ func extractClosePrices(candles []baseCandleModel.BaseCandle) []float64 {
 		closePrices[i] = candle.Close
 	}
 	return closePrices
+}
+
+// ==== Enhanced Trend Detection ====
+
+type TrendContext struct {
+	isUptrend     bool
+	isDowntrend   bool
+	trendStrength float64
+	momentum      float64
+	volumeTrend   string
+}
+
+func (s *Scalping1Strategy) analyzeTrendContext(candles []baseCandleModel.BaseCandle) TrendContext {
+	if len(candles) < 10 {
+		return TrendContext{isUptrend: false, isDowntrend: false, trendStrength: 0, momentum: 0, volumeTrend: "neutral"}
+	}
+
+	// 1. EMA Slope Analysis (short-term trend)
+	ema5 := s.calculateEMA(candles, 5)
+	ema10 := s.calculateEMA(candles, 10)
+
+	ema5Slope := s.calculateSlope(ema5, 3)   // Last 3 periods
+	ema10Slope := s.calculateSlope(ema10, 5) // Last 5 periods
+
+	// 2. Price Momentum Analysis
+	momentum := s.calculateMomentum(candles, 5)
+
+	// 3. Volume Trend Analysis
+	volumeTrend := s.analyzeVolumeTrend(candles, 5)
+
+	// 4. Higher Highs/Lower Lows Analysis
+	hhll := s.analyzeHigherHighsLowerLows(candles, 5)
+
+	// 5. Trend Strength Calculation
+	trendStrength := s.calculateTrendStrength(candles, 5)
+
+	// Determine trend direction
+	isUptrend := ema5Slope > 0 && ema10Slope > 0 && momentum > 0 && hhll == "higher_highs"
+	isDowntrend := ema5Slope < 0 && ema10Slope < 0 && momentum < 0 && hhll == "lower_lows"
+
+	return TrendContext{
+		isUptrend:     isUptrend,
+		isDowntrend:   isDowntrend,
+		trendStrength: trendStrength,
+		momentum:      momentum,
+		volumeTrend:   volumeTrend,
+	}
+}
+
+func (s *Scalping1Strategy) calculateEMA(candles []baseCandleModel.BaseCandle, period int) []float64 {
+	if len(candles) < period {
+		return []float64{}
+	}
+
+	closePrices := extractClosePrices(candles)
+	return talib.Ema(closePrices, period)
+}
+
+func (s *Scalping1Strategy) calculateSlope(values []float64, periods int) float64 {
+	if len(values) < periods+1 {
+		return 0
+	}
+
+	// Linear regression slope
+	sumX := 0.0
+	sumY := 0.0
+	sumXY := 0.0
+	sumX2 := 0.0
+
+	for i := len(values) - periods; i < len(values); i++ {
+		x := float64(i - (len(values) - periods))
+		y := values[i]
+
+		sumX += x
+		sumY += y
+		sumXY += x * y
+		sumX2 += x * x
+	}
+
+	n := float64(periods)
+	slope := (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX)
+	return slope
+}
+
+func (s *Scalping1Strategy) calculateMomentum(candles []baseCandleModel.BaseCandle, period int) float64 {
+	if len(candles) < period+1 {
+		return 0
+	}
+
+	currentPrice := candles[len(candles)-1].Close
+	previousPrice := candles[len(candles)-period-1].Close
+
+	return (currentPrice - previousPrice) / previousPrice * 100
+}
+
+func (s *Scalping1Strategy) analyzeVolumeTrend(candles []baseCandleModel.BaseCandle, period int) string {
+	if len(candles) < period*2 {
+		return "neutral"
+	}
+
+	recentVolumes := make([]float64, period)
+	previousVolumes := make([]float64, period)
+
+	for i := 0; i < period; i++ {
+		recentVolumes[i] = candles[len(candles)-1-i].Volume
+		previousVolumes[i] = candles[len(candles)-period-1-i].Volume
+	}
+
+	recentAvg := s.calculateAverage(recentVolumes)
+	previousAvg := s.calculateAverage(previousVolumes)
+
+	if recentAvg > previousAvg*1.2 {
+		return "increasing"
+	} else if recentAvg < previousAvg*0.8 {
+		return "decreasing"
+	}
+	return "neutral"
+}
+
+func (s *Scalping1Strategy) analyzeHigherHighsLowerLows(candles []baseCandleModel.BaseCandle, period int) string {
+	if len(candles) < period*2 {
+		return "neutral"
+	}
+
+	highs := make([]float64, period)
+	lows := make([]float64, period)
+
+	for i := 0; i < period; i++ {
+		highs[i] = candles[len(candles)-1-i].High
+		lows[i] = candles[len(candles)-1-i].Low
+	}
+
+	// Check for higher highs
+	higherHighs := true
+	for i := 1; i < len(highs); i++ {
+		if highs[i] <= highs[i-1] {
+			higherHighs = false
+			break
+		}
+	}
+
+	// Check for lower lows
+	lowerLows := true
+	for i := 1; i < len(lows); i++ {
+		if lows[i] >= lows[i-1] {
+			lowerLows = false
+			break
+		}
+	}
+
+	if higherHighs {
+		return "higher_highs"
+	} else if lowerLows {
+		return "lower_lows"
+	}
+	return "neutral"
+}
+
+func (s *Scalping1Strategy) calculateTrendStrength(candles []baseCandleModel.BaseCandle, period int) float64 {
+	if len(candles) < period {
+		return 0
+	}
+
+	// Calculate directional movement
+	upMoves := 0.0
+	downMoves := 0.0
+
+	for i := len(candles) - period; i < len(candles); i++ {
+		if i > 0 {
+			change := candles[i].Close - candles[i-1].Close
+			if change > 0 {
+				upMoves += change
+			} else {
+				downMoves += math.Abs(change)
+			}
+		}
+	}
+
+	totalMoves := upMoves + downMoves
+	if totalMoves == 0 {
+		return 0
+	}
+
+	// Trend strength as percentage of directional movement
+	return (upMoves - downMoves) / totalMoves * 100
+}
+
+func (s *Scalping1Strategy) calculateAverage(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+	return sum / float64(len(values))
+}
+
+// Enhanced trend validation for patterns
+func (s *Scalping1Strategy) validateTrendForPattern(candles []baseCandleModel.BaseCandle, patternType string) bool {
+	if len(candles) < 10 {
+		return false
+	}
+
+	trendContext := s.analyzeTrendContext(candles)
+
+	switch patternType {
+	case "bullish_reversal":
+		// For bullish reversal patterns, we want downtrend before
+		return trendContext.isDowntrend && trendContext.trendStrength < -20
+
+	case "bearish_reversal":
+		// For bearish reversal patterns, we want uptrend before
+		return trendContext.isUptrend && trendContext.trendStrength > 20
+
+	case "bullish_continuation":
+		// For bullish continuation, we want uptrend with pullback
+		return trendContext.isUptrend && trendContext.momentum > -5
+
+	case "bearish_continuation":
+		// For bearish continuation, we want downtrend with bounce
+		return trendContext.isDowntrend && trendContext.momentum < 5
+
+	default:
+		return true
+	}
 }
