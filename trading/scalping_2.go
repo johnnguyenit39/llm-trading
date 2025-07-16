@@ -20,13 +20,13 @@ const (
 	MACD_SLOW_2      = 26
 	MACD_SIGNAL_2    = 9
 
-	// Stochastic levels
-	STOCH_OVERSOLD_2   = 20
-	STOCH_OVERBOUGHT_2 = 80
+	// Stochastic levels - ADJUSTED for more signals
+	STOCH_OVERSOLD_2   = 25 // Increased from 20 to 25
+	STOCH_OVERBOUGHT_2 = 75 // Decreased from 80 to 75
 
-	// Breakout thresholds
-	BREAKOUT_VOLUME_MULTIPLIER = 2.0 // Volume must be 2x average for breakout
-	BREAKOUT_PRICE_MULTIPLIER  = 1.5 // Price must move 1.5x ATR for breakout
+	// Breakout thresholds - REDUCED for more signals
+	BREAKOUT_VOLUME_MULTIPLIER = 1.5 // Reduced from 2.0 to 1.5
+	BREAKOUT_PRICE_MULTIPLIER  = 1.2 // Reduced from 1.5 to 1.2
 )
 
 // ==== Types ====
@@ -141,6 +141,75 @@ func (s *Scalping2Strategy) AnalyzeWithEnhancedSignalString(input Scalping2Input
 	)
 
 	return &enhancedSignal, &enhancedString, nil
+}
+
+// ==== Simple Signal Mode for More Frequent Signals ====
+
+// AnalyzeWithSimpleSignalString generates signals with minimal validation for more frequent trading
+func (s *Scalping2Strategy) AnalyzeWithSimpleSignalString(input Scalping2Input, symbol string) (*BaseSignalModel, *string, error) {
+	if err := s.validateInput(input); err != nil {
+		return nil, nil, err
+	}
+
+	indicators := s.calculateIndicators(input)
+	signal := s.checkSimpleSignalConditions(input, indicators)
+	if signal == nil {
+		return nil, nil, nil // No signal
+	}
+
+	signalModel, signalStr := s.generateSignalString(symbol, *signal, input)
+	return &signalModel, &signalStr, nil
+}
+
+// checkSimpleSignalConditions uses relaxed conditions for more signals
+func (s *Scalping2Strategy) checkSimpleSignalConditions(input Scalping2Input, indicators Scalping2Indicators) *SignalInfo {
+	patterns := s.detectPatterns(input.M5Candles)
+
+	// BUY: Relaxed conditions - only need 2 out of 4 conditions
+	buyConditions := 0
+	if indicators.isPriceAboveSMA {
+		buyConditions++
+	}
+	if indicators.isStochOversold {
+		buyConditions++
+	}
+	if indicators.isMACDBullish {
+		buyConditions++
+	}
+	if patterns.hasBreakout || patterns.hasFlag || patterns.hasTriangle {
+		buyConditions++
+	}
+
+	if buyConditions >= 2 {
+		return &SignalInfo{
+			side:  BUY,
+			entry: indicators.currentPrice,
+		}
+	}
+
+	// SELL: Relaxed conditions - only need 2 out of 4 conditions
+	sellConditions := 0
+	if !indicators.isPriceAboveSMA {
+		sellConditions++
+	}
+	if indicators.isStochOverbought {
+		sellConditions++
+	}
+	if indicators.isMACDBearish {
+		sellConditions++
+	}
+	if patterns.hasBreakdown || patterns.hasBearFlag || patterns.hasDescendingTriangle {
+		sellConditions++
+	}
+
+	if sellConditions >= 2 {
+		return &SignalInfo{
+			side:  SELL,
+			entry: indicators.currentPrice,
+		}
+	}
+
+	return nil
 }
 
 // ==== Input Validation ====
@@ -276,18 +345,18 @@ func (s *Scalping2Strategy) checkMACDConditions(macd, macdSignal, macdHistogram 
 func (s *Scalping2Strategy) checkSignalConditions(input Scalping2Input, indicators Scalping2Indicators) *SignalInfo {
 	patterns := s.detectPatterns(input.M5Candles)
 
-	// BUY: Price above SMA50 + Stochastic oversold + MACD bullish + breakout patterns
-	if indicators.isPriceAboveSMA && indicators.isStochOversold && indicators.isMACDBullish &&
-		(patterns.hasBreakout || patterns.hasFlag || patterns.hasTriangle) {
+	// BUY: Price above SMA50 + (Stochastic oversold OR MACD bullish OR breakout patterns) - REDUCED requirements
+	if indicators.isPriceAboveSMA &&
+		(indicators.isStochOversold || indicators.isMACDBullish || patterns.hasBreakout || patterns.hasFlag || patterns.hasTriangle) {
 		return &SignalInfo{
 			side:  BUY,
 			entry: indicators.currentPrice,
 		}
 	}
 
-	// SELL: Price below SMA50 + Stochastic overbought + MACD bearish + breakdown patterns
-	if !indicators.isPriceAboveSMA && indicators.isStochOverbought && indicators.isMACDBearish &&
-		(patterns.hasBreakdown || patterns.hasBearFlag || patterns.hasDescendingTriangle) {
+	// SELL: Price below SMA50 + (Stochastic overbought OR MACD bearish OR breakdown patterns) - REDUCED requirements
+	if !indicators.isPriceAboveSMA &&
+		(indicators.isStochOverbought || indicators.isMACDBearish || patterns.hasBreakdown || patterns.hasBearFlag || patterns.hasDescendingTriangle) {
 		return &SignalInfo{
 			side:  SELL,
 			entry: indicators.currentPrice,
@@ -751,7 +820,8 @@ func (s *Scalping2Strategy) validateSignalQuality(input Scalping2Input, signal *
 
 	overallScore := score / 10.0 * 10.0 // Convert to 0-10 scale
 
-	if overallScore < 7.0 {
+	// REDUCED threshold from 7.0 to 5.0 for more signals
+	if overallScore < 5.0 {
 		return nil, fmt.Errorf("signal quality too low: %.2f/10", overallScore)
 	}
 
@@ -784,7 +854,8 @@ func (s *Scalping2Strategy) checkBreakoutStrength(candles []baseCandleModel.Base
 
 	if count > 0 {
 		avgMove /= float64(count)
-		return recentMove > avgMove*2.0 // Recent move is 2x average
+		// REDUCED requirement from 2.0x to 1.5x for more signals
+		return recentMove > avgMove*1.5
 	}
 
 	return false
@@ -798,7 +869,8 @@ func (s *Scalping2Strategy) checkVolumeConfirmation(candles []baseCandleModel.Ba
 	avgVolume := s.calculateAverageVolume(candles[:len(candles)-1])
 	currentVolume := candles[len(candles)-1].Volume
 
-	return currentVolume > avgVolume*1.5
+	// REDUCED requirement from 1.5x to 1.2x for more signals
+	return currentVolume > avgVolume*1.2
 }
 
 func (s *Scalping2Strategy) checkSupportResistanceTest(candles []baseCandleModel.BaseCandle, entry float64, side string) bool {

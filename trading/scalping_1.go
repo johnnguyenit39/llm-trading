@@ -20,8 +20,8 @@ const (
 	// Technical indicators
 	EMA_PERIOD     = 200
 	RSI_PERIOD     = 14
-	RSI_OVERSOLD   = 30
-	RSI_OVERBOUGHT = 70
+	RSI_OVERSOLD   = 35 // Increased from 30 to 35 for more signals
+	RSI_OVERBOUGHT = 65 // Decreased from 70 to 65 for more signals
 	ATR_PERIOD     = 20
 
 	// Leverage limits
@@ -271,18 +271,38 @@ func (s *Scalping1Strategy) checkRSIConditions(rsi []float64) (bool, bool) {
 func (s *Scalping1Strategy) checkSignalConditions(input Scalping1Input, indicators TechnicalIndicators) *SignalInfo {
 	patterns := s.detectPatterns(input.M1Candles)
 
-	// BUY: Price above EMA 200 + RSI oversold + bullish patterns
-	if indicators.isPriceAboveEMA && indicators.isRSIOversold &&
-		(patterns.hasBullishEngulfing || patterns.hasHammer || patterns.has2Bulls) {
+	// BUY: Relaxed conditions - only need 2 out of 3 main conditions
+	buyConditions := 0
+	if indicators.isPriceAboveEMA {
+		buyConditions++
+	}
+	if indicators.isRSIOversold {
+		buyConditions++
+	}
+	if patterns.hasBullishEngulfing || patterns.hasHammer || patterns.has2Bulls {
+		buyConditions++
+	}
+
+	if buyConditions >= 2 {
 		return &SignalInfo{
 			side:  BUY,
 			entry: indicators.currentPrice,
 		}
 	}
 
-	// SELL: Price below EMA 200 + RSI overbought + bearish patterns
-	if !indicators.isPriceAboveEMA && indicators.isRSIOverbought &&
-		(patterns.hasBearishEngulfing || patterns.hasShootingStar || patterns.has2Bears) {
+	// SELL: Relaxed conditions - only need 2 out of 3 main conditions
+	sellConditions := 0
+	if !indicators.isPriceAboveEMA {
+		sellConditions++
+	}
+	if indicators.isRSIOverbought {
+		sellConditions++
+	}
+	if patterns.hasBearishEngulfing || patterns.hasShootingStar || patterns.has2Bears {
+		sellConditions++
+	}
+
+	if sellConditions >= 2 {
 		return &SignalInfo{
 			side:  SELL,
 			entry: indicators.currentPrice,
@@ -318,12 +338,12 @@ func (s *Scalping1Strategy) detectBullishEngulfing(candles []baseCandleModel.Bas
 		return false
 	}
 
-	// Validate body sizes
+	// Validate body sizes - REDUCED requirement from 1.2x to 1.1x
 	prevBody := math.Abs(prev.Close - prev.Open)
 	currBody := math.Abs(curr.Close - curr.Open)
 
-	// Current body should be larger than previous body (at least 1.2x)
-	if currBody < prevBody*1.2 {
+	// Current body should be larger than previous body (at least 1.1x instead of 1.2x)
+	if currBody < prevBody*1.1 {
 		return false
 	}
 
@@ -332,10 +352,10 @@ func (s *Scalping1Strategy) detectBullishEngulfing(candles []baseCandleModel.Bas
 		return false
 	}
 
-	// Check for volume confirmation (if available)
+	// Check for volume confirmation (if available) - REDUCED requirement from 1.5x to 1.2x
 	if len(candles) >= 5 {
 		avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
-		if curr.Volume > 0 && curr.Volume < avgVolume*1.5 {
+		if curr.Volume > 0 && curr.Volume < avgVolume*1.2 {
 			return false // Volume should be above average
 		}
 	}
@@ -357,12 +377,12 @@ func (s *Scalping1Strategy) detectBearishEngulfing(candles []baseCandleModel.Bas
 		return false
 	}
 
-	// Validate body sizes
+	// Validate body sizes - REDUCED requirement from 1.2x to 1.1x
 	prevBody := math.Abs(prev.Close - prev.Open)
 	currBody := math.Abs(curr.Close - curr.Open)
 
-	// Current body should be larger than previous body (at least 1.2x)
-	if currBody < prevBody*1.2 {
+	// Current body should be larger than previous body (at least 1.1x instead of 1.2x)
+	if currBody < prevBody*1.1 {
 		return false
 	}
 
@@ -371,10 +391,10 @@ func (s *Scalping1Strategy) detectBearishEngulfing(candles []baseCandleModel.Bas
 		return false
 	}
 
-	// Check for volume confirmation (if available)
+	// Check for volume confirmation (if available) - REDUCED requirement from 1.5x to 1.2x
 	if len(candles) >= 5 {
 		avgVolume := s.calculateAverageVolume(candles[len(candles)-5 : len(candles)-1])
-		if curr.Volume > 0 && curr.Volume < avgVolume*1.5 {
+		if curr.Volume > 0 && curr.Volume < avgVolume*1.2 {
 			return false // Volume should be above average
 		}
 	}
@@ -1158,20 +1178,20 @@ func (s *Scalping1Strategy) generateEnhancedSignalStringText(baseString string, 
 // ==== False Signal Prevention ====
 
 const (
-	// Signal quality thresholds
-	MIN_SIGNAL_QUALITY_SCORE = 7.0 // Minimum score out of 10
-	MIN_VOLUME_CONFIRMATION  = 1.5 // Volume must be 1.5x average
-	MIN_TREND_STRENGTH       = 0.3 // Minimum trend strength (0-1)
-	MIN_PATTERN_QUALITY      = 0.7 // Minimum pattern quality score
+	// Signal quality thresholds - REDUCED for more signals
+	MIN_SIGNAL_QUALITY_SCORE = 5.0 // Reduced from 7.0 to 5.0
+	MIN_VOLUME_CONFIRMATION  = 1.2 // Reduced from 1.5 to 1.2
+	MIN_TREND_STRENGTH       = 0.2 // Reduced from 0.3 to 0.2
+	MIN_PATTERN_QUALITY      = 0.5 // Reduced from 0.7 to 0.5
 
-	// Market condition filters
-	MAX_SPREAD_PERCENT      = 0.1     // Maximum spread 0.1%
-	MIN_LIQUIDITY_THRESHOLD = 1000000 // Minimum volume for liquidity
-	MAX_GAP_PERCENT         = 0.5     // Maximum gap between candles
+	// Market condition filters - RELAXED
+	MAX_SPREAD_PERCENT      = 0.2    // Increased from 0.1 to 0.2
+	MIN_LIQUIDITY_THRESHOLD = 500000 // Reduced from 1000000 to 500000
+	MAX_GAP_PERCENT         = 1.0    // Increased from 0.5 to 1.0
 
 	// Time-based filters
-	AVOID_NEWS_TIME_MINUTES = 30   // Avoid trading 30min before/after news
-	AVOID_LOW_VOLUME_HOURS  = true // Avoid low volume hours
+	AVOID_NEWS_TIME_MINUTES = 30    // Keep as is
+	AVOID_LOW_VOLUME_HOURS  = false // Changed from true to false
 )
 
 type SignalQualityScore struct {
@@ -1255,30 +1275,30 @@ func (s *Scalping1Strategy) analyzeMarketCondition(input Scalping1Input) MarketC
 }
 
 func (s *Scalping1Strategy) isMarketConditionSuitable(condition MarketCondition) bool {
-	// Reject if spread too high
+	// Reject if spread too high - INCREASED threshold
 	if condition.spreadPercent > MAX_SPREAD_PERCENT {
 		return false
 	}
 
-	// Reject if gap too large
+	// Reject if gap too large - INCREASED threshold
 	if condition.gapPercent > MAX_GAP_PERCENT {
 		return false
 	}
 
-	// Reject if low liquidity
-	if condition.isLowLiquidity {
-		return false
+	// Reject if low liquidity - REDUCED requirement
+	if condition.isLowLiquidity && condition.spreadPercent > 0.1 {
+		return false // Only reject if both low liquidity AND high spread
 	}
 
-	// Reject if news time
-	if condition.isNewsTime {
-		return false
-	}
+	// Reject if news time - DISABLED for now
+	// if condition.isNewsTime {
+	// 	return false
+	// }
 
-	// Reject if low volume hour (optional)
-	if AVOID_LOW_VOLUME_HOURS && condition.isLowVolumeHour {
-		return false
-	}
+	// Reject if low volume hour - DISABLED
+	// if AVOID_LOW_VOLUME_HOURS && condition.isLowVolumeHour {
+	// 	return false
+	// }
 
 	return true
 }
@@ -1615,4 +1635,93 @@ func (s *Scalping1Strategy) findSwingHighs(candles []baseCandleModel.BaseCandle,
 	}
 
 	return swingHighs
+}
+
+// ==== Simple Signal Mode for More Frequent Signals ====
+
+// SimpleSignalMode generates signals with minimal validation for more frequent trading
+func (s *Scalping1Strategy) AnalyzeWithSimpleSignalString(input Scalping1Input, symbol string) (*BaseSignalModel, *string, error) {
+	if err := s.validateInput(input); err != nil {
+		return nil, nil, err
+	}
+
+	indicators := s.calculateIndicators(input)
+	signal := s.checkSimpleSignalConditions(input, indicators)
+	if signal == nil {
+		return nil, nil, nil // No signal
+	}
+
+	signalModel, signalStr := s.generateSignalString(symbol, *signal, input)
+	return &signalModel, &signalStr, nil
+}
+
+// checkSimpleSignalConditions uses relaxed conditions for more signals
+func (s *Scalping1Strategy) checkSimpleSignalConditions(input Scalping1Input, indicators TechnicalIndicators) *SignalInfo {
+	patterns := s.detectPatterns(input.M1Candles)
+
+	// BUY: Very relaxed conditions - only need 1 strong condition or 2 weak conditions
+	buyScore := 0
+
+	// Strong conditions (2 points each)
+	if indicators.isPriceAboveEMA && indicators.isRSIOversold {
+		buyScore += 4
+	}
+	if patterns.hasBullishEngulfing {
+		buyScore += 3
+	}
+
+	// Weak conditions (1 point each)
+	if indicators.isPriceAboveEMA {
+		buyScore += 1
+	}
+	if indicators.isRSIOversold {
+		buyScore += 1
+	}
+	if patterns.hasHammer {
+		buyScore += 1
+	}
+	if patterns.has2Bulls {
+		buyScore += 1
+	}
+
+	if buyScore >= 2 {
+		return &SignalInfo{
+			side:  BUY,
+			entry: indicators.currentPrice,
+		}
+	}
+
+	// SELL: Very relaxed conditions
+	sellScore := 0
+
+	// Strong conditions (2 points each)
+	if !indicators.isPriceAboveEMA && indicators.isRSIOverbought {
+		sellScore += 4
+	}
+	if patterns.hasBearishEngulfing {
+		sellScore += 3
+	}
+
+	// Weak conditions (1 point each)
+	if !indicators.isPriceAboveEMA {
+		sellScore += 1
+	}
+	if indicators.isRSIOverbought {
+		sellScore += 1
+	}
+	if patterns.hasShootingStar {
+		sellScore += 1
+	}
+	if patterns.has2Bears {
+		sellScore += 1
+	}
+
+	if sellScore >= 2 {
+		return &SignalInfo{
+			side:  SELL,
+			entry: indicators.currentPrice,
+		}
+	}
+
+	return nil
 }

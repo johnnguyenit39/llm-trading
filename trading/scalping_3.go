@@ -19,15 +19,15 @@ const (
 	ADX_PERIOD_3      = 14
 	VOLUME_PERIOD_3   = 20
 
-	// Williams %R levels
-	WILLIAMS_OVERSOLD_3   = -80
-	WILLIAMS_OVERBOUGHT_3 = -20
+	// Williams %R levels - ADJUSTED for more signals
+	WILLIAMS_OVERSOLD_3   = -75 // Increased from -80 to -75
+	WILLIAMS_OVERBOUGHT_3 = -25 // Decreased from -20 to -25
 
-	// ADX threshold for trend strength
-	ADX_TREND_THRESHOLD = 25
+	// ADX threshold for trend strength - REDUCED for more signals
+	ADX_TREND_THRESHOLD = 20 // Reduced from 25 to 20
 
-	// Volume spike threshold
-	VOLUME_SPIKE_MULTIPLIER = 2.5
+	// Volume spike threshold - REDUCED for more signals
+	VOLUME_SPIKE_MULTIPLIER = 2.0 // Reduced from 2.5 to 2.0
 
 	// Pivot point calculation periods
 	PIVOT_LOOKBACK = 5
@@ -455,20 +455,18 @@ func (s *Scalping3Strategy) checkVolumeSpike(candles []baseCandleModel.BaseCandl
 func (s *Scalping3Strategy) checkSignalConditions(input Scalping3Input, indicators Scalping3Indicators) *SignalInfo {
 	patterns := s.detectPatterns(input.M5Candles)
 
-	// BUY: Price near support + BB oversold + Williams %R oversold + volume spike + mean reversion patterns
-	if s.isNearSupport(indicators.currentPrice, indicators.pivotPoints) &&
-		indicators.isBBOversold && indicators.isWilliamsOversold && indicators.volumeSpike &&
-		(patterns.hasDoubleBottom || patterns.hasInverseHeadShoulders || patterns.hasPivotBounce) {
+	// BUY: (Price near support OR BB oversold OR Williams %R oversold) + (volume spike OR mean reversion patterns) - REDUCED requirements
+	if (s.isNearSupport(indicators.currentPrice, indicators.pivotPoints) || indicators.isBBOversold || indicators.isWilliamsOversold) &&
+		(indicators.volumeSpike || patterns.hasDoubleBottom || patterns.hasInverseHeadShoulders || patterns.hasPivotBounce) {
 		return &SignalInfo{
 			side:  BUY,
 			entry: indicators.currentPrice,
 		}
 	}
 
-	// SELL: Price near resistance + BB overbought + Williams %R overbought + volume spike + mean reversion patterns
-	if s.isNearResistance(indicators.currentPrice, indicators.pivotPoints) &&
-		indicators.isBBOverbought && indicators.isWilliamsOverbought && indicators.volumeSpike &&
-		(patterns.hasDoubleTop || patterns.hasHeadAndShoulders || patterns.hasPivotBounce) {
+	// SELL: (Price near resistance OR BB overbought OR Williams %R overbought) + (volume spike OR mean reversion patterns) - REDUCED requirements
+	if (s.isNearResistance(indicators.currentPrice, indicators.pivotPoints) || indicators.isBBOverbought || indicators.isWilliamsOverbought) &&
+		(indicators.volumeSpike || patterns.hasDoubleTop || patterns.hasHeadAndShoulders || patterns.hasPivotBounce) {
 		return &SignalInfo{
 			side:  SELL,
 			entry: indicators.currentPrice,
@@ -479,10 +477,10 @@ func (s *Scalping3Strategy) checkSignalConditions(input Scalping3Input, indicato
 }
 
 func (s *Scalping3Strategy) isNearSupport(price float64, pivots PivotPoints) bool {
-	// Check if price is within 0.5% of any support level
+	// Check if price is within 1% of any support level - INCREASED from 0.5% to 1%
 	supportLevels := []float64{pivots.support1, pivots.support2, pivots.support3}
 	for _, support := range supportLevels {
-		if math.Abs(price-support)/support < 0.005 {
+		if math.Abs(price-support)/support < 0.01 {
 			return true
 		}
 	}
@@ -490,10 +488,10 @@ func (s *Scalping3Strategy) isNearSupport(price float64, pivots PivotPoints) boo
 }
 
 func (s *Scalping3Strategy) isNearResistance(price float64, pivots PivotPoints) bool {
-	// Check if price is within 0.5% of any resistance level
+	// Check if price is within 1% of any resistance level - INCREASED from 0.5% to 1%
 	resistanceLevels := []float64{pivots.resistance1, pivots.resistance2, pivots.resistance3}
 	for _, resistance := range resistanceLevels {
-		if math.Abs(price-resistance)/resistance < 0.005 {
+		if math.Abs(price-resistance)/resistance < 0.01 {
 			return true
 		}
 	}
@@ -897,7 +895,8 @@ func (s *Scalping3Strategy) validateSignalQuality(input Scalping3Input, signal *
 
 	overallScore := score / 10.0 * 10.0
 
-	if overallScore < 7.0 {
+	// REDUCED threshold from 7.0 to 5.0 for more signals
+	if overallScore < 5.0 {
 		return nil, fmt.Errorf("signal quality too low: %.2f/10", overallScore)
 	}
 

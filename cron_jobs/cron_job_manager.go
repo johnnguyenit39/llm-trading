@@ -66,8 +66,8 @@ func isDuplicateSignal(symbol, strategyName, side string) bool {
 		return false
 	}
 
-	// Prevent duplicate signals within 15 minutes for same symbol/strategy/side
-	cooldownPeriod := 15 * time.Minute
+	// REDUCED cooldown period from 15 minutes to 5 minutes for more signals
+	cooldownPeriod := 5 * time.Minute
 	return time.Since(lastSent) < cooldownPeriod
 }
 
@@ -83,16 +83,16 @@ func isSignalQualityAcceptable(signal *trading.BaseSignalModel) bool {
 		return false
 	}
 
-	// Check if risk/reward ratio is acceptable (minimum 1:1.5)
+	// RELAXED risk/reward ratio from 1:1.5 to 1:1.2 for more signals
 	risk := math.Abs(signal.Entry - signal.StopLoss)
 	reward := math.Abs(signal.TakeProfit - signal.Entry)
 
-	if risk == 0 || reward/risk < 1.5 {
+	if risk == 0 || reward/risk < 1.2 {
 		return false
 	}
 
-	// Check if leverage is reasonable (not too high)
-	if signal.Leverage > 10 {
+	// RELAXED leverage limit from 10 to 20 for more signals
+	if signal.Leverage > 20 {
 		return false
 	}
 
@@ -199,9 +199,9 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					break
 				}
 
-				// Analyze Scalping1 strategy
+				// Analyze Scalping1 strategy with simple mode for more signals
 				scalping1Strategy := trading.NewScalping1Strategy()
-				signal1Model, signal1Str, err := scalping1Strategy.AnalyzeWithSignalString(trading.Scalping1Input{
+				signal1Model, signal1Str, err := scalping1Strategy.AnalyzeWithSimpleSignalString(trading.Scalping1Input{
 					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles300),
 					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles100),
 					H1Candles:  utilsConverter.ConvertBinanceCandlesToBase(H1Candles20),
@@ -224,9 +224,9 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					}
 				}
 
-				// Analyze Scalping2 strategy
+				// Analyze Scalping2 strategy with simple mode for more signals
 				scalping2Strategy := trading.NewScalping2Strategy()
-				signal2Model, signal2Str, err := scalping2Strategy.AnalyzeWithSignalString(trading.Scalping2Input{
+				signal2Model, signal2Str, err := scalping2Strategy.AnalyzeWithSimpleSignalString(trading.Scalping2Input{
 					H4Candles:  utilsConverter.ConvertBinanceCandlesToBase(H4Candles20),
 					M30Candles: utilsConverter.ConvertBinanceCandlesToBase(M30Candles60),
 					M5Candles:  utilsConverter.ConvertBinanceCandlesToBase(M5Candles20),
