@@ -271,7 +271,7 @@ func (s *Scalping1Strategy) checkRSIConditions(rsi []float64) (bool, bool) {
 func (s *Scalping1Strategy) checkSignalConditions(input Scalping1Input, indicators TechnicalIndicators) *SignalInfo {
 	patterns := s.detectPatterns(input.M1Candles)
 
-	// BUY: Need 3 out of 4 conditions for better accuracy
+	// BUY: Need 2 out of 4 conditions for better accuracy
 	buyConditions := 0
 	if indicators.isPriceAboveEMA {
 		buyConditions++
@@ -293,14 +293,14 @@ func (s *Scalping1Strategy) checkSignalConditions(input Scalping1Input, indicato
 		}
 	}
 
-	if buyConditions >= 3 {
+	if buyConditions >= 2 {
 		return &SignalInfo{
 			side:  BUY,
 			entry: indicators.currentPrice,
 		}
 	}
 
-	// SELL: Need 3 out of 4 conditions for better accuracy
+	// SELL: Need 2 out of 4 conditions for better accuracy
 	sellConditions := 0
 	if !indicators.isPriceAboveEMA {
 		sellConditions++
@@ -322,7 +322,7 @@ func (s *Scalping1Strategy) checkSignalConditions(input Scalping1Input, indicato
 		}
 	}
 
-	if sellConditions >= 3 {
+	if sellConditions >= 2 {
 		return &SignalInfo{
 			side:  SELL,
 			entry: indicators.currentPrice,
