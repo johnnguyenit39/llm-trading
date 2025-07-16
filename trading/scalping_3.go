@@ -158,6 +158,75 @@ func (s *Scalping3Strategy) AnalyzeWithEnhancedSignalString(input Scalping3Input
 	return &enhancedSignal, &enhancedString, nil
 }
 
+// ==== Simple Signal Mode for More Frequent Signals ====
+
+// AnalyzeWithSimpleSignalString generates signals with minimal validation for more frequent trading
+func (s *Scalping3Strategy) AnalyzeWithSimpleSignalString(input Scalping3Input, symbol string) (*BaseSignalModel, *string, error) {
+	if err := s.validateInput(input); err != nil {
+		return nil, nil, err
+	}
+
+	indicators := s.calculateIndicators(input)
+	signal := s.checkSimpleSignalConditions(input, indicators)
+	if signal == nil {
+		return nil, nil, nil // No signal
+	}
+
+	signalModel, signalStr := s.generateSignalString(symbol, *signal, input)
+	return &signalModel, &signalStr, nil
+}
+
+// checkSimpleSignalConditions uses relaxed conditions for more signals
+func (s *Scalping3Strategy) checkSimpleSignalConditions(input Scalping3Input, indicators Scalping3Indicators) *SignalInfo {
+	patterns := s.detectPatterns(input.M5Candles)
+
+	// BUY: Relaxed conditions - only need 2 out of 4 conditions
+	buyConditions := 0
+	if s.isNearSupport(indicators.currentPrice, indicators.pivotPoints) {
+		buyConditions++
+	}
+	if indicators.isBBOversold {
+		buyConditions++
+	}
+	if indicators.isWilliamsOversold {
+		buyConditions++
+	}
+	if patterns.hasDoubleBottom || patterns.hasInverseHeadShoulders || patterns.hasPivotBounce {
+		buyConditions++
+	}
+
+	if buyConditions >= 2 {
+		return &SignalInfo{
+			side:  BUY,
+			entry: indicators.currentPrice,
+		}
+	}
+
+	// SELL: Relaxed conditions - only need 2 out of 4 conditions
+	sellConditions := 0
+	if s.isNearResistance(indicators.currentPrice, indicators.pivotPoints) {
+		sellConditions++
+	}
+	if indicators.isBBOverbought {
+		sellConditions++
+	}
+	if indicators.isWilliamsOverbought {
+		sellConditions++
+	}
+	if patterns.hasDoubleTop || patterns.hasHeadAndShoulders || patterns.hasPivotBounce {
+		sellConditions++
+	}
+
+	if sellConditions >= 2 {
+		return &SignalInfo{
+			side:  SELL,
+			entry: indicators.currentPrice,
+		}
+	}
+
+	return nil
+}
+
 // ==== Input Validation ====
 
 func (s *Scalping3Strategy) validateInput(input Scalping3Input) error {

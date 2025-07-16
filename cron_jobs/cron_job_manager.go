@@ -249,9 +249,9 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					}
 				}
 
-				// Analyze Scalping3 strategy
+				// Analyze Scalping3 strategy with simple mode for more signals
 				scalping3Strategy := trading.NewScalping3Strategy()
-				signal3Model, signal3Str, err := scalping3Strategy.AnalyzeWithSignalString(trading.Scalping3Input{
+				signal3Model, signal3Str, err := scalping3Strategy.AnalyzeWithSimpleSignalString(trading.Scalping3Input{
 					D1Candles: utilsConverter.ConvertBinanceCandlesToBase(D1Candles20),
 					H1Candles: utilsConverter.ConvertBinanceCandlesToBase(H1Candles20),
 					M5Candles: utilsConverter.ConvertBinanceCandlesToBase(M5Candles20),
@@ -276,8 +276,8 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 
 			}(symbol)
 		}
-		// Tính thời gian còn lại đến đầu phút tiếp theo
-		next := now.Truncate(time.Minute).Add(time.Minute)
+		// Tính thời gian còn lại đến đầu phút tiếp theo - REDUCED to 30 seconds for more frequent checks
+		next := now.Truncate(time.Minute).Add(30 * time.Second)
 		time.Sleep(time.Until(next))
 	}
 }
