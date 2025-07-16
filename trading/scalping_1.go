@@ -271,7 +271,7 @@ func (s *Scalping1Strategy) checkRSIConditions(rsi []float64) (bool, bool) {
 func (s *Scalping1Strategy) checkSignalConditions(input Scalping1Input, indicators TechnicalIndicators) *SignalInfo {
 	patterns := s.detectPatterns(input.M1Candles)
 
-	// BUY: Relaxed conditions - only need 2 out of 3 main conditions
+	// BUY: Need 3 out of 4 conditions for better accuracy
 	buyConditions := 0
 	if indicators.isPriceAboveEMA {
 		buyConditions++
@@ -282,15 +282,25 @@ func (s *Scalping1Strategy) checkSignalConditions(input Scalping1Input, indicato
 	if patterns.hasBullishEngulfing || patterns.hasHammer || patterns.has2Bulls {
 		buyConditions++
 	}
+	// Add trend momentum check
+	if len(input.H1Candles) >= 5 {
+		recentPrices := make([]float64, 5)
+		for i := 0; i < 5; i++ {
+			recentPrices[i] = input.H1Candles[len(input.H1Candles)-1-i].Close
+		}
+		if recentPrices[0] > recentPrices[1] && recentPrices[1] > recentPrices[2] {
+			buyConditions++ // Uptrend momentum
+		}
+	}
 
-	if buyConditions >= 2 {
+	if buyConditions >= 3 {
 		return &SignalInfo{
 			side:  BUY,
 			entry: indicators.currentPrice,
 		}
 	}
 
-	// SELL: Relaxed conditions - only need 2 out of 3 main conditions
+	// SELL: Need 3 out of 4 conditions for better accuracy
 	sellConditions := 0
 	if !indicators.isPriceAboveEMA {
 		sellConditions++
@@ -301,8 +311,18 @@ func (s *Scalping1Strategy) checkSignalConditions(input Scalping1Input, indicato
 	if patterns.hasBearishEngulfing || patterns.hasShootingStar || patterns.has2Bears {
 		sellConditions++
 	}
+	// Add trend momentum check
+	if len(input.H1Candles) >= 5 {
+		recentPrices := make([]float64, 5)
+		for i := 0; i < 5; i++ {
+			recentPrices[i] = input.H1Candles[len(input.H1Candles)-1-i].Close
+		}
+		if recentPrices[0] < recentPrices[1] && recentPrices[1] < recentPrices[2] {
+			sellConditions++ // Downtrend momentum
+		}
+	}
 
-	if sellConditions >= 2 {
+	if sellConditions >= 3 {
 		return &SignalInfo{
 			side:  SELL,
 			entry: indicators.currentPrice,
@@ -1642,7 +1662,7 @@ func (s *Scalping1Strategy) findSwingHighs(candles []baseCandleModel.BaseCandle,
 // AnalyzeWithSimpleSignalString generates signals with minimal validation for more frequent trading
 // NOTE: This is NOT reducing algorithm quality, but optimizing for more trading opportunities
 // Professional traders typically use 2-3 confirmations, not 4+ confirmations
-// This mode requires 2/4 conditions instead of ALL conditions, which is more realistic
+// This mode requires 3/4 conditions for better accuracy while maintaining reasonable signal frequency
 func (s *Scalping1Strategy) AnalyzeWithSimpleSignalString(input Scalping1Input, symbol string) (*BaseSignalModel, *string, error) {
 	if err := s.validateInput(input); err != nil {
 		return nil, nil, err
@@ -1658,11 +1678,11 @@ func (s *Scalping1Strategy) AnalyzeWithSimpleSignalString(input Scalping1Input, 
 	return &signalModel, &signalStr, nil
 }
 
-// checkSimpleSignalConditions uses relaxed conditions for more signals
+// checkSimpleSignalConditions uses 3/4 conditions for better accuracy
 func (s *Scalping1Strategy) checkSimpleSignalConditions(input Scalping1Input, indicators TechnicalIndicators) *SignalInfo {
 	patterns := s.detectPatterns(input.M1Candles)
 
-	// BUY: Relaxed conditions - only need 2 out of 4 conditions
+	// BUY: Need 3 out of 4 conditions for better accuracy
 	buyConditions := 0
 	if indicators.isPriceAboveEMA {
 		buyConditions++
@@ -1684,14 +1704,14 @@ func (s *Scalping1Strategy) checkSimpleSignalConditions(input Scalping1Input, in
 		}
 	}
 
-	if buyConditions >= 2 {
+	if buyConditions >= 3 {
 		return &SignalInfo{
 			side:  BUY,
 			entry: indicators.currentPrice,
 		}
 	}
 
-	// SELL: Relaxed conditions - only need 2 out of 4 conditions
+	// SELL: Need 3 out of 4 conditions for better accuracy
 	sellConditions := 0
 	if !indicators.isPriceAboveEMA {
 		sellConditions++
@@ -1713,7 +1733,7 @@ func (s *Scalping1Strategy) checkSimpleSignalConditions(input Scalping1Input, in
 		}
 	}
 
-	if sellConditions >= 2 {
+	if sellConditions >= 3 {
 		return &SignalInfo{
 			side:  SELL,
 			entry: indicators.currentPrice,

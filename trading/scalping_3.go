@@ -176,11 +176,11 @@ func (s *Scalping3Strategy) AnalyzeWithSimpleSignalString(input Scalping3Input, 
 	return &signalModel, &signalStr, nil
 }
 
-// checkSimpleSignalConditions uses relaxed conditions for more signals
+// checkSimpleSignalConditions uses 3/4 conditions for better accuracy
 func (s *Scalping3Strategy) checkSimpleSignalConditions(input Scalping3Input, indicators Scalping3Indicators) *SignalInfo {
 	patterns := s.detectPatterns(input.M5Candles)
 
-	// BUY: Relaxed conditions - only need 2 out of 4 conditions
+	// BUY: Need 3 out of 4 conditions for better accuracy
 	buyConditions := 0
 	if s.isNearSupport(indicators.currentPrice, indicators.pivotPoints) {
 		buyConditions++
@@ -195,14 +195,14 @@ func (s *Scalping3Strategy) checkSimpleSignalConditions(input Scalping3Input, in
 		buyConditions++
 	}
 
-	if buyConditions >= 2 {
+	if buyConditions >= 3 {
 		return &SignalInfo{
 			side:  BUY,
 			entry: indicators.currentPrice,
 		}
 	}
 
-	// SELL: Relaxed conditions - only need 2 out of 4 conditions
+	// SELL: Need 3 out of 4 conditions for better accuracy
 	sellConditions := 0
 	if s.isNearResistance(indicators.currentPrice, indicators.pivotPoints) {
 		sellConditions++
@@ -217,7 +217,7 @@ func (s *Scalping3Strategy) checkSimpleSignalConditions(input Scalping3Input, in
 		sellConditions++
 	}
 
-	if sellConditions >= 2 {
+	if sellConditions >= 3 {
 		return &SignalInfo{
 			side:  SELL,
 			entry: indicators.currentPrice,
