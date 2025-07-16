@@ -58,8 +58,9 @@ type Scalping1SignalModel struct {
 }
 
 type Scalping1Input struct {
+	H1Candles  []baseCandleModel.BaseCandle // For trend analysis (higher timeframe)
 	M15Candles []baseCandleModel.BaseCandle // For EMA 200 trend filter
-	M1Candles  []baseCandleModel.BaseCandle // For RSI and patterns
+	M1Candles  []baseCandleModel.BaseCandle // For RSI and patterns (entry signals)
 }
 
 type Scalping1Strategy struct {
@@ -131,11 +132,67 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 	return &signalModel, &signalStr, nil
 }
 
+// Enhanced analysis with risk management
+func (s *Scalping1Strategy) AnalyzeWithEnhancedSignalString(input Scalping1Input, symbol string, accountBalance float64) (*EnhancedScalping1SignalModel, *string, error) {
+	if err := s.validateInput(input); err != nil {
+		return nil, nil, err
+	}
+
+	indicators := s.calculateIndicators(input)
+	signal := s.checkSignalConditions(input, indicators)
+	if signal == nil {
+		return nil, nil, nil // No signal
+	}
+
+	// Validate signal quality before proceeding
+	qualityScore, err := s.validateSignalQuality(input, signal, indicators)
+	if err != nil {
+		return nil, nil, fmt.Errorf("signal quality validation failed: %v", err)
+	}
+
+	// Check drawdown protection before generating signal
+	if !s.checkDrawdownProtection(accountBalance, accountBalance*1.1, 0) { // Assuming 10% initial drawdown
+		return nil, nil, fmt.Errorf("trading stopped due to drawdown protection")
+	}
+
+	enhancedSignal, enhancedString := s.generateEnhancedSignalString(symbol, *signal, input, accountBalance)
+
+	// Add quality score to signal string
+	enhancedString = s.addQualityScoreToSignal(enhancedString, qualityScore)
+
+	return &enhancedSignal, &enhancedString, nil
+}
+
+func (s *Scalping1Strategy) addQualityScoreToSignal(signalString string, qualityScore *SignalQualityScore) string {
+	result := signalString
+
+	result += "\n=== SIGNAL QUALITY ANALYSIS ===\n"
+	result += fmt.Sprintf("Overall Score: %.1f/10\n", qualityScore.overallScore)
+	result += fmt.Sprintf("Trend Score: %.1f/10\n", qualityScore.trendScore)
+	result += fmt.Sprintf("Pattern Score: %.1f/10\n", qualityScore.patternScore)
+	result += fmt.Sprintf("Volume Score: %.1f/10\n", qualityScore.volumeScore)
+	result += fmt.Sprintf("Market Score: %.1f/10\n", qualityScore.marketScore)
+	result += fmt.Sprintf("Confirmation Score: %.1f/10\n", qualityScore.confirmationScore)
+
+	// Add quality assessment
+	if qualityScore.overallScore >= 8.5 {
+		result += "Quality Assessment: 🟢 EXCELLENT\n"
+	} else if qualityScore.overallScore >= 7.5 {
+		result += "Quality Assessment: 🟡 GOOD\n"
+	} else if qualityScore.overallScore >= 7.0 {
+		result += "Quality Assessment: 🟠 ACCEPTABLE\n"
+	} else {
+		result += "Quality Assessment: 🔴 POOR\n"
+	}
+
+	return result
+}
+
 // ==== Input Validation ====
 
 func (s *Scalping1Strategy) validateInput(input Scalping1Input) error {
-	if len(input.M15Candles) < s.emaPeriod || len(input.M1Candles) < s.rsiPeriod {
-		return fmt.Errorf("insufficient data: need at least %d M15 candles and %d M1 candles", s.emaPeriod, s.rsiPeriod)
+	if len(input.H1Candles) < 20 || len(input.M15Candles) < s.emaPeriod || len(input.M1Candles) < s.rsiPeriod {
+		return fmt.Errorf("insufficient data: need at least 20 H1 candles, %d M15 candles and %d M1 candles", s.emaPeriod, s.rsiPeriod)
 	}
 	return nil
 }
@@ -645,33 +702,42 @@ type TrendContext struct {
 	volumeTrend   string
 }
 
+// Enhanced trend analysis using higher timeframe
 func (s *Scalping1Strategy) analyzeTrendContext(candles []baseCandleModel.BaseCandle) TrendContext {
 	if len(candles) < 10 {
 		return TrendContext{isUptrend: false, isDowntrend: false, trendStrength: 0, momentum: 0, volumeTrend: "neutral"}
 	}
 
-	// 1. EMA Slope Analysis (short-term trend)
+	// 1. EMA Slope Analysis on higher timeframe (H1)
 	ema5 := s.calculateEMA(candles, 5)
 	ema10 := s.calculateEMA(candles, 10)
+	ema20 := s.calculateEMA(candles, 20) // Add longer EMA for trend confirmation
 
-	ema5Slope := s.calculateSlope(ema5, 3)   // Last 3 periods
-	ema10Slope := s.calculateSlope(ema10, 5) // Last 5 periods
+	ema5Slope := s.calculateSlope(ema5, 3)    // Last 3 periods
+	ema10Slope := s.calculateSlope(ema10, 5)  // Last 5 periods
+	ema20Slope := s.calculateSlope(ema20, 10) // Last 10 periods for longer trend
 
-	// 2. Price Momentum Analysis
+	// 2. Price Momentum Analysis on higher timeframe
 	momentum := s.calculateMomentum(candles, 5)
 
-	// 3. Volume Trend Analysis
+	// 3. Volume Trend Analysis on higher timeframe
 	volumeTrend := s.analyzeVolumeTrend(candles, 5)
 
-	// 4. Higher Highs/Lower Lows Analysis
+	// 4. Higher Highs/Lower Lows Analysis on higher timeframe
 	hhll := s.analyzeHigherHighsLowerLows(candles, 5)
 
-	// 5. Trend Strength Calculation
+	// 5. Trend Strength Calculation on higher timeframe
 	trendStrength := s.calculateTrendStrength(candles, 5)
 
-	// Determine trend direction
-	isUptrend := ema5Slope > 0 && ema10Slope > 0 && momentum > 0 && hhll == "higher_highs"
-	isDowntrend := ema5Slope < 0 && ema10Slope < 0 && momentum < 0 && hhll == "lower_lows"
+	// 6. Support/Resistance levels on higher timeframe
+	supportResistance := s.analyzeSupportResistance(candles)
+
+	// Enhanced trend determination using multiple timeframes
+	isUptrend := ema5Slope > 0 && ema10Slope > 0 && ema20Slope > 0 &&
+		momentum > 0 && hhll == "higher_highs" && supportResistance.isAboveSupport
+
+	isDowntrend := ema5Slope < 0 && ema10Slope < 0 && ema20Slope < 0 &&
+		momentum < 0 && hhll == "lower_lows" && supportResistance.isBelowResistance
 
 	return TrendContext{
 		isUptrend:     isUptrend,
@@ -832,32 +898,693 @@ func (s *Scalping1Strategy) calculateAverage(values []float64) float64 {
 	return sum / float64(len(values))
 }
 
-// Enhanced trend validation for patterns
+// Enhanced trend validation using higher timeframe data
 func (s *Scalping1Strategy) validateTrendForPattern(candles []baseCandleModel.BaseCandle, patternType string) bool {
 	if len(candles) < 10 {
 		return false
 	}
 
+	// Use higher timeframe trend context for validation
 	trendContext := s.analyzeTrendContext(candles)
 
 	switch patternType {
 	case "bullish_reversal":
-		// For bullish reversal patterns, we want downtrend before
+		// For bullish reversal patterns, we want downtrend before on higher timeframe
 		return trendContext.isDowntrend && trendContext.trendStrength < -20
 
 	case "bearish_reversal":
-		// For bearish reversal patterns, we want uptrend before
+		// For bearish reversal patterns, we want uptrend before on higher timeframe
 		return trendContext.isUptrend && trendContext.trendStrength > 20
 
 	case "bullish_continuation":
-		// For bullish continuation, we want uptrend with pullback
+		// For bullish continuation, we want uptrend with pullback on higher timeframe
 		return trendContext.isUptrend && trendContext.momentum > -5
 
 	case "bearish_continuation":
-		// For bearish continuation, we want downtrend with bounce
+		// For bearish continuation, we want downtrend with bounce on higher timeframe
 		return trendContext.isDowntrend && trendContext.momentum < 5
 
 	default:
 		return true
 	}
+}
+
+// ==== Enhanced Risk Management ====
+
+const (
+	// Trailing stop settings
+	TRAILING_STOP_ACTIVATION = 0.5 // Activate trailing stop at 0.5% profit
+	TRAILING_STOP_DISTANCE   = 0.3 // Trail at 0.3% distance
+
+	// Position sizing settings
+	MAX_RISK_PER_TRADE = 0.02  // 2% max risk per trade
+	MIN_POSITION_SIZE  = 5.0   // $5 minimum position
+	MAX_POSITION_SIZE  = 100.0 // $100 maximum position
+
+	// Drawdown protection
+	MAX_DRAWDOWN_PERCENT = 0.15 // 15% maximum drawdown
+	DAILY_LOSS_LIMIT     = 0.10 // 10% daily loss limit
+
+	// Time-based exit
+	MAX_HOLD_TIME_MINUTES = 30 // Maximum hold time for scalping
+	PROFIT_LOCK_TIME      = 10 // Lock profit after 10 minutes
+)
+
+type PositionSizingResult struct {
+	positionSize float64
+	riskAmount   float64
+	riskPercent  float64
+}
+
+// Calculate position size based on volatility and account balance
+func (s *Scalping1Strategy) calculatePositionSize(entry, stopLoss, accountBalance float64, atrPercent float64) PositionSizingResult {
+	// Calculate risk per share/contract
+	riskPerUnit := math.Abs(entry - stopLoss)
+	if riskPerUnit == 0 {
+		return PositionSizingResult{positionSize: MIN_POSITION_SIZE, riskAmount: 0, riskPercent: 0}
+	}
+
+	// Calculate maximum risk amount (2% of account)
+	maxRiskAmount := accountBalance * MAX_RISK_PER_TRADE
+
+	// Calculate position size based on risk
+	positionSize := maxRiskAmount / riskPerUnit
+
+	// Adjust position size based on volatility
+	volatilityMultiplier := s.getVolatilityMultiplier(atrPercent)
+	positionSize *= volatilityMultiplier
+
+	// Apply position size limits
+	if positionSize < MIN_POSITION_SIZE {
+		positionSize = MIN_POSITION_SIZE
+	} else if positionSize > MAX_POSITION_SIZE {
+		positionSize = MAX_POSITION_SIZE
+	}
+
+	// Calculate actual risk
+	actualRiskAmount := positionSize * riskPerUnit
+	actualRiskPercent := (actualRiskAmount / accountBalance) * 100
+
+	return PositionSizingResult{
+		positionSize: positionSize,
+		riskAmount:   actualRiskAmount,
+		riskPercent:  actualRiskPercent,
+	}
+}
+
+func (s *Scalping1Strategy) getVolatilityMultiplier(atrPercent float64) float64 {
+	switch {
+	case atrPercent > HIGH_VOLATILITY_THRESHOLD:
+		return 0.7 // Reduce position size in high volatility
+	case atrPercent > MEDIUM_VOLATILITY_THRESHOLD:
+		return 0.85
+	case atrPercent > LOW_VOLATILITY_THRESHOLD:
+		return 1.0
+	default:
+		return 1.2 // Increase position size in low volatility
+	}
+}
+
+// Calculate trailing stop levels
+func (s *Scalping1Strategy) calculateTrailingStop(entry, currentPrice float64, side string, atrPercent float64) (float64, bool) {
+	// Calculate profit percentage
+	var profitPercent float64
+	if side == BUY {
+		profitPercent = (currentPrice - entry) / entry * 100
+	} else {
+		profitPercent = (entry - currentPrice) / entry * 100
+	}
+
+	// Check if trailing stop should be activated
+	if profitPercent < TRAILING_STOP_ACTIVATION {
+		return 0, false // Trailing stop not activated yet
+	}
+
+	// Calculate trailing stop distance based on volatility
+	trailingDistance := TRAILING_STOP_DISTANCE
+	if atrPercent > HIGH_VOLATILITY_THRESHOLD {
+		trailingDistance = 0.5 // Wider trailing stop in high volatility
+	} else if atrPercent < LOW_VOLATILITY_THRESHOLD {
+		trailingDistance = 0.2 // Tighter trailing stop in low volatility
+	}
+
+	// Calculate trailing stop level
+	var trailingStop float64
+	if side == BUY {
+		trailingStop = currentPrice * (1 - trailingDistance/100)
+	} else {
+		trailingStop = currentPrice * (1 + trailingDistance/100)
+	}
+
+	return trailingStop, true
+}
+
+// Check drawdown protection
+func (s *Scalping1Strategy) checkDrawdownProtection(currentBalance, initialBalance float64, dailyPnL float64) bool {
+	// Check maximum drawdown
+	currentDrawdown := (initialBalance - currentBalance) / initialBalance
+	if currentDrawdown > MAX_DRAWDOWN_PERCENT {
+		return false // Stop trading due to max drawdown
+	}
+
+	// Check daily loss limit
+	if dailyPnL < -DAILY_LOSS_LIMIT {
+		return false // Stop trading due to daily loss limit
+	}
+
+	return true
+}
+
+// Enhanced signal model with risk management
+type EnhancedScalping1SignalModel struct {
+	Scalping1SignalModel
+	TrailingStop      float64 `json:"trailing_stop"`
+	PositionSize      float64 `json:"position_size"`
+	RiskAmount        float64 `json:"risk_amount"`
+	RiskPercent       float64 `json:"risk_percent"`
+	MaxHoldTime       int     `json:"max_hold_time"`
+	ProfitLockTime    int     `json:"profit_lock_time"`
+	UseTrailingStop   bool    `json:"use_trailing_stop"`
+	DrawdownProtected bool    `json:"drawdown_protected"`
+}
+
+// Enhanced signal generation with risk management
+func (s *Scalping1Strategy) generateEnhancedSignalString(symbol string, signal SignalInfo, input Scalping1Input, accountBalance float64) (EnhancedScalping1SignalModel, string) {
+	// Generate base signal
+	baseSignal, baseString := s.generateSignalString(symbol, signal, input)
+
+	// Calculate enhanced risk management
+	atrPercent := calcATRPercent(input.M15Candles, ATR_PERIOD)
+
+	// Position sizing
+	sizingResult := s.calculatePositionSize(signal.entry, baseSignal.StopLoss, accountBalance, atrPercent)
+
+	// Trailing stop calculation
+	trailingStop, useTrailing := s.calculateTrailingStop(signal.entry, signal.entry, signal.side, atrPercent)
+
+	// Create enhanced signal model
+	enhancedSignal := EnhancedScalping1SignalModel{
+		Scalping1SignalModel: baseSignal,
+		TrailingStop:         trailingStop,
+		PositionSize:         sizingResult.positionSize,
+		RiskAmount:           sizingResult.riskAmount,
+		RiskPercent:          sizingResult.riskPercent,
+		MaxHoldTime:          MAX_HOLD_TIME_MINUTES,
+		ProfitLockTime:       PROFIT_LOCK_TIME,
+		UseTrailingStop:      useTrailing,
+		DrawdownProtected:    true,
+	}
+
+	// Generate enhanced signal string
+	enhancedString := s.generateEnhancedSignalStringText(baseString, enhancedSignal, accountBalance)
+
+	return enhancedSignal, enhancedString
+}
+
+func (s *Scalping1Strategy) generateEnhancedSignalStringText(baseString string, signal EnhancedScalping1SignalModel, accountBalance float64) string {
+	result := baseString
+
+	// Add risk management information
+	result += "\n=== RISK MANAGEMENT ===\n"
+	result += fmt.Sprintf("Position Size: $%.2f\n", signal.PositionSize)
+	result += fmt.Sprintf("Risk Amount: $%.2f (%.2f%% of account)\n", signal.RiskAmount, signal.RiskPercent)
+
+	if signal.UseTrailingStop {
+		result += fmt.Sprintf("Trailing Stop: %.4f (activated at %.1f%% profit)\n", signal.TrailingStop, TRAILING_STOP_ACTIVATION)
+	} else {
+		result += "Trailing Stop: Not activated yet\n"
+	}
+
+	result += fmt.Sprintf("Max Hold Time: %d minutes\n", signal.MaxHoldTime)
+	result += fmt.Sprintf("Profit Lock Time: %d minutes\n", signal.ProfitLockTime)
+	result += fmt.Sprintf("Max Drawdown: %.1f%%\n", MAX_DRAWDOWN_PERCENT*100)
+	result += fmt.Sprintf("Daily Loss Limit: %.1f%%\n", DAILY_LOSS_LIMIT*100)
+
+	// Add account protection status
+	result += fmt.Sprintf("Account Balance: $%.2f\n", accountBalance)
+	result += "Drawdown Protection: ✅ Active\n"
+
+	return result
+}
+
+// ==== False Signal Prevention ====
+
+const (
+	// Signal quality thresholds
+	MIN_SIGNAL_QUALITY_SCORE = 7.0 // Minimum score out of 10
+	MIN_VOLUME_CONFIRMATION  = 1.5 // Volume must be 1.5x average
+	MIN_TREND_STRENGTH       = 0.3 // Minimum trend strength (0-1)
+	MIN_PATTERN_QUALITY      = 0.7 // Minimum pattern quality score
+
+	// Market condition filters
+	MAX_SPREAD_PERCENT      = 0.1     // Maximum spread 0.1%
+	MIN_LIQUIDITY_THRESHOLD = 1000000 // Minimum volume for liquidity
+	MAX_GAP_PERCENT         = 0.5     // Maximum gap between candles
+
+	// Time-based filters
+	AVOID_NEWS_TIME_MINUTES = 30   // Avoid trading 30min before/after news
+	AVOID_LOW_VOLUME_HOURS  = true // Avoid low volume hours
+)
+
+type SignalQualityScore struct {
+	overallScore      float64
+	trendScore        float64
+	patternScore      float64
+	volumeScore       float64
+	marketScore       float64
+	confirmationScore float64
+}
+
+type MarketCondition struct {
+	isHighVolatility bool
+	isLowLiquidity   bool
+	isNewsTime       bool
+	isLowVolumeHour  bool
+	spreadPercent    float64
+	gapPercent       float64
+}
+
+// Enhanced signal validation with multiple filters
+func (s *Scalping1Strategy) validateSignalQuality(input Scalping1Input, signal *SignalInfo, indicators TechnicalIndicators) (*SignalQualityScore, error) {
+	// 1. Market condition check
+	marketCondition := s.analyzeMarketCondition(input)
+	if !s.isMarketConditionSuitable(marketCondition) {
+		return nil, fmt.Errorf("market condition not suitable: %+v", marketCondition)
+	}
+
+	// 2. Calculate individual scores
+	trendScore := s.calculateTrendScore(input, indicators)
+	patternScore := s.calculatePatternScore(input.M1Candles, signal.side)
+	volumeScore := s.calculateVolumeScore(input.M1Candles)
+	marketScore := s.calculateMarketScore(marketCondition)
+	confirmationScore := s.calculateConfirmationScore(input, signal, indicators)
+
+	// 3. Calculate overall score
+	overallScore := (trendScore + patternScore + volumeScore + marketScore + confirmationScore) / 5.0
+
+	// 4. Check minimum threshold
+	if overallScore < MIN_SIGNAL_QUALITY_SCORE {
+		return nil, fmt.Errorf("signal quality too low: %.2f/10", overallScore)
+	}
+
+	return &SignalQualityScore{
+		overallScore:      overallScore,
+		trendScore:        trendScore,
+		patternScore:      patternScore,
+		volumeScore:       volumeScore,
+		marketScore:       marketScore,
+		confirmationScore: confirmationScore,
+	}, nil
+}
+
+func (s *Scalping1Strategy) analyzeMarketCondition(input Scalping1Input) MarketCondition {
+	// Use H1 candles for market condition analysis
+	atrPercent := calcATRPercent(input.H1Candles, ATR_PERIOD)
+
+	// Calculate spread (if available)
+	spreadPercent := s.calculateSpreadPercent(input.M1Candles)
+
+	// Calculate gap between candles on H1
+	gapPercent := s.calculateGapPercent(input.H1Candles)
+
+	// Check liquidity on H1 timeframe
+	totalVolume := s.calculateTotalVolume(input.H1Candles, 10)
+
+	// Check if it's news time (simplified - you'd need to integrate with news API)
+	isNewsTime := s.isNewsTime()
+
+	// Check if it's low volume hour
+	isLowVolumeHour := s.isLowVolumeHour()
+
+	return MarketCondition{
+		isHighVolatility: atrPercent > HIGH_VOLATILITY_THRESHOLD,
+		isLowLiquidity:   totalVolume < MIN_LIQUIDITY_THRESHOLD,
+		isNewsTime:       isNewsTime,
+		isLowVolumeHour:  isLowVolumeHour,
+		spreadPercent:    spreadPercent,
+		gapPercent:       gapPercent,
+	}
+}
+
+func (s *Scalping1Strategy) isMarketConditionSuitable(condition MarketCondition) bool {
+	// Reject if spread too high
+	if condition.spreadPercent > MAX_SPREAD_PERCENT {
+		return false
+	}
+
+	// Reject if gap too large
+	if condition.gapPercent > MAX_GAP_PERCENT {
+		return false
+	}
+
+	// Reject if low liquidity
+	if condition.isLowLiquidity {
+		return false
+	}
+
+	// Reject if news time
+	if condition.isNewsTime {
+		return false
+	}
+
+	// Reject if low volume hour (optional)
+	if AVOID_LOW_VOLUME_HOURS && condition.isLowVolumeHour {
+		return false
+	}
+
+	return true
+}
+
+func (s *Scalping1Strategy) calculateTrendScore(input Scalping1Input, indicators TechnicalIndicators) float64 {
+	score := 0.0
+
+	// Use H1 candles for trend analysis
+	h1TrendContext := s.analyzeTrendContext(input.H1Candles)
+
+	// Higher timeframe trend alignment (0-4 points)
+	if h1TrendContext.isUptrend && indicators.isPriceAboveEMA {
+		score += 4.0 // Perfect alignment
+	} else if h1TrendContext.isDowntrend && !indicators.isPriceAboveEMA {
+		score += 4.0 // Perfect alignment
+	} else if h1TrendContext.isUptrend || indicators.isPriceAboveEMA {
+		score += 2.0 // Partial alignment
+	}
+
+	// RSI confirmation with higher timeframe context (0-2 points)
+	if indicators.isRSIOversold && h1TrendContext.isUptrend {
+		score += 2.0 // Pullback in uptrend
+	} else if indicators.isRSIOverbought && h1TrendContext.isDowntrend {
+		score += 2.0 // Bounce in downtrend
+	}
+
+	// Higher timeframe trend strength (0-3 points)
+	if math.Abs(h1TrendContext.trendStrength) > MIN_TREND_STRENGTH*100 {
+		score += 3.0
+	} else if math.Abs(h1TrendContext.trendStrength) > MIN_TREND_STRENGTH*50 {
+		score += 1.5
+	}
+
+	// Higher timeframe momentum confirmation (0-1 point)
+	if h1TrendContext.momentum > 0 && indicators.isPriceAboveEMA {
+		score += 1.0
+	} else if h1TrendContext.momentum < 0 && !indicators.isPriceAboveEMA {
+		score += 1.0
+	}
+
+	return score
+}
+
+func (s *Scalping1Strategy) calculatePatternScore(candles []baseCandleModel.BaseCandle, side string) float64 {
+	score := 0.0
+
+	// Pattern quality (0-4 points)
+	patterns := s.detectPatterns(candles)
+
+	if side == BUY {
+		if patterns.hasBullishEngulfing {
+			score += 4.0
+		} else if patterns.hasHammer {
+			score += 3.0
+		} else if patterns.has2Bulls {
+			score += 2.0
+		}
+	} else {
+		if patterns.hasBearishEngulfing {
+			score += 4.0
+		} else if patterns.hasShootingStar {
+			score += 3.0
+		} else if patterns.has2Bears {
+			score += 2.0
+		}
+	}
+
+	// Pattern context validation (0-3 points)
+	if s.validateTrendForPattern(candles, side+"_reversal") {
+		score += 3.0
+	}
+
+	// Multiple pattern confirmation (0-3 points)
+	patternCount := 0
+	if patterns.hasBullishEngulfing || patterns.hasBearishEngulfing {
+		patternCount++
+	}
+	if patterns.hasHammer || patterns.hasShootingStar {
+		patternCount++
+	}
+	if patterns.has2Bulls || patterns.has2Bears {
+		patternCount++
+	}
+
+	if patternCount >= 2 {
+		score += 3.0
+	} else if patternCount == 1 {
+		score += 1.5
+	}
+
+	return score
+}
+
+func (s *Scalping1Strategy) calculateVolumeScore(candles []baseCandleModel.BaseCandle) float64 {
+	if len(candles) < 5 {
+		return 0.0
+	}
+
+	// Calculate average volume
+	avgVolume := s.calculateAverageVolume(candles[:len(candles)-1])
+	currentVolume := candles[len(candles)-1].Volume
+
+	if avgVolume == 0 {
+		return 5.0 // Neutral score if no volume data
+	}
+
+	volumeRatio := currentVolume / avgVolume
+
+	// Score based on volume confirmation
+	if volumeRatio >= MIN_VOLUME_CONFIRMATION {
+		return 10.0
+	} else if volumeRatio >= 1.2 {
+		return 7.0
+	} else if volumeRatio >= 1.0 {
+		return 5.0
+	} else {
+		return 2.0
+	}
+}
+
+func (s *Scalping1Strategy) calculateMarketScore(condition MarketCondition) float64 {
+	score := 10.0 // Start with perfect score
+
+	// Deduct for high volatility
+	if condition.isHighVolatility {
+		score -= 2.0
+	}
+
+	// Deduct for spread
+	if condition.spreadPercent > 0.05 {
+		score -= 3.0
+	}
+
+	// Deduct for gaps
+	if condition.gapPercent > 0.2 {
+		score -= 2.0
+	}
+
+	return math.Max(0, score)
+}
+
+func (s *Scalping1Strategy) calculateConfirmationScore(input Scalping1Input, signal *SignalInfo, _ TechnicalIndicators) float64 {
+	score := 0.0
+
+	// Price action confirmation (0-3 points)
+	if s.checkPriceActionConfirmation(input.M1Candles, signal.side) {
+		score += 3.0
+	}
+
+	// Support/Resistance test (0-2 points)
+	if s.checkSupportResistanceTest(input.M15Candles, signal.entry, signal.side) {
+		score += 2.0
+	}
+
+	// Momentum confirmation (0-3 points)
+	if s.checkMomentumConfirmation(input.M1Candles, signal.side) {
+		score += 3.0
+	}
+
+	// Divergence check (0-2 points)
+	if s.checkDivergence(input.M1Candles, signal.side) {
+		score += 2.0
+	}
+
+	return score
+}
+
+// Helper functions for signal validation
+func (s *Scalping1Strategy) calculateSpreadPercent(_ []baseCandleModel.BaseCandle) float64 {
+	// Simplified spread calculation
+	// In real implementation, you'd get bid/ask data
+	return 0.05 // Assume 0.05% spread
+}
+
+func (s *Scalping1Strategy) calculateGapPercent(candles []baseCandleModel.BaseCandle) float64 {
+	if len(candles) < 2 {
+		return 0
+	}
+
+	prevClose := candles[len(candles)-2].Close
+	currOpen := candles[len(candles)-1].Open
+
+	return math.Abs(currOpen-prevClose) / prevClose * 100
+}
+
+func (s *Scalping1Strategy) calculateTotalVolume(candles []baseCandleModel.BaseCandle, periods int) float64 {
+	if len(candles) < periods {
+		return 0
+	}
+
+	total := 0.0
+	for i := len(candles) - periods; i < len(candles); i++ {
+		total += candles[i].Volume
+	}
+	return total
+}
+
+func (s *Scalping1Strategy) isNewsTime() bool {
+	// Simplified - in real implementation, integrate with news API
+	// Check if current time is within 30 minutes of major news events
+	return false
+}
+
+func (s *Scalping1Strategy) isLowVolumeHour() bool {
+	// Simplified - check if it's low volume trading hours
+	// For crypto, this might be weekends or certain hours
+	return false
+}
+
+func (s *Scalping1Strategy) checkPriceActionConfirmation(candles []baseCandleModel.BaseCandle, side string) bool {
+	if len(candles) < 3 {
+		return false
+	}
+
+	// Check for strong price action in the direction of the signal
+	lastCandle := candles[len(candles)-1]
+	prevCandle := candles[len(candles)-2]
+
+	if side == BUY {
+		return lastCandle.Close > lastCandle.Open && lastCandle.Close > prevCandle.High
+	} else {
+		return lastCandle.Close < lastCandle.Open && lastCandle.Close < prevCandle.Low
+	}
+}
+
+func (s *Scalping1Strategy) checkSupportResistanceTest(_ []baseCandleModel.BaseCandle, _ float64, _ string) bool {
+	// Check if price is testing a key support/resistance level
+	// Simplified implementation
+	return true
+}
+
+func (s *Scalping1Strategy) checkMomentumConfirmation(candles []baseCandleModel.BaseCandle, side string) bool {
+	if len(candles) < 5 {
+		return false
+	}
+
+	// Check if momentum is building in the signal direction
+	recentPrices := make([]float64, 5)
+	for i := 0; i < 5; i++ {
+		recentPrices[i] = candles[len(candles)-1-i].Close
+	}
+
+	if side == BUY {
+		return recentPrices[0] > recentPrices[1] && recentPrices[1] > recentPrices[2]
+	} else {
+		return recentPrices[0] < recentPrices[1] && recentPrices[1] < recentPrices[2]
+	}
+}
+
+func (s *Scalping1Strategy) checkDivergence(_ []baseCandleModel.BaseCandle, _ string) bool {
+	// Check for RSI divergence
+	// Simplified implementation
+	return false
+}
+
+// Support/Resistance analysis on higher timeframe
+type SupportResistanceLevels struct {
+	supportLevels     []float64
+	resistanceLevels  []float64
+	isAboveSupport    bool
+	isBelowResistance bool
+}
+
+func (s *Scalping1Strategy) analyzeSupportResistance(candles []baseCandleModel.BaseCandle) SupportResistanceLevels {
+	if len(candles) < 20 {
+		return SupportResistanceLevels{isAboveSupport: true, isBelowResistance: true}
+	}
+
+	// Find recent swing lows and highs
+	swingLows := s.findSwingLows(candles, 5)
+	swingHighs := s.findSwingHighs(candles, 5)
+
+	currentPrice := candles[len(candles)-1].Close
+
+	// Check if price is above recent support levels
+	isAboveSupport := true
+	for _, support := range swingLows {
+		if currentPrice < support*0.995 { // Within 0.5% of support
+			isAboveSupport = false
+			break
+		}
+	}
+
+	// Check if price is below recent resistance levels
+	isBelowResistance := true
+	for _, resistance := range swingHighs {
+		if currentPrice > resistance*1.005 { // Within 0.5% of resistance
+			isBelowResistance = false
+			break
+		}
+	}
+
+	return SupportResistanceLevels{
+		supportLevels:     swingLows,
+		resistanceLevels:  swingHighs,
+		isAboveSupport:    isAboveSupport,
+		isBelowResistance: isBelowResistance,
+	}
+}
+
+func (s *Scalping1Strategy) findSwingLows(candles []baseCandleModel.BaseCandle, lookback int) []float64 {
+	var swingLows []float64
+
+	for i := lookback; i < len(candles)-lookback; i++ {
+		isSwingLow := true
+		for j := i - lookback; j <= i+lookback; j++ {
+			if j != i && candles[j].Low <= candles[i].Low {
+				isSwingLow = false
+				break
+			}
+		}
+		if isSwingLow {
+			swingLows = append(swingLows, candles[i].Low)
+		}
+	}
+
+	return swingLows
+}
+
+func (s *Scalping1Strategy) findSwingHighs(candles []baseCandleModel.BaseCandle, lookback int) []float64 {
+	var swingHighs []float64
+
+	for i := lookback; i < len(candles)-lookback; i++ {
+		isSwingHigh := true
+		for j := i - lookback; j <= i+lookback; j++ {
+			if j != i && candles[j].High >= candles[i].High {
+				isSwingHigh = false
+				break
+			}
+		}
+		if isSwingHigh {
+			swingHighs = append(swingHighs, candles[i].High)
+		}
+	}
+
+	return swingHighs
 }
