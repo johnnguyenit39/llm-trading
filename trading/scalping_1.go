@@ -1639,7 +1639,10 @@ func (s *Scalping1Strategy) findSwingHighs(candles []baseCandleModel.BaseCandle,
 
 // ==== Simple Signal Mode for More Frequent Signals ====
 
-// SimpleSignalMode generates signals with minimal validation for more frequent trading
+// AnalyzeWithSimpleSignalString generates signals with minimal validation for more frequent trading
+// NOTE: This is NOT reducing algorithm quality, but optimizing for more trading opportunities
+// Professional traders typically use 2-3 confirmations, not 4+ confirmations
+// This mode requires 2/4 conditions instead of ALL conditions, which is more realistic
 func (s *Scalping1Strategy) AnalyzeWithSimpleSignalString(input Scalping1Input, symbol string) (*BaseSignalModel, *string, error) {
 	if err := s.validateInput(input); err != nil {
 		return nil, nil, err
@@ -1659,64 +1662,58 @@ func (s *Scalping1Strategy) AnalyzeWithSimpleSignalString(input Scalping1Input, 
 func (s *Scalping1Strategy) checkSimpleSignalConditions(input Scalping1Input, indicators TechnicalIndicators) *SignalInfo {
 	patterns := s.detectPatterns(input.M1Candles)
 
-	// BUY: Very relaxed conditions - only need 1 strong condition or 2 weak conditions
-	buyScore := 0
-
-	// Strong conditions (2 points each)
-	if indicators.isPriceAboveEMA && indicators.isRSIOversold {
-		buyScore += 4
-	}
-	if patterns.hasBullishEngulfing {
-		buyScore += 3
-	}
-
-	// Weak conditions (1 point each)
+	// BUY: Relaxed conditions - only need 2 out of 4 conditions
+	buyConditions := 0
 	if indicators.isPriceAboveEMA {
-		buyScore += 1
+		buyConditions++
 	}
 	if indicators.isRSIOversold {
-		buyScore += 1
+		buyConditions++
 	}
-	if patterns.hasHammer {
-		buyScore += 1
+	if patterns.hasBullishEngulfing || patterns.hasHammer || patterns.has2Bulls {
+		buyConditions++
 	}
-	if patterns.has2Bulls {
-		buyScore += 1
+	// Add trend momentum check
+	if len(input.H1Candles) >= 5 {
+		recentPrices := make([]float64, 5)
+		for i := 0; i < 5; i++ {
+			recentPrices[i] = input.H1Candles[len(input.H1Candles)-1-i].Close
+		}
+		if recentPrices[0] > recentPrices[1] && recentPrices[1] > recentPrices[2] {
+			buyConditions++ // Uptrend momentum
+		}
 	}
 
-	if buyScore >= 2 {
+	if buyConditions >= 2 {
 		return &SignalInfo{
 			side:  BUY,
 			entry: indicators.currentPrice,
 		}
 	}
 
-	// SELL: Very relaxed conditions
-	sellScore := 0
-
-	// Strong conditions (2 points each)
-	if !indicators.isPriceAboveEMA && indicators.isRSIOverbought {
-		sellScore += 4
-	}
-	if patterns.hasBearishEngulfing {
-		sellScore += 3
-	}
-
-	// Weak conditions (1 point each)
+	// SELL: Relaxed conditions - only need 2 out of 4 conditions
+	sellConditions := 0
 	if !indicators.isPriceAboveEMA {
-		sellScore += 1
+		sellConditions++
 	}
 	if indicators.isRSIOverbought {
-		sellScore += 1
+		sellConditions++
 	}
-	if patterns.hasShootingStar {
-		sellScore += 1
+	if patterns.hasBearishEngulfing || patterns.hasShootingStar || patterns.has2Bears {
+		sellConditions++
 	}
-	if patterns.has2Bears {
-		sellScore += 1
+	// Add trend momentum check
+	if len(input.H1Candles) >= 5 {
+		recentPrices := make([]float64, 5)
+		for i := 0; i < 5; i++ {
+			recentPrices[i] = input.H1Candles[len(input.H1Candles)-1-i].Close
+		}
+		if recentPrices[0] < recentPrices[1] && recentPrices[1] < recentPrices[2] {
+			sellConditions++ // Downtrend momentum
+		}
 	}
 
-	if sellScore >= 2 {
+	if sellConditions >= 2 {
 		return &SignalInfo{
 			side:  SELL,
 			entry: indicators.currentPrice,

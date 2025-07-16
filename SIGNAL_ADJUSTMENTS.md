@@ -44,8 +44,25 @@
 - **Risk/Reward Ratio**: 1:1.5 → 1:1.2 (giảm 20%)
 - **Max Leverage**: 10x → 20x (tăng 100%)
 
+### 6. Rate Limiting Fixes (Sửa lỗi 418)
+- **Sequential Processing**: Thay đổi từ concurrent sang sequential
+- **API Call Delays**: Thêm delays giữa các API calls
+  - 500ms giữa các symbols
+  - 200ms trước mỗi API call
+  - 100ms giữa các API calls
+- **Exponential Backoff**: Tăng retry delays (5s, 10s)
+- **Cycle Interval**: Tăng từ 30s → 3 phút
+- **Cooldown Period**: Giảm từ 15 phút → 5 phút
+
+### 7. Simple Signal Mode (Chế độ tín hiệu đơn giản)
+- **Scalping1**: Chỉ cần 2/4 điều kiện
+- **Scalping2**: Chỉ cần 2/4 điều kiện  
+- **Scalping3**: Chỉ cần 2/4 điều kiện
+- **Bỏ qua quality validation**: Tăng tần suất tín hiệu
+
 ## Kết quả mong đợi
-- **Tăng tần suất tín hiệu**: 3-5x so với trước
+- **Tăng tần suất tín hiệu**: 5-10x so với trước
+- **Tránh rate limiting**: Không còn 418 errors
 - **Duy trì chất lượng**: Vẫn đảm bảo R:R > 1:1.2
 - **Giảm false negatives**: Ít bỏ lỡ cơ hội tốt
 - **Tăng cơ hội giao dịch**: Nhiều setup hơn để lựa chọn
@@ -56,6 +73,7 @@ Theo dõi:
 - Tỷ lệ win/loss
 - Chất lượng tín hiệu (score)
 - Drawdown và risk metrics
+- Rate limiting errors (418)
 
 ## Rollback Plan
 Nếu cần, có thể khôi phục về các giá trị cũ trong file constants. 
