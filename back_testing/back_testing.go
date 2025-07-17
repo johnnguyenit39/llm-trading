@@ -24,7 +24,7 @@ func NewBackTesting(db *gorm.DB) *BackTesting {
 }
 
 // ExecuteFuturesOrder executes a futures order and records it in the database
-func (b *BackTesting) ExecuteFuturesOrder(symbol string, amount, price float64, decision string, strategy string, takeProfit, stopLoss, leverage float64, keys *okxmodel.OkxApiKeysModel) error {
+func (b *BackTesting) ExecuteFuturesOrder(symbol string, amount, price float64, decision string, strategy string, takeProfit, stopLoss float64, keys *okxmodel.OkxApiKeysModel) error {
 	// Initialize OKX service
 	okxService := okx.NewOKXService(keys) // Using nil to use environment variables
 
@@ -63,7 +63,7 @@ func (b *BackTesting) ExecuteFuturesOrder(symbol string, amount, price float64, 
 		price,
 		side,
 		types.Market, // Using market order type
-		leverage,     // Default leverage
+		10,           // Default leverage
 		posSide,
 		takeProfit, takeProfit, // Use the same price for trigger and order
 		stopLoss, stopLoss, // Use the same price for trigger and order

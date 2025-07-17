@@ -2,376 +2,63 @@ package cronjobs
 
 import (
 	"context"
-	backtesting "j_ai_trade/back_testing"
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
-	okxmodel "j_ai_trade/brokers/okx/model"
 	"j_ai_trade/telegram"
 	"j_ai_trade/trading"
 	utilsConverter "j_ai_trade/utils/converter"
-	"math"
 	"os"
-	"sync"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
-)
-
-// Signal deduplication map to prevent spam
-var (
-	signalHistory = make(map[string]time.Time) // key: "symbol_strategy_side"
-	signalMutex   sync.RWMutex
 )
 
 // InitCronJobs initializes and starts all cron jobs
 func InitCronJobs(db *gorm.DB) {
 	repo := repository.NewBinanceRepository()
 	binanceService := binance.NewBinanceService(repo)
-	go ScalpingStrategy(binanceService, db)
-
-	// Start cleanup routine to prevent memory leaks
-	go cleanupSignalHistory()
+	go Scalping1Strategy(binanceService)
 }
 
-// cleanupSignalHistory removes old entries from signal history to prevent memory leaks
-func cleanupSignalHistory() {
-	ticker := time.NewTicker(1 * time.Hour) // Cleanup every hour
-	defer ticker.Stop()
-
-	for range ticker.C {
-		signalMutex.Lock()
-		now := time.Now()
-		cutoffTime := now.Add(-30 * time.Minute) // Remove entries older than 30 minutes
-
-		for key, timestamp := range signalHistory {
-			if timestamp.Before(cutoffTime) {
-				delete(signalHistory, key)
-			}
-		}
-		signalMutex.Unlock()
-
-		log.Info().Int("entries_cleaned", len(signalHistory)).Msg("Signal history cleanup completed")
-	}
-}
-
-// isDuplicateSignal checks if a similar signal was sent recently
-func isDuplicateSignal(symbol, strategyName, side string) bool {
-	key := symbol + "_" + strategyName + "_" + side
-	signalMutex.RLock()
-	lastSent, exists := signalHistory[key]
-	signalMutex.RUnlock()
-
-	if !exists {
-		return false
-	}
-
-	// REDUCED cooldown period from 15 minutes to 5 minutes for more signals
-	cooldownPeriod := 5 * time.Minute
-	return time.Since(lastSent) < cooldownPeriod
-}
-
-// isSignalQualityAcceptable checks if the signal meets minimum quality standards
-func isSignalQualityAcceptable(signal *trading.BaseSignalModel) bool {
-	// Check if entry price is reasonable (not zero or negative)
-	if signal.Entry <= 0 {
-		return false
-	}
-
-	// Check if stop loss and take profit are reasonable
-	if signal.StopLoss <= 0 || signal.TakeProfit <= 0 {
-		return false
-	}
-
-	// RELAXED risk/reward ratio from 1:1.5 to 1:1.2 for more signals
-	risk := math.Abs(signal.Entry - signal.StopLoss)
-	reward := math.Abs(signal.TakeProfit - signal.Entry)
-
-	if risk == 0 || reward/risk < 1.2 {
-		return false
-	}
-
-	// RELAXED leverage limit from 10 to 20 for more signals
-	if signal.Leverage > 20 {
-		return false
-	}
-
-	return true
-}
-
-// recordSignalSent records that a signal was sent
-func recordSignalSent(symbol, strategyName, side string) {
-	key := symbol + "_" + strategyName + "_" + side
-	signalMutex.Lock()
-	signalHistory[key] = time.Now()
-	signalMutex.Unlock()
-}
-
-func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
+func Scalping1Strategy(binanceService *binance.BinanceService) {
 	telegramService := telegram.NewTelegramService()
 	symbols := []string{"BTCUSDT", "ADAUSDT", "AVAXUSDT", "SOLUSDT", "SUIUSDT", "DOGEUSDT", "ETHUSDT", "NEARUSDT"}
 
 	for {
 		now := time.Now()
-
-		// Process symbols sequentially to avoid rate limiting
+		// Chạy logic ngay lập tức
 		for _, symbol := range symbols {
-			// Add delay between symbols to respect rate limits
-			time.Sleep(500 * time.Millisecond) // 500ms delay between symbols
+			go func(sym string) {
+				// Fetch data cho từng coin
+				M15Candles, _ := binanceService.Fetch15mCandles(context.Background(), sym, 300)
+				M1Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 100)
 
-			// Declare variables outside retry loop
-			var M15Candles300, M1Candles100, H1Candles20, H4Candles20, M30Candles60, M5Candles20, M5Candles150, D1Candles20 []repository.BinanceCandle
-			var err error
+				// Analyze strategy cho từng coin
+				scalping1Strategy := trading.NewScalping1Strategy()
+				signal, err := scalping1Strategy.AnalyzeWithSignalString(trading.Scalping1Input{
+					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles),
+					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles),
+				}, M15Candles[0].Symbol)
 
-			// Add retry mechanism for robustness
-			maxRetries := 2
-			for retry := 0; retry <= maxRetries; retry++ {
-				if retry > 0 {
-					log.Info().Str("symbol", symbol).Int("retry", retry).Msg("Retrying data fetch")
-					// Exponential backoff to avoid rate limiting
-					time.Sleep(time.Duration(retry*5) * time.Second) // 5s, 10s delays
+				if err != nil {
+					// // Handle error
+					return
 				}
 
-				// Add delay between API calls to respect rate limits
-				time.Sleep(200 * time.Millisecond)
-
-				// Fetch data cho Scalping1 strategy
-				M15Candles300, err = binanceService.Fetch15mCandles(context.Background(), symbol, 300)
-				if err != nil || len(M15Candles300) == 0 {
-					log.Error().Err(err).Msgf("Failed to fetch M15 candles for %s (attempt %d)", symbol, retry+1)
-					if retry == maxRetries {
-						continue // Skip to next symbol
+				// Handle signal
+				if signal != nil {
+					err := telegramService.SendMessageToChannel(
+						os.Getenv("J_AI_TRADE_BOT_V1"),
+						os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
+						*signal) // dereference signal
+					if err != nil {
+						// log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
 					}
-					continue
 				}
-
-				time.Sleep(100 * time.Millisecond) // Small delay between calls
-
-				M1Candles100, err = binanceService.Fetch1mCandles(context.Background(), symbol, 100)
-				if err != nil || len(M1Candles100) == 0 {
-					log.Error().Err(err).Msgf("Failed to fetch M1 candles for %s (attempt %d)", symbol, retry+1)
-					if retry == maxRetries {
-						continue // Skip to next symbol
-					}
-					continue
-				}
-
-				time.Sleep(100 * time.Millisecond)
-
-				H1Candles20, err = binanceService.Fetch1hCandles(context.Background(), symbol, 20)
-				if err != nil || len(H1Candles20) == 0 {
-					log.Error().Err(err).Msgf("Failed to fetch H1 candles for %s (attempt %d)", symbol, retry+1)
-					if retry == maxRetries {
-						continue // Skip to next symbol
-					}
-					continue
-				}
-
-				time.Sleep(100 * time.Millisecond)
-
-				// Fetch data cho Scalping2 strategy
-				H4Candles20, err = binanceService.Fetch4hCandles(context.Background(), symbol, 20)
-				if err != nil || len(H4Candles20) == 0 {
-					log.Error().Err(err).Msgf("Failed to fetch H4 candles for %s (attempt %d)", symbol, retry+1)
-					if retry == maxRetries {
-						continue // Skip to next symbol
-					}
-					continue
-				}
-
-				time.Sleep(100 * time.Millisecond)
-
-				M30Candles60, err = binanceService.Fetch30mCandles(context.Background(), symbol, 60)
-				if err != nil || len(M30Candles60) == 0 {
-					log.Error().Err(err).Msgf("Failed to fetch M30 candles for %s (attempt %d)", symbol, retry+1)
-					if retry == maxRetries {
-						continue // Skip to next symbol
-					}
-					continue
-				}
-
-				time.Sleep(100 * time.Millisecond)
-
-				M5Candles20, err = binanceService.Fetch5mCandles(context.Background(), symbol, 150) // Increased to 150 for Twin Range Filter
-				if err != nil || len(M5Candles20) == 0 {
-					log.Error().Err(err).Msgf("Failed to fetch M5 candles for %s (attempt %d)", symbol, retry+1)
-					if retry == maxRetries {
-						continue // Skip to next symbol
-					}
-					continue
-				}
-
-				time.Sleep(100 * time.Millisecond)
-
-				// Fetch data cho Scalping3 strategy
-				D1Candles20, err = binanceService.Fetch1dCandles(context.Background(), symbol, 20)
-				if err != nil || len(D1Candles20) == 0 {
-					log.Error().Err(err).Msgf("Failed to fetch D1 candles for %s (attempt %d)", symbol, retry+1)
-					if retry == maxRetries {
-						continue // Skip to next symbol
-					}
-					continue
-				}
-
-				// Fetch data cho Scalping3 strategy
-				M5Candles150, err = binanceService.Fetch15mCandles(context.Background(), symbol, 150)
-				if err != nil || len(D1Candles20) == 0 {
-					log.Error().Err(err).Msgf("Failed to fetch D1 candles for %s (attempt %d)", symbol, retry+1)
-					if retry == maxRetries {
-						continue // Skip to next symbol
-					}
-					continue
-				}
-
-				// All data fetched successfully, proceed with analysis
-				break
-			}
-
-			// Analyze Scalping1 strategy with simple mode for more signals
-			scalping1Strategy := trading.NewScalping1Strategy()
-			signal1Model, signal1Str, err := scalping1Strategy.AnalyzeWithSimpleSignalString(trading.Scalping1Input{
-				M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles300),
-				M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles100),
-				H1Candles:  utilsConverter.ConvertBinanceCandlesToBase(H1Candles20),
-			}, symbol)
-
-			if err != nil {
-				log.Error().Err(err).Str("symbol", symbol).Msg("Scalping1 analysis failed")
-			}
-
-			// Handle Scalping1 signal with deduplication and quality check
-			if signal1Str != nil && signal1Model != nil {
-				if !isDuplicateSignal(symbol, "Scalping1", signal1Model.Side) && isSignalQualityAcceptable(signal1Model) {
-					handleSignal(signal1Model, signal1Str, telegramService, db, symbol, "Scalping1")
-					recordSignalSent(symbol, "Scalping1", signal1Model.Side)
-					log.Info().Str("symbol", symbol).Str("strategy", "Scalping1").Str("side", signal1Model.Side).Msg("Signal sent successfully")
-				} else if isDuplicateSignal(symbol, "Scalping1", signal1Model.Side) {
-					log.Info().Str("symbol", symbol).Str("strategy", "Scalping1").Str("side", signal1Model.Side).Msg("Skipping duplicate signal")
-				} else {
-					log.Warn().Str("symbol", symbol).Str("strategy", "Scalping1").Str("side", signal1Model.Side).Msg("Signal quality check failed")
-				}
-			}
-
-			// Analyze Scalping2 strategy with simple mode for more signals
-			scalping2Strategy := trading.NewScalping2Strategy()
-			signal2Model, signal2Str, err := scalping2Strategy.AnalyzeWithSimpleSignalString(trading.Scalping2Input{
-				H4Candles:  utilsConverter.ConvertBinanceCandlesToBase(H4Candles20),
-				M30Candles: utilsConverter.ConvertBinanceCandlesToBase(M30Candles60),
-				M5Candles:  utilsConverter.ConvertBinanceCandlesToBase(M5Candles20),
-			}, symbol)
-
-			if err != nil {
-				log.Error().Err(err).Str("symbol", symbol).Msg("Scalping2 analysis failed")
-			}
-
-			// Handle Scalping2 signal with deduplication and quality check
-			if signal2Str != nil && signal2Model != nil {
-				if !isDuplicateSignal(symbol, "Scalping2", signal2Model.Side) && isSignalQualityAcceptable(signal2Model) {
-					handleSignal(signal2Model, signal2Str, telegramService, db, symbol, "Scalping2")
-					recordSignalSent(symbol, "Scalping2", signal2Model.Side)
-					log.Info().Str("symbol", symbol).Str("strategy", "Scalping2").Str("side", signal2Model.Side).Msg("Signal sent successfully")
-				} else if isDuplicateSignal(symbol, "Scalping2", signal2Model.Side) {
-					log.Info().Str("symbol", symbol).Str("strategy", "Scalping2").Str("side", signal2Model.Side).Msg("Skipping duplicate signal")
-				} else {
-					log.Warn().Str("symbol", symbol).Str("strategy", "Scalping2").Str("side", signal2Model.Side).Msg("Signal quality check failed")
-				}
-			}
-
-			// Analyze Scalping3 strategy with simple mode for more signals
-			scalping3Strategy := trading.NewScalping3Strategy()
-			signal3Model, signal3Str, err := scalping3Strategy.AnalyzeWithSimpleSignalString(trading.Scalping3Input{
-				D1Candles: utilsConverter.ConvertBinanceCandlesToBase(D1Candles20),
-				H1Candles: utilsConverter.ConvertBinanceCandlesToBase(H1Candles20),
-				M5Candles: utilsConverter.ConvertBinanceCandlesToBase(M5Candles20),
-			}, symbol)
-
-			if err != nil {
-				log.Error().Err(err).Str("symbol", symbol).Msg("Scalping3 analysis failed")
-			}
-
-			// Handle Scalping3 signal with deduplication and quality check
-			if signal3Str != nil && signal3Model != nil {
-				if !isDuplicateSignal(symbol, "Scalping3", signal3Model.Side) && isSignalQualityAcceptable(signal3Model) {
-					handleSignal(signal3Model, signal3Str, telegramService, db, symbol, "Scalping3")
-					recordSignalSent(symbol, "Scalping3", signal3Model.Side)
-					log.Info().Str("symbol", symbol).Str("strategy", "Scalping3").Str("side", signal3Model.Side).Msg("Signal sent successfully")
-				} else if isDuplicateSignal(symbol, "Scalping3", signal3Model.Side) {
-					log.Info().Str("symbol", symbol).Str("strategy", "Scalping3").Str("side", signal3Model.Side).Msg("Skipping duplicate signal")
-				} else {
-					log.Warn().Str("symbol", symbol).Str("strategy", "Scalping3").Str("side", signal3Model.Side).Msg("Signal quality check failed")
-				}
-			}
-
-			// Analyze Scalping4 strategy (Twin Range Filter)
-			scalping4Strategy := trading.NewScalping4Strategy()
-			signal4Model, signal4Str, err := scalping4Strategy.AnalyzeWithSignalString(trading.Scalping4Input{
-				Candles: utilsConverter.ConvertBinanceCandlesToBase(M5Candles150), // Using 150 M5 candles for Twin Range Filter
-			}, symbol)
-
-			if err != nil {
-				log.Error().Err(err).Str("symbol", symbol).Msg("Scalping4 analysis failed")
-			}
-
-			// Handle Scalping4 signal with deduplication and quality check
-			if signal4Str != nil && signal4Model != nil {
-				if !isDuplicateSignal(symbol, "Scalping4", signal4Model.Side) && isSignalQualityAcceptable(signal4Model) {
-					handleSignal(signal4Model, signal4Str, telegramService, db, symbol, "Scalping4")
-					recordSignalSent(symbol, "Scalping4", signal4Model.Side)
-					log.Info().Str("symbol", symbol).Str("strategy", "Scalping4").Str("side", signal4Model.Side).Msg("Signal sent successfully")
-				} else if isDuplicateSignal(symbol, "Scalping4", signal4Model.Side) {
-					log.Info().Str("symbol", symbol).Str("strategy", "Scalping4").Str("side", signal4Model.Side).Msg("Skipping duplicate signal")
-				} else {
-					log.Warn().Str("symbol", symbol).Str("strategy", "Scalping4").Str("side", signal4Model.Side).Msg("Signal quality check failed")
-				}
-			}
+			}(symbol)
 		}
-
-		// Tính thời gian còn lại đến đầu phút tiếp theo - INCREASED to 3 minutes to avoid rate limiting
-		next := now.Truncate(time.Minute).Add(3 * time.Minute)
+		// Tính thời gian còn lại đến đầu phút tiếp theo
+		next := now.Truncate(time.Minute).Add(time.Minute)
 		time.Sleep(time.Until(next))
-	}
-}
-
-func handleSignal(signal *trading.BaseSignalModel, signalStr *string, telegramService *telegram.TelegramService, db *gorm.DB, symbol string, strategyName string) {
-	// Send to Telegram
-	err := telegramService.SendMessageToChannel(
-		os.Getenv("J_AI_TRADE_BOT_V1"),
-		os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
-		*signalStr)
-	if err != nil {
-		log.Error().Err(err).Msgf("Failed to send %s signal to Telegram", strategyName)
-	}
-
-	// Execute order
-	backTesting := backtesting.NewBackTesting(db)
-
-	apiKeys := []*okxmodel.OkxApiKeysModel{
-		{
-			ApiKey:     os.Getenv("OKX_API_KEY"),
-			ApiSecret:  os.Getenv("OKX_API_SECRET_KEY"),
-			Passphrase: os.Getenv("OKX_API_PASSPHRASE"),
-		},
-		{
-			ApiKey:     "aae2ecad-9769-4054-a1d0-85ed40ab78b1",
-			ApiSecret:  "28E251ADE9EC925866E745FA9C14E08B",
-			Passphrase: "Vertivcookta5@",
-		},
-	}
-
-	for _, apiKey := range apiKeys {
-		err = backTesting.ExecuteFuturesOrder(
-			symbol,
-			signal.AmountUSD,
-			signal.Entry,
-			signal.Side,
-			strategyName,
-			signal.TakeProfit,
-			signal.StopLoss,
-			signal.Leverage,
-			apiKey,
-		)
-		if err != nil {
-			log.Error().Err(err).Msgf("Failed to execute %s futures order", strategyName)
-		}
 	}
 }
