@@ -357,8 +357,6 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 	has2Bulls := s.detect2Bulls(input.M1Candles)
 	has2Bears := s.detect2Bears(input.M1Candles)
 
-	rrList := []float64{1, 2}
-
 	// TradingView logic + EMA trend filter
 	// BUY: Price above EMA 200 + RSI oversold + bullish patterns
 	if isPriceAboveEMA && isRSIOversold && (hasBullishEngulfing || hasHammer || has2Bulls) {
@@ -368,7 +366,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, rrList, input.M1Candles, signalScore)
+		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles)
 		return &signalStr, nil
 	}
 
@@ -380,7 +378,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, rrList, input.M1Candles, signalScore)
+		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles)
 		return &signalStr, nil
 	}
 
@@ -504,96 +502,166 @@ func calcATRPercent(candles []baseCandleModel.BaseCandle, period int) float64 {
 	return atr / close
 }
 
-// Hàm gợi ý đòn bẩy tự động dựa trên volatility thực tế và target lãi ký quỹ
-func suggestLeverageByVolatility(atrPercent float64, targetProfitPercent float64) float64 {
-	if atrPercent == 0 {
-		return 1 // fallback, không thể chia cho 0
-	}
-	return targetProfitPercent / atrPercent
+type VolatilityProfile struct {
+	ATRPercent     float64 // ATR% hiện tại
+	ATRPercentMA   float64 // ATR% trung bình M15
+	VolatilityRank string  // LOW, MEDIUM, HIGH, EXTREME
+	SuggestedRR    float64 // Risk:Reward ratio đề xuất
+	MaxLeverage    float64 // Đòn bẩy tối đa an toàn
+	ProfitTarget   float64 // Target profit % đề xuất
 }
 
-func genMultiRRSignalStringPercent(symbol, side string, entry float64, rrList []float64, m1Candles []baseCandleModel.BaseCandle) string {
-	var icon string
-	if side == "BUY" {
-		icon = "🟢" // Green circle for BUY
-	} else {
-		icon = "🔴" // Red circle for SELL
-	}
-
-	atrPercent := calcATRPercent(m1Candles, 20) // ATR% 20 nến M1
-	targetProfitPercent := 1.0                  // 100% ký quỹ
-	leverage := suggestLeverageByVolatility(atrPercent, targetProfitPercent)
-
-	// Giả sử ký quỹ mặc định là 10 USD (có thể truyền từ ngoài vào nếu cần)
-	margin := 10.0
-
-	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.4f\nLeverage: %.1fx\nATR%%(20): %.4f\n\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, atrPercent*100)
-
-	for _, rr := range rrList {
-		var sl, tp float64
-		rrStr := fmt.Sprintf("1:%.0f", rr)
-		// Reward = margin * RR
-		reward := margin * rr
-
-		if side == "BUY" {
-			// SL = liquidation price, TP = đạt đúng reward USD
-			sl = entry * (1 - 1/leverage)
-			tp = entry + (reward*entry)/(margin*leverage)
-		} else {
-			// SL = liquidation price, TP = đạt đúng reward USD
-			sl = entry * (1 + 1/leverage)
-			tp = entry - (reward*entry)/(margin*leverage)
+// Tính volatility profile cho scalping M1, so sánh với M15
+func calculateScalpingVolatilityProfile(m1Candles, m15Candles []baseCandleModel.BaseCandle) VolatilityProfile {
+	if len(m1Candles) < 20 || len(m15Candles) < 20 {
+		return VolatilityProfile{
+			ATRPercent:     0.005,
+			ATRPercentMA:   0.005,
+			VolatilityRank: "MEDIUM",
+			SuggestedRR:    1.5,
+			MaxLeverage:    20.0,
+			ProfitTarget:   0.15,
 		}
-
-		result += fmt.Sprintf("RR: %s\nStop Loss: %.4f\nTake Profit: %.4f\n\n", rrStr, sl, tp)
 	}
-	return strings.TrimSpace(result)
+	currentATRPercent := calcATRPercent(m1Candles, 20)
+	m15ATRPercent := calcATRPercent(m15Candles, 20)
+	volatilityRatio := 1.0
+	if m15ATRPercent > 0 {
+		volatilityRatio = currentATRPercent / m15ATRPercent
+	}
+	adjustedATRPercent := currentATRPercent
+	if volatilityRatio < 0.3 {
+		adjustedATRPercent = currentATRPercent * 3.0
+	} else if volatilityRatio > 3.0 {
+		adjustedATRPercent = currentATRPercent * 0.7
+	}
+	var volatilityRank string
+	var suggestedRR, maxLeverage, profitTarget float64
+	if adjustedATRPercent < 0.002 {
+		volatilityRank = "LOW"
+		suggestedRR = 1.2
+		maxLeverage = 30.0
+		profitTarget = 0.12
+	} else if adjustedATRPercent < 0.005 {
+		volatilityRank = "MEDIUM"
+		suggestedRR = 1.5
+		maxLeverage = 25.0
+		profitTarget = 0.15
+	} else if adjustedATRPercent < 0.01 {
+		volatilityRank = "HIGH"
+		suggestedRR = 2.0
+		maxLeverage = 15.0
+		profitTarget = 0.20
+	} else {
+		volatilityRank = "EXTREME"
+		suggestedRR = 2.5
+		maxLeverage = 10.0
+		profitTarget = 0.25
+	}
+	return VolatilityProfile{
+		ATRPercent:     adjustedATRPercent,
+		ATRPercentMA:   m15ATRPercent,
+		VolatilityRank: volatilityRank,
+		SuggestedRR:    suggestedRR,
+		MaxLeverage:    maxLeverage,
+		ProfitTarget:   profitTarget,
+	}
 }
 
-// genMultiRRSignalStringPercentWithScore includes signal scoring information
-func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, rrList []float64, m1Candles []baseCandleModel.BaseCandle, signalScore SignalScore) string {
-	var icon string
-	if side == "BUY" {
-		icon = "🟢" // Green circle for BUY
-	} else {
-		icon = "🔴" // Red circle for SELL
+func calculateScalpingLeverage(profile VolatilityProfile) float64 {
+	leverage := profile.ProfitTarget / profile.ATRPercent
+	if leverage > profile.MaxLeverage {
+		leverage = profile.MaxLeverage
+	} else if leverage < 1.0 {
+		leverage = 1.0
+	}
+	return leverage
+}
+
+// roundLeverageToExchangeValues rounds leverage to common exchange values
+func roundLeverageToExchangeValues(leverage float64) float64 {
+	// Common leverage values on exchanges: 1, 2, 3, 5, 10, 20, 25, 50, 100, 125
+	commonValues := []float64{1, 2, 3, 5, 10, 20, 25, 50, 100, 125}
+
+	// Find the closest common value
+	closest := commonValues[0]
+	minDiff := math.Abs(leverage - closest)
+
+	for _, value := range commonValues {
+		diff := math.Abs(leverage - value)
+		if diff < minDiff {
+			minDiff = diff
+			closest = value
+		}
 	}
 
-	atrPercent := calcATRPercent(m1Candles, 20) // ATR% 20 nến M1
-	targetProfitPercent := 1.0                  // 100% ký quỹ
-	leverage := suggestLeverageByVolatility(atrPercent, targetProfitPercent)
+	return closest
+}
 
-	// Giả sử ký quỹ mặc định là 10 USD (có thể truyền từ ngoài vào nếu cần)
-	margin := 10.0
+// calculateRealisticStopLoss calculates a more realistic stop loss based on volatility
+func calculateRealisticStopLoss(entry float64, side string, volatilityPercent float64) float64 {
+	// Base stop loss distance based on volatility
+	// For low volatility (< 1%): use 1.5x volatility
+	// For medium volatility (1-3%): use 1.2x volatility
+	// For high volatility (> 3%): use 1.0x volatility
+	var stopDistance float64
 
-	// Add signal score information
-	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.4f\nLeverage: %.1fx\nATR%%(20): %.4f\n\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, atrPercent*100)
+	if volatilityPercent < 0.01 {
+		stopDistance = volatilityPercent * 1.5
+	} else if volatilityPercent < 0.03 {
+		stopDistance = volatilityPercent * 1.2
+	} else {
+		stopDistance = volatilityPercent * 1.0
+	}
 
-	// Add scoring information
-	result += fmt.Sprintf("📊 SIGNAL SCORE: %.1f/%.0f (%.1f%%)\n", signalScore.TotalScore, signalScore.MaxScore, signalScore.Percentage)
-	result += fmt.Sprintf("💡 Recommendation: %s\n\n", signalScore.Recommendation)
+	// Minimum stop distance of 0.3% to avoid getting stopped out too easily
+	if stopDistance < 0.003 {
+		stopDistance = 0.003
+	}
 
-	// Add score breakdown
-	result += "📈 Score Breakdown:\n"
+	if side == "BUY" {
+		return entry * (1 - stopDistance)
+	} else {
+		return entry * (1 + stopDistance)
+	}
+}
+
+// Cập nhật hàm này để dùng volatility profile
+func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, m1Candles []baseCandleModel.BaseCandle, signalScore SignalScore, m15Candles []baseCandleModel.BaseCandle) string {
+	var icon string
+	if side == "BUY" {
+		icon = "🟢"
+	} else {
+		icon = "🔴"
+	}
+	volProfile := calculateScalpingVolatilityProfile(m1Candles, m15Candles)
+	rawLeverage := calculateScalpingLeverage(volProfile)
+	leverage := roundLeverageToExchangeValues(rawLeverage)
+	suggestedRR := volProfile.SuggestedRR
+	dynamicRRList := []float64{suggestedRR, suggestedRR * 1.5}
+	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\nATR%%(adj): %.4f\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, volProfile.ATRPercent*100)
+	result += fmt.Sprintf("\n📊 SIGNAL SCORE: %.1f/%.0f (%.1f%%)\n", signalScore.TotalScore, signalScore.MaxScore, signalScore.Percentage)
+	result += fmt.Sprintf("💡 Recommendation: %s\n", signalScore.Recommendation)
+	result += "\n📈 Score Breakdown:\n"
 	for category, score := range signalScore.Breakdown {
 		result += fmt.Sprintf("  • %s: %.1f/25\n", category, score)
 	}
-	result += "\n"
-
-	for _, rr := range rrList {
+	result += fmt.Sprintf("\n⚡ Volatility: %s (%.4f%%)\n", volProfile.VolatilityRank, volProfile.ATRPercent*100)
+	result += fmt.Sprintf("🎯 Suggested RR: 1:%.1f\n", suggestedRR)
+	result += fmt.Sprintf("🏆 Profit Target: %.1f%%\n\n", volProfile.ProfitTarget*100)
+	for _, rr := range dynamicRRList {
 		var sl, tp float64
-		rrStr := fmt.Sprintf("1:%.0f", rr)
-		// Reward = margin * RR
-		reward := margin * rr
+		rrStr := fmt.Sprintf("1:%.1f", rr)
 
+		// Use realistic stop loss calculation
+		sl = calculateRealisticStopLoss(entry, side, volProfile.ATRPercent)
+
+		// Calculate take profit based on stop loss distance and RR ratio
+		stopDistance := math.Abs(entry-sl) / entry
 		if side == "BUY" {
-			// SL = liquidation price, TP = đạt đúng reward USD
-			sl = entry * (1 - 1/leverage)
-			tp = entry + (reward*entry)/(margin*leverage)
+			tp = entry + (stopDistance * rr * entry)
 		} else {
-			// SL = liquidation price, TP = đạt đúng reward USD
-			sl = entry * (1 + 1/leverage)
-			tp = entry - (reward*entry)/(margin*leverage)
+			tp = entry - (stopDistance * rr * entry)
 		}
 
 		result += fmt.Sprintf("RR: %s\nStop Loss: %.4f\nTake Profit: %.4f\n\n", rrStr, sl, tp)
