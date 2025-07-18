@@ -14,6 +14,7 @@ import (
 
 type Scalping1Input struct {
 	M15Candles []baseCandleModel.BaseCandle // M15 candles for EMA 200 trend filter
+	M5Candles  []baseCandleModel.BaseCandle // M5 candles for ATR and volatility assessment
 	M1Candles  []baseCandleModel.BaseCandle // M1 candles for RSI and patterns (matching TradingView)
 }
 
