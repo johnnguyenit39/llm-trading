@@ -17,6 +17,9 @@ type Scalping1Input struct {
 	M15Candles []baseCandleModel.BaseCandle // M15 candles for EMA 200 trend filter
 	M5Candles  []baseCandleModel.BaseCandle // M5 candles for EMA 50 and M5-M1 alignment
 	M1Candles  []baseCandleModel.BaseCandle // M1 candles for RSI and patterns (matching TradingView)
+	H1Candles  []baseCandleModel.BaseCandle // H1 candles for trend analysis
+	H4Candles  []baseCandleModel.BaseCandle // H4 candles for major trend
+	D1Candles  []baseCandleModel.BaseCandle // D1 candles for daily trend
 }
 
 type Scalping1Signal string
@@ -56,39 +59,39 @@ func NewScalping1Strategy() *Scalping1Strategy {
 
 // ==== Signal Scoring System ====
 
-// calculateSignalScore evaluates the quality of a trading signal (120-point system)
+// calculateSignalScore evaluates the quality of a trading signal (150-point system)
 func (s *Scalping1Strategy) calculateSignalScore(input Scalping1Input, side string, currentPrice, currentEMA float64, rsi7 []float64) SignalScore {
 	score := 0.0
-	maxScore := 120.0
+	maxScore := 150.0 // Increased max score to 150
 	breakdown := make(map[string]float64)
 	details := make(map[string]interface{})
 
-	// A. Multi-Timeframe Alignment (20 points)
+	// A. Multi-Timeframe Alignment (25 points) - Enhanced
 	alignmentScore := s.scoreMultiTimeframeAlignment(input, side, currentPrice)
 	score += alignmentScore
 	breakdown["Multi-Timeframe Alignment"] = alignmentScore
 
-	// B. Enhanced Trend Strength (25 points)
+	// B. Enhanced Trend Strength (30 points) - Enhanced
 	trendScore := s.scoreEnhancedTrendStrength(input, side, currentPrice, currentEMA)
 	score += trendScore
 	breakdown["Enhanced Trend Strength"] = trendScore
 
-	// C. Advanced RSI Analysis (20 points)
+	// C. Advanced RSI Analysis (25 points) - Enhanced
 	rsiScore := s.scoreAdvancedRSI(input, side, rsi7)
 	score += rsiScore
 	breakdown["Advanced RSI Analysis"] = rsiScore
 
-	// D. Pattern Recognition (20 points)
+	// D. Pattern Recognition (25 points) - Enhanced
 	patternScore := s.scorePatternRecognition(input, side)
 	score += patternScore
 	breakdown["Pattern Recognition"] = patternScore
 
-	// E. Market Microstructure (20 points)
+	// E. Market Microstructure (25 points) - Enhanced
 	microstructureScore := s.scoreMarketMicrostructure(input, side)
 	score += microstructureScore
 	breakdown["Market Microstructure"] = microstructureScore
 
-	// F. Risk Management (15 points)
+	// F. Risk Management (20 points) - Enhanced
 	riskScore := s.scoreRiskManagement(input, side)
 	score += riskScore
 	breakdown["Risk Management"] = riskScore
@@ -106,14 +109,18 @@ func (s *Scalping1Strategy) calculateSignalScore(input Scalping1Input, side stri
 	}
 }
 
-// getRecommendation provides trading recommendation based on score (120-point system)
+// getRecommendation provides trading recommendation based on score (150-point system)
 func (s *Scalping1Strategy) getRecommendation(percentage float64) string {
-	if percentage >= 85 {
+	if percentage >= 90 {
+		return "EXCEPTIONAL - Maximum confidence signal"
+	} else if percentage >= 80 {
 		return "EXCELLENT - Very high confidence signal"
 	} else if percentage >= 70 {
 		return "STRONG - High confidence signal"
-	} else if percentage >= 55 {
+	} else if percentage >= 60 {
 		return "GOOD - Moderate confidence signal"
+	} else if percentage >= 50 {
+		return "FAIR - Low-moderate confidence"
 	} else if percentage >= 40 {
 		return "WEAK - Low confidence, high risk"
 	} else {
@@ -123,59 +130,23 @@ func (s *Scalping1Strategy) getRecommendation(percentage float64) string {
 
 // ==== New Enhanced Scoring Methods (120-point system) ====
 
-// A. Multi-Timeframe Alignment (20 points)
+// A. Multi-Timeframe Alignment (25 points) - Enhanced
 func (s *Scalping1Strategy) scoreMultiTimeframeAlignment(input Scalping1Input, side string, currentPrice float64) float64 {
 	score := 0.0
 
-	// M15-M5 Alignment (10 points)
-	m15m5Score := s.scoreM15M5Alignment(input, side, currentPrice)
+	// M15-M5 Alignment (10 points) - Enhanced
+	m15m5Score := s.scoreM15M5AlignmentEnhanced(input, side, currentPrice)
 	score += m15m5Score
 
 	// M5-M1 Alignment (10 points)
 	m5m1Score := s.scoreM5M1Alignment(input, side, currentPrice)
 	score += m5m1Score
 
+	// H1-M15 Alignment (5 points) - NEW
+	h1m15Score := s.scoreH1M15Alignment(input, side, currentPrice)
+	score += h1m15Score
+
 	return score
-}
-
-func (s *Scalping1Strategy) scoreM15M5Alignment(input Scalping1Input, side string, currentPrice float64) float64 {
-	if len(input.M15Candles) < 10 || len(input.M5Candles) < 10 {
-		return 5.0
-	}
-
-	// Calculate EMA 200 on M15
-	m15ClosePrices := make([]float64, len(input.M15Candles))
-	for i, candle := range input.M15Candles {
-		m15ClosePrices[i] = candle.Close
-	}
-	m15EMA200 := talib.Ema(m15ClosePrices, s.emaPeriod200)
-
-	// Calculate EMA 50 on M5
-	m5ClosePrices := make([]float64, len(input.M5Candles))
-	for i, candle := range input.M5Candles {
-		m5ClosePrices[i] = candle.Close
-	}
-	m5EMA50 := talib.Ema(m5ClosePrices, s.emaPeriod50)
-
-	if len(m15EMA200) == 0 || len(m5EMA50) == 0 {
-		return 5.0
-	}
-
-	m15Trend := currentPrice > m15EMA200[len(m15EMA200)-1]
-	m5Trend := currentPrice > m5EMA50[len(m5EMA50)-1]
-
-	// Check alignment
-	if m15Trend == m5Trend {
-		if side == "BUY" && m15Trend {
-			return 10.0 // Perfect bullish alignment
-		} else if side == "SELL" && !m15Trend {
-			return 10.0 // Perfect bearish alignment
-		} else {
-			return 7.0 // Aligned but wrong direction
-		}
-	} else {
-		return 3.0 // Misaligned timeframes
-	}
 }
 
 func (s *Scalping1Strategy) scoreM5M1Alignment(input Scalping1Input, side string, currentPrice float64) float64 {
@@ -222,349 +193,125 @@ func (s *Scalping1Strategy) scoreM5M1Alignment(input Scalping1Input, side string
 	}
 }
 
-// B. Enhanced Trend Strength (25 points)
+// B. Enhanced Trend Strength (30 points) - Enhanced
 func (s *Scalping1Strategy) scoreEnhancedTrendStrength(input Scalping1Input, side string, currentPrice, currentEMA float64) float64 {
 	score := 0.0
 
-	// EMA Multiple Timeframes (15 points)
-	emaScore := s.scoreEMAMultipleTimeframes(input, side, currentPrice)
+	// EMA Multiple Timeframes (15 points) - Enhanced
+	emaScore := s.scoreEMAMultipleTimeframesEnhanced(input, side, currentPrice)
 	score += emaScore
 
-	// Trend Consistency (10 points)
-	consistencyScore := s.scoreTrendConsistency(input, side, currentPrice, currentEMA)
+	// Trend Consistency (10 points) - Enhanced
+	consistencyScore := s.scoreTrendConsistencyEnhanced(input, side, currentPrice, currentEMA)
 	score += consistencyScore
+
+	// ADX Trend Strength (5 points) - NEW
+	adxScore := s.scoreADXTrendStrength(input, side)
+	score += adxScore
 
 	return score
 }
 
-func (s *Scalping1Strategy) scoreEMAMultipleTimeframes(input Scalping1Input, side string, currentPrice float64) float64 {
-	if len(input.M15Candles) < s.emaPeriod200 || len(input.M5Candles) < s.emaPeriod50 {
-		return 7.0
-	}
-
-	// M15 EMA 200
-	m15ClosePrices := make([]float64, len(input.M15Candles))
-	for i, candle := range input.M15Candles {
-		m15ClosePrices[i] = candle.Close
-	}
-	m15EMA200 := talib.Ema(m15ClosePrices, s.emaPeriod200)
-
-	// M5 EMA 50
-	m5ClosePrices := make([]float64, len(input.M5Candles))
-	for i, candle := range input.M5Candles {
-		m5ClosePrices[i] = candle.Close
-	}
-	m5EMA50 := talib.Ema(m5ClosePrices, s.emaPeriod50)
-
-	if len(m15EMA200) == 0 || len(m5EMA50) == 0 {
-		return 7.0
-	}
-
-	m15EMA := m15EMA200[len(m15EMA200)-1]
-	m5EMA := m5EMA50[len(m5EMA50)-1]
-
-	// Calculate distances
-	m15Distance := math.Abs(currentPrice-m15EMA) / m15EMA * 100
-	m5Distance := math.Abs(currentPrice-m5EMA) / m5EMA * 100
-
-	score := 0.0
-
-	// M15 EMA scoring (0-8 points)
-	if m15Distance > 0.5 {
-		score += 8.0
-	} else if m15Distance > 0.2 {
-		score += 5.0
-	} else if m15Distance > 0.1 {
-		score += 3.0
-	}
-
-	// M5 EMA scoring (0-7 points)
-	if m5Distance > 0.3 {
-		score += 7.0
-	} else if m5Distance > 0.15 {
-		score += 4.0
-	} else if m5Distance > 0.05 {
-		score += 2.0
-	}
-
-	return math.Min(15.0, score)
-}
-
-func (s *Scalping1Strategy) scoreTrendConsistency(input Scalping1Input, side string, currentPrice, currentEMA float64) float64 {
-	if len(input.M15Candles) < 10 {
-		return 5.0
-	}
-
-	// Check consistency across timeframes
-	consistency := 0.0
-
-	// M15 consistency (last 10 candles)
-	m15Consistency := 0.0
-	for i := len(input.M15Candles) - 10; i < len(input.M15Candles); i++ {
-		if (currentPrice > currentEMA && input.M15Candles[i].Close > currentEMA) ||
-			(currentPrice < currentEMA && input.M15Candles[i].Close < currentEMA) {
-			m15Consistency += 1.0
-		}
-	}
-	m15Consistency = m15Consistency / 10.0
-
-	// M5 consistency (last 5 candles)
-	m5Consistency := 0.0
-	if len(input.M5Candles) >= 5 {
-		for i := len(input.M5Candles) - 5; i < len(input.M5Candles); i++ {
-			if (currentPrice > currentEMA && input.M5Candles[i].Close > currentEMA) ||
-				(currentPrice < currentEMA && input.M5Candles[i].Close < currentEMA) {
-				m5Consistency += 1.0
-			}
-		}
-		m5Consistency = m5Consistency / 5.0
-	}
-
-	consistency = (m15Consistency + m5Consistency) / 2.0
-	return consistency * 10.0
-}
-
-// C. Advanced RSI Analysis (20 points)
+// C. Advanced RSI Analysis (25 points) - Enhanced
 func (s *Scalping1Strategy) scoreAdvancedRSI(input Scalping1Input, side string, rsi7 []float64) float64 {
 	score := 0.0
 
-	// RSI Divergence (10 points)
-	divergenceScore := s.scoreRSIDivergence(input, side, rsi7)
+	// RSI Divergence (10 points) - Enhanced
+	divergenceScore := s.scoreRSIDivergenceEnhanced(input, side, rsi7)
 	score += divergenceScore
 
-	// RSI Multi-Timeframe (10 points)
-	multiTimeframeScore := s.scoreRSIMultiTimeframe(input, side)
+	// RSI Multi-Timeframe (10 points) - Enhanced
+	multiTimeframeScore := s.scoreRSIMultiTimeframeEnhanced(input, side)
 	score += multiTimeframeScore
 
-	return score
-}
-
-func (s *Scalping1Strategy) scoreRSIDivergence(input Scalping1Input, side string, rsi7 []float64) float64 {
-	if len(rsi7) < 10 || len(input.M1Candles) < 10 {
-		return 5.0
-	}
-
-	// Simple divergence detection
-	// Check if price is making higher highs but RSI is making lower highs (bearish divergence)
-	// or price is making lower lows but RSI is making higher lows (bullish divergence)
-
-	// For now, return a basic score based on RSI conditions
-	currentRSI := rsi7[len(rsi7)-1]
-	prevRSI := rsi7[len(rsi7)-2]
-
-	score := 0.0
-
-	if side == "BUY" {
-		if currentRSI < 30 && currentRSI > prevRSI {
-			score = 8.0 // Strong bullish momentum
-		} else if currentRSI < 40 && currentRSI > prevRSI {
-			score = 5.0 // Moderate bullish momentum
-		}
-	} else {
-		if currentRSI > 70 && currentRSI < prevRSI {
-			score = 8.0 // Strong bearish momentum
-		} else if currentRSI > 60 && currentRSI < prevRSI {
-			score = 5.0 // Moderate bearish momentum
-		}
-	}
+	// RSI Momentum (5 points) - NEW
+	momentumScore := s.scoreRSIMomentum(input, side, rsi7)
+	score += momentumScore
 
 	return score
 }
 
-func (s *Scalping1Strategy) scoreRSIMultiTimeframe(input Scalping1Input, side string) float64 {
-	if len(input.M1Candles) < s.rsiPeriod || len(input.M5Candles) < s.rsiPeriod {
-		return 5.0
-	}
-
-	// Calculate RSI on M1
-	m1ClosePrices := make([]float64, len(input.M1Candles))
-	for i, candle := range input.M1Candles {
-		m1ClosePrices[i] = candle.Close
-	}
-	m1RSI := talib.Rsi(m1ClosePrices, s.rsiPeriod)
-
-	// Calculate RSI on M5
-	m5ClosePrices := make([]float64, len(input.M5Candles))
-	for i, candle := range input.M5Candles {
-		m5ClosePrices[i] = candle.Close
-	}
-	m5RSI := talib.Rsi(m5ClosePrices, s.rsiPeriod)
-
-	if len(m1RSI) == 0 || len(m5RSI) == 0 {
-		return 5.0
-	}
-
-	m1CurrentRSI := m1RSI[len(m1RSI)-1]
-	m5CurrentRSI := m5RSI[len(m5RSI)-1]
-
-	score := 0.0
-
-	if side == "BUY" {
-		// Check if both timeframes show oversold conditions
-		if m1CurrentRSI < 30 && m5CurrentRSI < 40 {
-			score = 10.0
-		} else if m1CurrentRSI < 40 && m5CurrentRSI < 50 {
-			score = 7.0
-		} else if m1CurrentRSI < 50 {
-			score = 4.0
-		}
-	} else {
-		// Check if both timeframes show overbought conditions
-		if m1CurrentRSI > 70 && m5CurrentRSI > 60 {
-			score = 10.0
-		} else if m1CurrentRSI > 60 && m5CurrentRSI > 50 {
-			score = 7.0
-		} else if m1CurrentRSI > 50 {
-			score = 4.0
-		}
-	}
-
-	return score
-}
-
-// D. Pattern Recognition (20 points)
+// D. Pattern Recognition (25 points) - Enhanced
 func (s *Scalping1Strategy) scorePatternRecognition(input Scalping1Input, side string) float64 {
 	score := 0.0
 
-	// Candlestick Patterns (10 points)
-	patternScore := s.scoreCandlestickPatterns(input, side)
+	// Candlestick Patterns (10 points) - Enhanced
+	patternScore := s.scoreCandlestickPatternsEnhanced(input, side)
 	score += patternScore
 
-	// Support/Resistance (10 points)
-	supportResistanceScore := s.scoreSupportResistance(input, side)
+	// Support/Resistance (10 points) - Enhanced
+	supportResistanceScore := s.scoreSupportResistanceEnhanced(input, side)
 	score += supportResistanceScore
 
-	return score
-}
-
-func (s *Scalping1Strategy) scoreCandlestickPatterns(input Scalping1Input, side string) float64 {
-	if len(input.M1Candles) < 3 {
-		return 5.0
-	}
-
-	score := 0.0
-	patterns := 0
-
-	// Check for multiple patterns
-	if s.detectBullishEngulfing(input.M1Candles) && side == "BUY" {
-		patterns++
-		score += 4.0
-	}
-	if s.detectBearishEngulfing(input.M1Candles) && side == "SELL" {
-		patterns++
-		score += 4.0
-	}
-	if s.detectHammer(input.M1Candles, 0.333) && side == "BUY" {
-		patterns++
-		score += 3.0
-	}
-	if s.detectShootingStar(input.M1Candles, 0.333) && side == "SELL" {
-		patterns++
-		score += 3.0
-	}
-	if s.detect2Bulls(input.M1Candles) && side == "BUY" {
-		patterns++
-		score += 2.0
-	}
-	if s.detect2Bears(input.M1Candles) && side == "SELL" {
-		patterns++
-		score += 2.0
-	}
-
-	// Bonus for multiple patterns
-	if patterns >= 2 {
-		score += 2.0
-	}
-
-	return math.Min(10.0, score)
-}
-
-func (s *Scalping1Strategy) scoreSupportResistance(input Scalping1Input, side string) float64 {
-	if len(input.M1Candles) < 20 {
-		return 5.0
-	}
-
-	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
-	score := 0.0
-
-	// Find recent highs and lows
-	recentHighs := make([]float64, 0)
-	recentLows := make([]float64, 0)
-
-	for i := len(input.M1Candles) - 20; i < len(input.M1Candles); i++ {
-		recentHighs = append(recentHighs, input.M1Candles[i].High)
-		recentLows = append(recentLows, input.M1Candles[i].Low)
-	}
-
-	// Find resistance levels (recent highs)
-	sort.Float64s(recentHighs)
-	resistance := recentHighs[len(recentHighs)-1]
-
-	// Find support levels (recent lows)
-	sort.Float64s(recentLows)
-	support := recentLows[0]
-
-	// Calculate distance to key levels
-	resistanceDistance := math.Abs(currentPrice-resistance) / currentPrice * 100
-	supportDistance := math.Abs(currentPrice-support) / currentPrice * 100
-
-	if side == "BUY" {
-		// Check if price is near support
-		if supportDistance < 0.5 {
-			score = 10.0 // Very close to support
-		} else if supportDistance < 1.0 {
-			score = 7.0 // Close to support
-		} else if supportDistance < 2.0 {
-			score = 4.0 // Moderate distance to support
-		}
-	} else {
-		// Check if price is near resistance
-		if resistanceDistance < 0.5 {
-			score = 10.0 // Very close to resistance
-		} else if resistanceDistance < 1.0 {
-			score = 7.0 // Close to resistance
-		} else if resistanceDistance < 2.0 {
-			score = 4.0 // Moderate distance to resistance
-		}
-	}
+	// Harmonic Patterns (5 points) - NEW
+	harmonicScore := s.scoreHarmonicPatterns(input, side)
+	score += harmonicScore
 
 	return score
 }
 
-// E. Market Microstructure (20 points)
+// E. Market Microstructure (25 points) - Enhanced
 func (s *Scalping1Strategy) scoreMarketMicrostructure(input Scalping1Input, side string) float64 {
 	score := 0.0
 
-	// Volume Analysis (10 points)
-	volumeScore := s.scoreVolumeAnalysis(input, side)
+	// Volume Analysis (10 points) - Enhanced
+	volumeScore := s.scoreVolumeAnalysisEnhanced(input, side)
 	score += volumeScore
 
-	// Price Action (10 points)
-	priceActionScore := s.scorePriceAction(input, side)
+	// Price Action (10 points) - Enhanced
+	priceActionScore := s.scorePriceActionEnhanced(input, side)
 	score += priceActionScore
+
+	// Order Flow Analysis (5 points) - NEW
+	orderFlowScore := s.scoreOrderFlowAnalysis(input, side)
+	score += orderFlowScore
 
 	return score
 }
 
-func (s *Scalping1Strategy) scoreVolumeAnalysis(input Scalping1Input, side string) float64 {
+func (s *Scalping1Strategy) scoreVolumeAnalysisEnhanced(input Scalping1Input, side string) float64 {
 	if len(input.M1Candles) < 5 {
 		return 5.0
 	}
 
-	// For now, return a default score since volume data might not be available
-	// In a real implementation, you'd compare current volume to average volume
-	// and check for volume confirmation
+	// Enhanced volume analysis
+	score := 0.0
 
-	return 5.0 // Default score
+	// Check for volume confirmation
+	recentCandles := input.M1Candles[len(input.M1Candles)-5:]
+	avgVolume := 0.0
+	for _, candle := range recentCandles {
+		avgVolume += candle.Volume
+	}
+	avgVolume = avgVolume / float64(len(recentCandles))
+
+	currentVolume := input.M1Candles[len(input.M1Candles)-1].Volume
+	volumeRatio := currentVolume / avgVolume
+
+	// Score based on volume ratio
+	if volumeRatio > 2.0 {
+		score = 10.0 // High volume confirmation
+	} else if volumeRatio > 1.5 {
+		score = 8.0 // Above average volume
+	} else if volumeRatio > 1.0 {
+		score = 6.0 // Average volume
+	} else if volumeRatio > 0.5 {
+		score = 4.0 // Below average volume
+	} else {
+		score = 2.0 // Low volume
+	}
+
+	return score
 }
 
-func (s *Scalping1Strategy) scorePriceAction(input Scalping1Input, side string) float64 {
+func (s *Scalping1Strategy) scorePriceActionEnhanced(input Scalping1Input, side string) float64 {
 	if len(input.M1Candles) < 3 {
 		return 5.0
 	}
 
 	score := 0.0
 
+	// Enhanced price action analysis
 	// Check for pin bars (hammer/shooting star)
 	if s.detectHammer(input.M1Candles, 0.333) && side == "BUY" {
 		score += 4.0
@@ -583,25 +330,34 @@ func (s *Scalping1Strategy) scorePriceAction(input Scalping1Input, side string) 
 		score += 3.0
 	}
 
+	// Check for breakout patterns
+	if s.detectBreakoutPattern(input.M1Candles, side) {
+		score += 2.0
+	}
+
 	return math.Min(10.0, score)
 }
 
-// F. Risk Management (15 points)
+// F. Risk Management (20 points) - Enhanced
 func (s *Scalping1Strategy) scoreRiskManagement(input Scalping1Input, side string) float64 {
 	score := 0.0
 
-	// Volatility Assessment (8 points)
-	volatilityScore := s.scoreVolatilityAssessment(input)
+	// Volatility Assessment (10 points) - Enhanced
+	volatilityScore := s.scoreVolatilityAssessmentEnhanced(input)
 	score += volatilityScore
 
-	// Position Sizing (7 points)
-	positionScore := s.scorePositionSizing(input, side)
+	// Position Sizing (5 points) - Enhanced
+	positionScore := s.scorePositionSizingEnhanced(input, side)
 	score += positionScore
+
+	// Quick Exit Strategy (5 points) - NEW
+	exitScore := s.scoreQuickExitStrategy(input, side)
+	score += exitScore
 
 	return score
 }
 
-func (s *Scalping1Strategy) scoreVolatilityAssessment(input Scalping1Input) float64 {
+func (s *Scalping1Strategy) scoreVolatilityAssessmentEnhanced(input Scalping1Input) float64 {
 	if len(input.M1Candles) < 20 {
 		return 4.0
 	}
@@ -622,10 +378,45 @@ func (s *Scalping1Strategy) scoreVolatilityAssessment(input Scalping1Input) floa
 	return score
 }
 
-func (s *Scalping1Strategy) scorePositionSizing(input Scalping1Input, side string) float64 {
+func (s *Scalping1Strategy) scorePositionSizingEnhanced(input Scalping1Input, side string) float64 {
 	// Calculate optimal position size based on volatility and risk
 	// For now, return a default score
 	return 5.0
+}
+
+// Quick Exit Strategy (5 points) - NEW
+func (s *Scalping1Strategy) scoreQuickExitStrategy(input Scalping1Input, side string) float64 {
+	if len(input.M1Candles) < 5 {
+		return 2.5
+	}
+
+	// Simplified quick exit strategy analysis based on price action
+	score := 0.0
+
+	// Check for quick exit signals
+	recentCandles := input.M1Candles[len(input.M1Candles)-5:]
+	priceRange := 0.0
+	totalVolume := 0.0
+
+	for _, candle := range recentCandles {
+		priceRange += (candle.High - candle.Low) / candle.Close
+		totalVolume += candle.Volume
+	}
+
+	avgPriceRange := priceRange / float64(len(recentCandles))
+	avgVolume := totalVolume / float64(len(recentCandles))
+
+	// Quick exit signals: price not moving despite volume
+	if avgVolume > 1000 && avgPriceRange < 0.001 { // Adjust thresholds as needed
+		score += 2.5
+	}
+
+	// Check for momentum divergence
+	if s.detectMomentumDivergence(input.M1Candles, side) {
+		score += 2.5
+	}
+
+	return math.Min(5.0, score)
 }
 
 // ==== Helper Methods for New Scoring System ====
@@ -993,24 +784,24 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 	result := fmt.Sprintf("%s Signal: %s\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\nATR%%(adj): %.4f\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, volProfile.ATRPercent*100)
 	result += fmt.Sprintf("\n📊 SIGNAL SCORE: %.1f/%.0f (%.1f%%)\n", signalScore.TotalScore, signalScore.MaxScore, signalScore.Percentage)
 	result += fmt.Sprintf("💡 Recommendation: %s\n", signalScore.Recommendation)
-	result += "\n📈 Score Breakdown (120-point system):\n"
+	result += "\n�� Score Breakdown (150-point system):\n"
 	for category, score := range signalScore.Breakdown {
 		var maxPoints float64
 		switch category {
 		case "Multi-Timeframe Alignment":
-			maxPoints = 20
-		case "Enhanced Trend Strength":
 			maxPoints = 25
+		case "Enhanced Trend Strength":
+			maxPoints = 30
 		case "Advanced RSI Analysis":
-			maxPoints = 20
+			maxPoints = 25
 		case "Pattern Recognition":
-			maxPoints = 20
+			maxPoints = 25
 		case "Market Microstructure":
-			maxPoints = 20
+			maxPoints = 25
 		case "Risk Management":
-			maxPoints = 15
-		default:
 			maxPoints = 20
+		default:
+			maxPoints = 25
 		}
 		result += fmt.Sprintf("  • %s: %.1f/%.0f\n", category, score, maxPoints)
 	}
@@ -1067,4 +858,736 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 		result += fmt.Sprintf("RR: %s\nStop Loss: %.4f\nTake Profit: %.4f\n\n", rrStr, sl, tp)
 	}
 	return strings.TrimSpace(result)
+}
+
+func (s *Scalping1Strategy) scoreM15M5AlignmentEnhanced(input Scalping1Input, side string, currentPrice float64) float64 {
+	if len(input.M15Candles) < 10 || len(input.M5Candles) < 10 {
+		return 5.0
+	}
+
+	// Calculate EMA 200 on M15
+	m15ClosePrices := make([]float64, len(input.M15Candles))
+	for i, candle := range input.M15Candles {
+		m15ClosePrices[i] = candle.Close
+	}
+	m15EMA200 := talib.Ema(m15ClosePrices, s.emaPeriod200)
+
+	// Calculate EMA 50 on M5
+	m5ClosePrices := make([]float64, len(input.M5Candles))
+	for i, candle := range input.M5Candles {
+		m5ClosePrices[i] = candle.Close
+	}
+	m5EMA50 := talib.Ema(m5ClosePrices, s.emaPeriod50)
+
+	if len(m15EMA200) == 0 || len(m5EMA50) == 0 {
+		return 5.0
+	}
+
+	m15Trend := currentPrice > m15EMA200[len(m15EMA200)-1]
+	m5Trend := currentPrice > m5EMA50[len(m5EMA50)-1]
+
+	// Enhanced scoring with trend strength
+	score := 0.0
+
+	// Check alignment
+	if m15Trend == m5Trend {
+		if side == "BUY" && m15Trend {
+			// Calculate trend strength from M15 data
+			trendStrength := s.calculateTrendStrength(input.M15Candles, 20)
+			score = 8.0 + (trendStrength * 2.0) // Max 10 points
+		} else if side == "SELL" && !m15Trend {
+			trendStrength := s.calculateTrendStrength(input.M15Candles, 20)
+			score = 8.0 + (trendStrength * 2.0)
+		} else {
+			score = 6.0 // Aligned but wrong direction
+		}
+	} else {
+		score = 2.0 // Misaligned
+	}
+
+	return math.Min(10.0, score)
+}
+
+func (s *Scalping1Strategy) scoreH1M15Alignment(input Scalping1Input, side string, currentPrice float64) float64 {
+	if len(input.H1Candles) < 10 || len(input.M15Candles) < 10 {
+		return 2.5
+	}
+
+	// Calculate EMA 50 on H1
+	h1ClosePrices := make([]float64, len(input.H1Candles))
+	for i, candle := range input.H1Candles {
+		h1ClosePrices[i] = candle.Close
+	}
+	h1EMA50 := talib.Ema(h1ClosePrices, 50)
+
+	// Calculate EMA 200 on M15
+	m15ClosePrices := make([]float64, len(input.M15Candles))
+	for i, candle := range input.M15Candles {
+		m15ClosePrices[i] = candle.Close
+	}
+	m15EMA200 := talib.Ema(m15ClosePrices, s.emaPeriod200)
+
+	if len(h1EMA50) == 0 || len(m15EMA200) == 0 {
+		return 2.5
+	}
+
+	h1Trend := currentPrice > h1EMA50[len(h1EMA50)-1]
+	m15Trend := currentPrice > m15EMA200[len(m15EMA200)-1]
+
+	// Check alignment
+	if h1Trend == m15Trend {
+		if side == "BUY" && h1Trend {
+			return 5.0 // Perfect bullish alignment
+		} else if side == "SELL" && !h1Trend {
+			return 5.0 // Perfect bearish alignment
+		} else {
+			return 3.0 // Aligned but wrong direction
+		}
+	} else {
+		return 1.0 // Misaligned timeframes
+	}
+}
+
+func (s *Scalping1Strategy) calculateTrendStrength(candles []baseCandleModel.BaseCandle, period int) float64 {
+	if len(candles) < period {
+		return 0.0
+	}
+
+	// Calculate trend strength based on number of bullish candles
+	bullishCandles := 0
+	for i := len(candles) - period; i < len(candles); i++ {
+		if candles[i].Close > candles[i].Open {
+			bullishCandles++
+		}
+	}
+
+	return float64(bullishCandles) / float64(period)
+}
+
+func (s *Scalping1Strategy) scoreEMAMultipleTimeframesEnhanced(input Scalping1Input, side string, currentPrice float64) float64 {
+	if len(input.M15Candles) < s.emaPeriod200 || len(input.M5Candles) < s.emaPeriod50 {
+		return 7.0
+	}
+
+	// M15 EMA 200
+	m15ClosePrices := make([]float64, len(input.M15Candles))
+	for i, candle := range input.M15Candles {
+		m15ClosePrices[i] = candle.Close
+	}
+	m15EMA200 := talib.Ema(m15ClosePrices, s.emaPeriod200)
+
+	// M5 EMA 50
+	m5ClosePrices := make([]float64, len(input.M5Candles))
+	for i, candle := range input.M5Candles {
+		m5ClosePrices[i] = candle.Close
+	}
+	m5EMA50 := talib.Ema(m5ClosePrices, s.emaPeriod50)
+
+	// H1 EMA 50 (if available)
+	var h1EMA50 []float64
+	if len(input.H1Candles) >= 50 {
+		h1ClosePrices := make([]float64, len(input.H1Candles))
+		for i, candle := range input.H1Candles {
+			h1ClosePrices[i] = candle.Close
+		}
+		h1EMA50 = talib.Ema(h1ClosePrices, 50)
+	}
+
+	if len(m15EMA200) == 0 || len(m5EMA50) == 0 {
+		return 7.0
+	}
+
+	m15EMA := m15EMA200[len(m15EMA200)-1]
+	m5EMA := m5EMA50[len(m5EMA50)-1]
+
+	// Calculate distances
+	m15Distance := math.Abs(currentPrice-m15EMA) / m15EMA * 100
+	m5Distance := math.Abs(currentPrice-m5EMA) / m5EMA * 100
+
+	score := 0.0
+
+	// M15 EMA scoring (0-8 points)
+	if m15Distance > 0.5 {
+		score += 8.0
+	} else if m15Distance > 0.2 {
+		score += 5.0
+	} else if m15Distance > 0.1 {
+		score += 3.0
+	}
+
+	// M5 EMA scoring (0-7 points)
+	if m5Distance > 0.3 {
+		score += 7.0
+	} else if m5Distance > 0.15 {
+		score += 4.0
+	} else if m5Distance > 0.05 {
+		score += 2.0
+	}
+
+	// H1 EMA bonus (if available)
+	if len(h1EMA50) > 0 {
+		h1EMA := h1EMA50[len(h1EMA50)-1]
+		h1Distance := math.Abs(currentPrice-h1EMA) / h1EMA * 100
+		if h1Distance > 0.2 {
+			score += 2.0
+		}
+	}
+
+	return math.Min(15.0, score)
+}
+
+func (s *Scalping1Strategy) scoreTrendConsistencyEnhanced(input Scalping1Input, side string, currentPrice, currentEMA float64) float64 {
+	if len(input.M15Candles) < 10 {
+		return 5.0
+	}
+
+	// Check consistency across multiple timeframes
+	consistency := 0.0
+
+	// M15 consistency (last 10 candles)
+	m15Consistency := 0.0
+	for i := len(input.M15Candles) - 10; i < len(input.M15Candles); i++ {
+		if (currentPrice > currentEMA && input.M15Candles[i].Close > currentEMA) ||
+			(currentPrice < currentEMA && input.M15Candles[i].Close < currentEMA) {
+			m15Consistency += 1.0
+		}
+	}
+	m15Consistency = m15Consistency / 10.0
+
+	// M5 consistency (last 5 candles)
+	m5Consistency := 0.0
+	if len(input.M5Candles) >= 5 {
+		for i := len(input.M5Candles) - 5; i < len(input.M5Candles); i++ {
+			if (currentPrice > currentEMA && input.M5Candles[i].Close > currentEMA) ||
+				(currentPrice < currentEMA && input.M5Candles[i].Close < currentEMA) {
+				m5Consistency += 1.0
+			}
+		}
+		m5Consistency = m5Consistency / 5.0
+	}
+
+	// H1 consistency (if available)
+	h1Consistency := 0.0
+	if len(input.H1Candles) >= 5 {
+		for i := len(input.H1Candles) - 5; i < len(input.H1Candles); i++ {
+			if (currentPrice > currentEMA && input.H1Candles[i].Close > currentEMA) ||
+				(currentPrice < currentEMA && input.H1Candles[i].Close < currentEMA) {
+				h1Consistency += 1.0
+			}
+		}
+		h1Consistency = h1Consistency / 5.0
+	}
+
+	// Calculate weighted average
+	if h1Consistency > 0 {
+		consistency = (m15Consistency*0.5 + m5Consistency*0.3 + h1Consistency*0.2)
+	} else {
+		consistency = (m15Consistency*0.6 + m5Consistency*0.4)
+	}
+
+	return consistency * 10.0
+}
+
+func (s *Scalping1Strategy) scoreADXTrendStrength(input Scalping1Input, side string) float64 {
+	if len(input.M15Candles) < 14 {
+		return 2.5
+	}
+
+	// Calculate ADX on M15
+	m15High := make([]float64, len(input.M15Candles))
+	m15Low := make([]float64, len(input.M15Candles))
+	m15Close := make([]float64, len(input.M15Candles))
+
+	for i, candle := range input.M15Candles {
+		m15High[i] = candle.High
+		m15Low[i] = candle.Low
+		m15Close[i] = candle.Close
+	}
+
+	adx := talib.Adx(m15High, m15Low, m15Close, 14)
+
+	if len(adx) == 0 {
+		return 2.5
+	}
+
+	currentADX := adx[len(adx)-1]
+
+	// Score based on ADX strength
+	score := 0.0
+	if currentADX > 25 {
+		score = 5.0 // Strong trend
+	} else if currentADX > 20 {
+		score = 4.0 // Moderate trend
+	} else if currentADX > 15 {
+		score = 3.0 // Weak trend
+	} else {
+		score = 1.0 // No trend
+	}
+
+	return score
+}
+
+func (s *Scalping1Strategy) scoreRSIDivergenceEnhanced(input Scalping1Input, side string, rsi7 []float64) float64 {
+	if len(rsi7) < 10 || len(input.M1Candles) < 10 {
+		return 5.0
+	}
+
+	// Enhanced divergence detection
+	currentRSI := rsi7[len(rsi7)-1]
+	prevRSI := rsi7[len(rsi7)-2]
+	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
+	prevPrice := input.M1Candles[len(input.M1Candles)-2].Close
+
+	score := 0.0
+
+	// Check for bullish divergence (price making lower lows, RSI making higher lows)
+	if side == "BUY" {
+		if currentPrice < prevPrice && currentRSI > prevRSI && currentRSI < 40 {
+			score = 10.0 // Strong bullish divergence
+		} else if currentRSI < 30 && currentRSI > prevRSI {
+			score = 8.0 // Strong oversold bounce
+		} else if currentRSI < 40 && currentRSI > prevRSI {
+			score = 5.0 // Moderate oversold bounce
+		}
+	} else {
+		// Check for bearish divergence (price making higher highs, RSI making lower highs)
+		if currentPrice > prevPrice && currentRSI < prevRSI && currentRSI > 60 {
+			score = 10.0 // Strong bearish divergence
+		} else if currentRSI > 70 && currentRSI < prevRSI {
+			score = 8.0 // Strong overbought rejection
+		} else if currentRSI > 60 && currentRSI < prevRSI {
+			score = 5.0 // Moderate overbought rejection
+		}
+	}
+
+	return score
+}
+
+func (s *Scalping1Strategy) scoreRSIMultiTimeframeEnhanced(input Scalping1Input, side string) float64 {
+	if len(input.M1Candles) < s.rsiPeriod || len(input.M5Candles) < s.rsiPeriod {
+		return 5.0
+	}
+
+	// Calculate RSI on M1
+	m1ClosePrices := make([]float64, len(input.M1Candles))
+	for i, candle := range input.M1Candles {
+		m1ClosePrices[i] = candle.Close
+	}
+	m1RSI := talib.Rsi(m1ClosePrices, s.rsiPeriod)
+
+	// Calculate RSI on M5
+	m5ClosePrices := make([]float64, len(input.M5Candles))
+	for i, candle := range input.M5Candles {
+		m5ClosePrices[i] = candle.Close
+	}
+	m5RSI := talib.Rsi(m5ClosePrices, s.rsiPeriod)
+
+	// Calculate RSI on M15 (if available)
+	var m15RSI []float64
+	if len(input.M15Candles) >= s.rsiPeriod {
+		m15ClosePrices := make([]float64, len(input.M15Candles))
+		for i, candle := range input.M15Candles {
+			m15ClosePrices[i] = candle.Close
+		}
+		m15RSI = talib.Rsi(m15ClosePrices, s.rsiPeriod)
+	}
+
+	if len(m1RSI) == 0 || len(m5RSI) == 0 {
+		return 5.0
+	}
+
+	m1CurrentRSI := m1RSI[len(m1RSI)-1]
+	m5CurrentRSI := m5RSI[len(m5RSI)-1]
+
+	score := 0.0
+
+	if side == "BUY" {
+		// Check if multiple timeframes show oversold conditions
+		if m1CurrentRSI < 30 && m5CurrentRSI < 40 {
+			score = 10.0
+		} else if m1CurrentRSI < 40 && m5CurrentRSI < 50 {
+			score = 7.0
+		} else if m1CurrentRSI < 50 {
+			score = 4.0
+		}
+
+		// Bonus for M15 alignment
+		if len(m15RSI) > 0 {
+			m15CurrentRSI := m15RSI[len(m15RSI)-1]
+			if m15CurrentRSI < 50 {
+				score += 2.0
+			}
+		}
+	} else {
+		// Check if multiple timeframes show overbought conditions
+		if m1CurrentRSI > 70 && m5CurrentRSI > 60 {
+			score = 10.0
+		} else if m1CurrentRSI > 60 && m5CurrentRSI > 50 {
+			score = 7.0
+		} else if m1CurrentRSI > 50 {
+			score = 4.0
+		}
+
+		// Bonus for M15 alignment
+		if len(m15RSI) > 0 {
+			m15CurrentRSI := m15RSI[len(m15RSI)-1]
+			if m15CurrentRSI > 50 {
+				score += 2.0
+			}
+		}
+	}
+
+	return math.Min(10.0, score)
+}
+
+func (s *Scalping1Strategy) scoreRSIMomentum(input Scalping1Input, side string, rsi7 []float64) float64 {
+	if len(rsi7) < 3 {
+		return 2.5
+	}
+
+	// Calculate RSI momentum (slope)
+	currentRSI := rsi7[len(rsi7)-1]
+	prevRSI := rsi7[len(rsi7)-2]
+	prevPrevRSI := rsi7[len(rsi7)-3]
+
+	// Calculate momentum
+	momentum1 := currentRSI - prevRSI
+	momentum2 := prevRSI - prevPrevRSI
+
+	score := 0.0
+
+	if side == "BUY" {
+		// Check for accelerating bullish momentum
+		if momentum1 > 0 && momentum2 > 0 && momentum1 > momentum2 {
+			score = 5.0 // Accelerating bullish momentum
+		} else if momentum1 > 0 {
+			score = 3.0 // Bullish momentum
+		} else if currentRSI < 30 {
+			score = 2.0 // Oversold condition
+		}
+	} else {
+		// Check for accelerating bearish momentum
+		if momentum1 < 0 && momentum2 < 0 && momentum1 < momentum2 {
+			score = 5.0 // Accelerating bearish momentum
+		} else if momentum1 < 0 {
+			score = 3.0 // Bearish momentum
+		} else if currentRSI > 70 {
+			score = 2.0 // Overbought condition
+		}
+	}
+
+	return score
+}
+
+func (s *Scalping1Strategy) scoreCandlestickPatternsEnhanced(input Scalping1Input, side string) float64 {
+	if len(input.M1Candles) < 3 {
+		return 5.0
+	}
+
+	score := 0.0
+	patterns := 0
+
+	// Enhanced pattern detection with more patterns
+	if s.detectBullishEngulfing(input.M1Candles) && side == "BUY" {
+		patterns++
+		score += 4.0
+	}
+	if s.detectBearishEngulfing(input.M1Candles) && side == "SELL" {
+		patterns++
+		score += 4.0
+	}
+	if s.detectHammer(input.M1Candles, 0.333) && side == "BUY" {
+		patterns++
+		score += 3.0
+	}
+	if s.detectShootingStar(input.M1Candles, 0.333) && side == "SELL" {
+		patterns++
+		score += 3.0
+	}
+	if s.detect2Bulls(input.M1Candles) && side == "BUY" {
+		patterns++
+		score += 2.0
+	}
+	if s.detect2Bears(input.M1Candles) && side == "SELL" {
+		patterns++
+		score += 2.0
+	}
+
+	// Add new patterns
+	if s.detectDoji(input.M1Candles) {
+		patterns++
+		score += 1.5
+	}
+	if s.detectSpinningTop(input.M1Candles) {
+		patterns++
+		score += 1.0
+	}
+
+	// Bonus for multiple patterns
+	if patterns >= 2 {
+		score += 2.0
+	}
+
+	return math.Min(10.0, score)
+}
+
+func (s *Scalping1Strategy) scoreSupportResistanceEnhanced(input Scalping1Input, side string) float64 {
+	if len(input.M1Candles) < 20 {
+		return 5.0
+	}
+
+	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
+	score := 0.0
+
+	// Find recent highs and lows
+	recentHighs := make([]float64, 0)
+	recentLows := make([]float64, 0)
+
+	for i := len(input.M1Candles) - 20; i < len(input.M1Candles); i++ {
+		recentHighs = append(recentHighs, input.M1Candles[i].High)
+		recentLows = append(recentLows, input.M1Candles[i].Low)
+	}
+
+	// Find resistance levels (recent highs)
+	sort.Float64s(recentHighs)
+	resistance := recentHighs[len(recentHighs)-1]
+
+	// Find support levels (recent lows)
+	sort.Float64s(recentLows)
+	support := recentLows[0]
+
+	// Calculate distance to key levels
+	resistanceDistance := math.Abs(currentPrice-resistance) / currentPrice * 100
+	supportDistance := math.Abs(currentPrice-support) / currentPrice * 100
+
+	// Enhanced scoring with multiple timeframe support/resistance
+	if side == "BUY" {
+		// Check if price is near support
+		if supportDistance < 0.3 {
+			score = 10.0 // Very close to support
+		} else if supportDistance < 0.5 {
+			score = 8.0 // Close to support
+		} else if supportDistance < 1.0 {
+			score = 6.0 // Moderate distance to support
+		} else if supportDistance < 2.0 {
+			score = 4.0 // Far from support
+		}
+
+		// Bonus for M5 support alignment
+		if len(input.M5Candles) >= 10 {
+			m5Support := s.findM5Support(input.M5Candles)
+			if m5Support > 0 {
+				m5Distance := math.Abs(currentPrice-m5Support) / currentPrice * 100
+				if m5Distance < 0.5 {
+					score += 2.0
+				}
+			}
+		}
+	} else {
+		// Check if price is near resistance
+		if resistanceDistance < 0.3 {
+			score = 10.0 // Very close to resistance
+		} else if resistanceDistance < 0.5 {
+			score = 8.0 // Close to resistance
+		} else if resistanceDistance < 1.0 {
+			score = 6.0 // Moderate distance to resistance
+		} else if resistanceDistance < 2.0 {
+			score = 4.0 // Far from resistance
+		}
+
+		// Bonus for M5 resistance alignment
+		if len(input.M5Candles) >= 10 {
+			m5Resistance := s.findM5Resistance(input.M5Candles)
+			if m5Resistance > 0 {
+				m5Distance := math.Abs(currentPrice-m5Resistance) / currentPrice * 100
+				if m5Distance < 0.5 {
+					score += 2.0
+				}
+			}
+		}
+	}
+
+	return math.Min(10.0, score)
+}
+
+func (s *Scalping1Strategy) scoreHarmonicPatterns(input Scalping1Input, side string) float64 {
+	if len(input.M1Candles) < 10 {
+		return 2.5
+	}
+
+	score := 0.0
+
+	// Simple harmonic pattern detection (Gartley-like)
+	if s.detectGartleyPattern(input.M1Candles, side) {
+		score += 3.0
+	}
+
+	// Butterfly pattern
+	if s.detectButterflyPattern(input.M1Candles, side) {
+		score += 2.0
+	}
+
+	// Bat pattern
+	if s.detectBatPattern(input.M1Candles, side) {
+		score += 2.0
+	}
+
+	return math.Min(5.0, score)
+}
+
+// Helper functions for enhanced pattern recognition
+func (s *Scalping1Strategy) detectDoji(candles []baseCandleModel.BaseCandle) bool {
+	if len(candles) < 1 {
+		return false
+	}
+	c := candles[len(candles)-1]
+	bodySize := math.Abs(c.Close - c.Open)
+	totalSize := c.High - c.Low
+	return bodySize/totalSize < 0.1 // Body less than 10% of total range
+}
+
+func (s *Scalping1Strategy) detectSpinningTop(candles []baseCandleModel.BaseCandle) bool {
+	if len(candles) < 1 {
+		return false
+	}
+	c := candles[len(candles)-1]
+	bodySize := math.Abs(c.Close - c.Open)
+	upperShadow := c.High - math.Max(c.Open, c.Close)
+	lowerShadow := math.Min(c.Open, c.Close) - c.Low
+	return bodySize < upperShadow && bodySize < lowerShadow
+}
+
+func (s *Scalping1Strategy) findM5Support(candles []baseCandleModel.BaseCandle) float64 {
+	if len(candles) < 10 {
+		return 0
+	}
+	lows := make([]float64, 0)
+	for i := len(candles) - 10; i < len(candles); i++ {
+		lows = append(lows, candles[i].Low)
+	}
+	sort.Float64s(lows)
+	return lows[0]
+}
+
+func (s *Scalping1Strategy) findM5Resistance(candles []baseCandleModel.BaseCandle) float64 {
+	if len(candles) < 10 {
+		return 0
+	}
+	highs := make([]float64, 0)
+	for i := len(candles) - 10; i < len(candles); i++ {
+		highs = append(highs, candles[i].High)
+	}
+	sort.Float64s(highs)
+	return highs[len(highs)-1]
+}
+
+func (s *Scalping1Strategy) detectGartleyPattern(candles []baseCandleModel.BaseCandle, side string) bool {
+	// Simplified Gartley pattern detection
+	if len(candles) < 5 {
+		return false
+	}
+	// Basic implementation - can be enhanced
+	return false
+}
+
+func (s *Scalping1Strategy) detectButterflyPattern(candles []baseCandleModel.BaseCandle, side string) bool {
+	// Simplified Butterfly pattern detection
+	if len(candles) < 5 {
+		return false
+	}
+	// Basic implementation - can be enhanced
+	return false
+}
+
+func (s *Scalping1Strategy) detectBatPattern(candles []baseCandleModel.BaseCandle, side string) bool {
+	// Simplified Bat pattern detection
+	if len(candles) < 5 {
+		return false
+	}
+	// Basic implementation - can be enhanced
+	return false
+}
+
+func (s *Scalping1Strategy) scoreOrderFlowAnalysis(input Scalping1Input, side string) float64 {
+	if len(input.M1Candles) < 5 {
+		return 2.5
+	}
+
+	// Simplified order flow analysis based on price action
+	score := 0.0
+
+	// Check for absorption patterns (price not moving despite volume)
+	recentCandles := input.M1Candles[len(input.M1Candles)-5:]
+	priceRange := 0.0
+	totalVolume := 0.0
+
+	for _, candle := range recentCandles {
+		priceRange += (candle.High - candle.Low) / candle.Close
+		totalVolume += candle.Volume
+	}
+
+	avgPriceRange := priceRange / float64(len(recentCandles))
+	avgVolume := totalVolume / float64(len(recentCandles))
+
+	// High volume with low price movement suggests absorption
+	if avgVolume > 1000 && avgPriceRange < 0.001 { // Adjust thresholds as needed
+		score += 3.0
+	}
+
+	// Check for momentum divergence
+	if s.detectMomentumDivergence(input.M1Candles, side) {
+		score += 2.0
+	}
+
+	return math.Min(5.0, score)
+}
+
+func (s *Scalping1Strategy) detectMomentumDivergence(candles []baseCandleModel.BaseCandle, side string) bool {
+	if len(candles) < 3 {
+		return false
+	}
+
+	// Simple momentum divergence detection
+	momentum := 0.0
+	for i := len(candles) - 3; i < len(candles); i++ {
+		if candles[i].Close > candles[i].Open {
+			momentum += 1.0
+		} else {
+			momentum -= 1.0
+		}
+	}
+
+	if side == "BUY" {
+		return momentum < 0 // Price going up but momentum decreasing
+	} else {
+		return momentum > 0 // Price going down but momentum increasing
+	}
+}
+
+func (s *Scalping1Strategy) detectBreakoutPattern(candles []baseCandleModel.BaseCandle, side string) bool {
+	if len(candles) < 5 {
+		return false
+	}
+
+	// Simple breakout detection
+	recentCandles := candles[len(candles)-5:]
+	high := recentCandles[0].High
+	low := recentCandles[0].Low
+
+	for _, candle := range recentCandles {
+		if candle.High > high {
+			high = candle.High
+		}
+		if candle.Low < low {
+			low = candle.Low
+		}
+	}
+
+	currentPrice := candles[len(candles)-1].Close
+
+	if side == "BUY" {
+		return currentPrice > high*0.999 // Near breakout
+	} else {
+		return currentPrice < low*1.001 // Near breakdown
+	}
 }

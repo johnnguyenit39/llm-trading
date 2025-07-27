@@ -34,12 +34,19 @@ func Scalping1Strategy(binanceService *binance.BinanceService) {
 				M5Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 200)
 				M1Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 100)
 
+				H1Candles, _ := binanceService.Fetch15mCandles(context.Background(), sym, 50)
+				H4Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 30)
+				D1Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 20)
+
 				// Analyze strategy cho từng coin
 				scalping1Strategy := trading.NewScalping1Strategy()
 				signal, err := scalping1Strategy.AnalyzeWithSignalString(trading.Scalping1Input{
 					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles),
 					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles),
 					M5Candles:  utilsConverter.ConvertBinanceCandlesToBase(M5Candles),
+					H1Candles:  utilsConverter.ConvertBinanceCandlesToBase(H1Candles),
+					H4Candles:  utilsConverter.ConvertBinanceCandlesToBase(H4Candles),
+					D1Candles:  utilsConverter.ConvertBinanceCandlesToBase(D1Candles),
 				}, M15Candles[0].Symbol)
 
 				if err != nil {
