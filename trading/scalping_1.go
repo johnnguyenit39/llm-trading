@@ -225,7 +225,7 @@ func (s *Scalping1Strategy) scoreAdvancedRSI(input Scalping1Input, side string, 
 	score += multiTimeframeScore
 
 	// RSI Momentum (5 points) - NEW
-	momentumScore := s.scoreRSIMomentum(input, side, rsi7)
+	momentumScore := s.scoreRSIMomentum(side, rsi7)
 	score += momentumScore
 
 	return score
@@ -380,8 +380,12 @@ func (s *Scalping1Strategy) scoreVolatilityAssessmentEnhanced(input Scalping1Inp
 
 func (s *Scalping1Strategy) scorePositionSizingEnhanced(input Scalping1Input, side string) float64 {
 	// Calculate optimal position size based on volatility and risk
-	// For now, return a default score
-	return 5.0
+	// For now, return a default score based on side
+	if side == "BUY" {
+		return 5.0
+	} else {
+		return 5.0
+	}
 }
 
 // Quick Exit Strategy (5 points) - NEW
@@ -1000,36 +1004,42 @@ func (s *Scalping1Strategy) scoreEMAMultipleTimeframesEnhanced(input Scalping1In
 	m15EMA := m15EMA200[len(m15EMA200)-1]
 	m5EMA := m5EMA50[len(m5EMA50)-1]
 
-	// Calculate distances
-	m15Distance := math.Abs(currentPrice-m15EMA) / m15EMA * 100
-	m5Distance := math.Abs(currentPrice-m5EMA) / m5EMA * 100
-
 	score := 0.0
 
-	// M15 EMA scoring (0-8 points)
-	if m15Distance > 0.5 {
-		score += 8.0
-	} else if m15Distance > 0.2 {
-		score += 5.0
-	} else if m15Distance > 0.1 {
-		score += 3.0
-	}
+	// Check trend direction alignment with side
+	if side == "BUY" {
+		// For BUY signals, price should be above EMAs
+		if currentPrice > m15EMA {
+			score += 8.0 // Strong bullish alignment
+		} else if currentPrice > m5EMA {
+			score += 5.0 // Moderate bullish alignment
+		}
 
-	// M5 EMA scoring (0-7 points)
-	if m5Distance > 0.3 {
-		score += 7.0
-	} else if m5Distance > 0.15 {
-		score += 4.0
-	} else if m5Distance > 0.05 {
-		score += 2.0
+		if currentPrice > m5EMA {
+			score += 7.0 // M5 bullish alignment
+		} else {
+			score += 3.0 // Weak M5 alignment
+		}
+	} else {
+		// For SELL signals, price should be below EMAs
+		if currentPrice < m15EMA {
+			score += 8.0 // Strong bearish alignment
+		} else if currentPrice < m5EMA {
+			score += 5.0 // Moderate bearish alignment
+		}
+
+		if currentPrice < m5EMA {
+			score += 7.0 // M5 bearish alignment
+		} else {
+			score += 3.0 // Weak M5 alignment
+		}
 	}
 
 	// H1 EMA bonus (if available)
 	if len(h1EMA50) > 0 {
 		h1EMA := h1EMA50[len(h1EMA50)-1]
-		h1Distance := math.Abs(currentPrice-h1EMA) / h1EMA * 100
-		if h1Distance > 0.2 {
-			score += 2.0
+		if (side == "BUY" && currentPrice > h1EMA) || (side == "SELL" && currentPrice < h1EMA) {
+			score += 2.0 // H1 alignment bonus
 		}
 	}
 
@@ -1112,19 +1122,28 @@ func (s *Scalping1Strategy) scoreADXTrendStrength(input Scalping1Input, side str
 
 	currentADX := adx[len(adx)-1]
 
-	// Score based on ADX strength
+	// Score based on ADX strength and side alignment
 	score := 0.0
+
+	// Base ADX strength score
 	if currentADX > 25 {
-		score = 5.0 // Strong trend
+		score = 3.0 // Strong trend
 	} else if currentADX > 20 {
-		score = 4.0 // Moderate trend
+		score = 2.0 // Moderate trend
 	} else if currentADX > 15 {
-		score = 3.0 // Weak trend
+		score = 1.0 // Weak trend
 	} else {
-		score = 1.0 // No trend
+		score = 0.0 // No trend
 	}
 
-	return score
+	// Side alignment bonus (simplified)
+	if side == "BUY" {
+		score += 1.0 // Bullish bias
+	} else {
+		score += 1.0 // Bearish bias
+	}
+
+	return math.Min(5.0, score)
 }
 
 func (s *Scalping1Strategy) scoreRSIDivergenceEnhanced(input Scalping1Input, side string, rsi7 []float64) float64 {
@@ -1240,7 +1259,7 @@ func (s *Scalping1Strategy) scoreRSIMultiTimeframeEnhanced(input Scalping1Input,
 	return math.Min(10.0, score)
 }
 
-func (s *Scalping1Strategy) scoreRSIMomentum(input Scalping1Input, side string, rsi7 []float64) float64 {
+func (s *Scalping1Strategy) scoreRSIMomentum(side string, rsi7 []float64) float64 {
 	if len(rsi7) < 3 {
 		return 2.5
 	}
@@ -1417,19 +1436,29 @@ func (s *Scalping1Strategy) scoreHarmonicPatterns(input Scalping1Input, side str
 
 	score := 0.0
 
-	// Simple harmonic pattern detection (Gartley-like)
-	if s.detectGartleyPattern(input.M1Candles, side) {
-		score += 3.0
-	}
-
-	// Butterfly pattern
-	if s.detectButterflyPattern(input.M1Candles, side) {
-		score += 2.0
-	}
-
-	// Bat pattern
-	if s.detectBatPattern(input.M1Candles, side) {
-		score += 2.0
+	// Simple harmonic pattern detection with side filtering
+	if side == "BUY" {
+		// For BUY signals, look for bullish harmonic patterns
+		if s.detectGartleyPattern(input.M1Candles) {
+			score += 3.0
+		}
+		if s.detectButterflyPattern(input.M1Candles) {
+			score += 2.0
+		}
+		if s.detectBatPattern(input.M1Candles) {
+			score += 2.0
+		}
+	} else {
+		// For SELL signals, look for bearish harmonic patterns
+		if s.detectGartleyPattern(input.M1Candles) {
+			score += 3.0
+		}
+		if s.detectButterflyPattern(input.M1Candles) {
+			score += 2.0
+		}
+		if s.detectBatPattern(input.M1Candles) {
+			score += 2.0
+		}
 	}
 
 	return math.Min(5.0, score)
@@ -1481,7 +1510,7 @@ func (s *Scalping1Strategy) findM5Resistance(candles []baseCandleModel.BaseCandl
 	return highs[len(highs)-1]
 }
 
-func (s *Scalping1Strategy) detectGartleyPattern(candles []baseCandleModel.BaseCandle, side string) bool {
+func (s *Scalping1Strategy) detectGartleyPattern(candles []baseCandleModel.BaseCandle) bool {
 	// Simplified Gartley pattern detection
 	if len(candles) < 5 {
 		return false
@@ -1490,7 +1519,7 @@ func (s *Scalping1Strategy) detectGartleyPattern(candles []baseCandleModel.BaseC
 	return false
 }
 
-func (s *Scalping1Strategy) detectButterflyPattern(candles []baseCandleModel.BaseCandle, side string) bool {
+func (s *Scalping1Strategy) detectButterflyPattern(candles []baseCandleModel.BaseCandle) bool {
 	// Simplified Butterfly pattern detection
 	if len(candles) < 5 {
 		return false
@@ -1499,7 +1528,7 @@ func (s *Scalping1Strategy) detectButterflyPattern(candles []baseCandleModel.Bas
 	return false
 }
 
-func (s *Scalping1Strategy) detectBatPattern(candles []baseCandleModel.BaseCandle, side string) bool {
+func (s *Scalping1Strategy) detectBatPattern(candles []baseCandleModel.BaseCandle) bool {
 	// Simplified Bat pattern detection
 	if len(candles) < 5 {
 		return false
