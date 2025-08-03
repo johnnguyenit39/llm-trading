@@ -28,16 +28,16 @@ WORKDIR /app
 # Install certificates for HTTPS communication if needed
 RUN apk add --no-cache ca-certificates
 
-# Expose port 8080
-EXPOSE 8080
+# Expose port 80
+EXPOSE 80
+
+# Copy necessary files into the container
+COPY .env ./
+COPY assets ./assets
+COPY firebase-sva.json ./firebase-sva.json
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/main .
-
-# Copy i18n files
-COPY --from=builder /app/appi18n/active.*.json ./appi18n/
-#Copy Assets
-COPY assets ./assets
 
 # Define the entry point
 CMD ["./main"]

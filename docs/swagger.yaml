@@ -716,7 +716,7 @@ definitions:
         example: Hello from J-AI-Trade!
         type: string
     type: object
-host: localhost:8080
+host: localhost:80
 info:
   contact:
     email: support@swagger.io

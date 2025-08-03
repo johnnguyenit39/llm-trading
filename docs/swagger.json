@@ -14,7 +14,7 @@
         },
         "version": "1.0"
     },
-    "host": "localhost:8080",
+    "host": "localhost:80",
     "basePath": "/api",
     "paths": {
         "/v1/ai-expert/create": {

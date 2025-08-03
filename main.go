@@ -29,7 +29,7 @@ import (
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host localhost:8080
+// @host localhost:80
 // @BasePath /api
 
 // @securityDefinitions.apikey Bearer
@@ -81,8 +81,8 @@ func main() {
 
 	// Initialize and start cron jobs
 	cronjobsManager.InitCronJobs(db)
-	// Start the application on port 8080
-	if err := app.Run(":8080"); err != nil {
+	// Start the application on port 80
+	if err := app.Run(":80"); err != nil {
 		log.Fatal().Err(err).Msg("failed to start the application")
 	}
 }
