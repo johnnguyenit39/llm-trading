@@ -34,7 +34,6 @@ EXPOSE 80
 # Copy necessary files into the container
 COPY .env ./
 COPY assets ./assets
-COPY firebase-sva.json ./firebase-sva.json
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/main .
