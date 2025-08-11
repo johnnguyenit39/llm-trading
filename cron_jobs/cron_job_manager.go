@@ -31,7 +31,6 @@ func Scalping1Strategy(binanceService *binance.BinanceService) {
 		// Chạy logic ngay lập tức
 		for _, symbol := range symbols {
 			go func(sym string) {
-				log.Info().Str("request_id", uuid.New().String()).Msg("Start analyzing scalping 1 strategy")
 				// Fetch data cho từng coin
 				M15Candles, _ := binanceService.Fetch15mCandles(context.Background(), sym, 300)
 				M5Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 200)
@@ -66,8 +65,7 @@ func Scalping1Strategy(binanceService *binance.BinanceService) {
 					if err != nil {
 						log.Error().Err(err).Msg("Failed to send signal to Telegram") // Removed martian log
 					}
-				} else {
-					log.Info().Str("request_id", uuid.New().String()).Msg("Sent new signal to Telegram")
+					log.Info().Str("request_id", uuid.New().String()).Msg("New signal is sent: " + *signal)
 				}
 			}(symbol)
 		}
