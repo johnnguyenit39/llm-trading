@@ -512,6 +512,10 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
+		if signalScore.TotalScore < 100 {
+			return nil, nil
+		}
+
 		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
 		return &signalStr, nil
 	}
@@ -523,6 +527,10 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
+
+		if signalScore.TotalScore < 100 {
+			return nil, nil
+		}
 
 		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
 		return &signalStr, nil
