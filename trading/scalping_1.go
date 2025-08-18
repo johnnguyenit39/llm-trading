@@ -512,7 +512,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 100 {
+		if signalScore.TotalScore < 90 {
 			return nil, nil
 		}
 
@@ -528,7 +528,7 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 100 {
+		if signalScore.TotalScore < 90 {
 			return nil, nil
 		}
 
