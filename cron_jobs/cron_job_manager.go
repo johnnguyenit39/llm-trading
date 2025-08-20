@@ -38,13 +38,41 @@ func Scalping1Strategy(binanceService *binance.BinanceService, db *gorm.DB) {
 		for _, symbol := range symbols {
 			go func(sym string) {
 				// Fetch data cho từng coin
-				M15Candles, _ := binanceService.Fetch15mCandles(context.Background(), sym, 300)
-				M5Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 200)
-				M1Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 100)
+				M15Candles, err := binanceService.Fetch15mCandles(context.Background(), sym, 300)
+				if err != nil || len(M15Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("Failed to fetch M15 candles or empty data")
+					return
+				}
 
-				H1Candles, _ := binanceService.Fetch15mCandles(context.Background(), sym, 50)
-				H4Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 30)
-				D1Candles, _ := binanceService.Fetch1mCandles(context.Background(), sym, 20)
+				M5Candles, err := binanceService.Fetch1mCandles(context.Background(), sym, 200)
+				if err != nil || len(M5Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("Failed to fetch M5 candles or empty data")
+					return
+				}
+
+				M1Candles, err := binanceService.Fetch1mCandles(context.Background(), sym, 100)
+				if err != nil || len(M1Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("Failed to fetch M1 candles or empty data")
+					return
+				}
+
+				H1Candles, err := binanceService.Fetch15mCandles(context.Background(), sym, 50)
+				if err != nil || len(H1Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("Failed to fetch H1 candles or empty data")
+					return
+				}
+
+				H4Candles, err := binanceService.Fetch1mCandles(context.Background(), sym, 30)
+				if err != nil || len(H4Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("Failed to fetch H4 candles or empty data")
+					return
+				}
+
+				D1Candles, err := binanceService.Fetch1mCandles(context.Background(), sym, 20)
+				if err != nil || len(D1Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("Failed to fetch D1 candles or empty data")
+					return
+				}
 
 				// Analyze strategy cho từng coin
 				scalping1Strategy := trading.NewScalping1Strategy()
@@ -55,7 +83,7 @@ func Scalping1Strategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					H1Candles:  utilsConverter.ConvertBinanceCandlesToBase(H1Candles),
 					H4Candles:  utilsConverter.ConvertBinanceCandlesToBase(H4Candles),
 					D1Candles:  utilsConverter.ConvertBinanceCandlesToBase(D1Candles),
-				}, M15Candles[0].Symbol)
+				}, sym)
 
 				if err != nil {
 					// Handle error
