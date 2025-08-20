@@ -22,11 +22,22 @@ type Scalping1Input struct {
 	D1Candles  []baseCandleModel.BaseCandle // D1 candles for daily trend
 }
 
-type Scalping1Signal string
+// Scalping1Signal contains all the trading signal information
+type Scalping1Signal struct {
+	Symbol         string            // Trading symbol (e.g., "BTCUSDT")
+	Decision       string            // "BUY" or "SELL"
+	Entry          float64           // Entry price
+	StopLoss       float64           // Stop loss price
+	TakeProfit     float64           // Take profit price
+	Leverage       float64           // Suggested leverage
+	SignalScore    SignalScore       // Signal quality score
+	Volatility     VolatilityProfile // Volatility information
+	TimeframeTrend map[string]string // M15, M5 trend analysis
+}
 
 const (
-	BUY  Scalping1Signal = "BUY"
-	SELL Scalping1Signal = "SELL"
+	BUY  string = "BUY"
+	SELL string = "SELL"
 )
 
 type Scalping1Strategy struct {
@@ -537,6 +548,166 @@ func (s *Scalping1Strategy) AnalyzeWithSignalString(input Scalping1Input, symbol
 	}
 
 	return nil, nil // No signal
+}
+
+// AnalyzeWithSignalAndModel analyzes the input and returns both signal string and model
+func (s *Scalping1Strategy) AnalyzeWithSignalAndModel(input Scalping1Input, symbol string) (*string, *Scalping1Signal, error) {
+	if len(input.M15Candles) < s.emaPeriod200 || len(input.M5Candles) < s.emaPeriod50 || len(input.M1Candles) < s.rsiPeriod {
+		return nil, nil, fmt.Errorf("insufficient data: need at least %d M15 candles, %d M5 candles, and %d M1 candles", s.emaPeriod200, s.emaPeriod50, s.rsiPeriod)
+	}
+
+	// Calculate EMA 200 on M15 for trend filter
+	closePrices := make([]float64, len(input.M15Candles))
+	for i, candle := range input.M15Candles {
+		closePrices[i] = candle.Close
+	}
+	ema200 := talib.Ema(closePrices, s.emaPeriod200)
+
+	m1ClosePrices := make([]float64, len(input.M1Candles))
+	for i, candle := range input.M1Candles {
+		m1ClosePrices[i] = candle.Close
+	}
+	rsi7 := talib.Rsi(m1ClosePrices, s.rsiPeriod)
+
+	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
+	currentEMA := ema200[len(ema200)-1]
+	isPriceAboveEMA := currentPrice > currentEMA
+
+	// RSI conditions matching TradingView: (rsiOS or rsiOS[1]) and (rsiOB or rsiOB[1])
+	lenRSI := len(rsi7)
+	isRSIOversold := false
+	isRSIOverbought := false
+	if lenRSI >= 2 {
+		isRSIOversold = rsi7[lenRSI-1] < s.rsiOversold || rsi7[lenRSI-2] < s.rsiOversold
+		isRSIOverbought = rsi7[lenRSI-1] > s.rsiOverbought || rsi7[lenRSI-2] > s.rsiOverbought
+	} else if lenRSI == 1 {
+		isRSIOversold = rsi7[0] < s.rsiOversold
+		isRSIOverbought = rsi7[0] > s.rsiOverbought
+	}
+
+	// Pattern detection matching TradingView logic
+	hasBullishEngulfing := s.detectBullishEngulfing(input.M1Candles)
+	hasBearishEngulfing := s.detectBearishEngulfing(input.M1Candles)
+	hasHammer := s.detectHammer(input.M1Candles, 0.333)
+	hasShootingStar := s.detectShootingStar(input.M1Candles, 0.333)
+	has2Bulls := s.detect2Bulls(input.M1Candles)
+	has2Bears := s.detect2Bears(input.M1Candles)
+
+	// TradingView logic + EMA trend filter
+	// BUY: Price above EMA 200 + RSI oversold + bullish patterns
+	if isPriceAboveEMA && isRSIOversold && (hasBullishEngulfing || hasHammer || has2Bulls) {
+		side := "BUY"
+		entry := currentPrice
+
+		// Calculate signal score
+		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
+
+		if signalScore.TotalScore < 90 {
+			return nil, nil, nil
+		}
+
+		// Generate signal string
+		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
+
+		// Create signal model
+		signalModel := s.createSignalModel(symbol, side, entry, signalScore, input.M1Candles, input.M15Candles, input.M5Candles)
+
+		return &signalStr, signalModel, nil
+	}
+
+	// SELL: Price below EMA 200 + RSI overbought + bearish patterns
+	if !isPriceAboveEMA && isRSIOverbought && (hasBearishEngulfing || hasShootingStar || has2Bears) {
+		side := "SELL"
+		entry := currentPrice
+
+		// Calculate signal score
+		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
+
+		if signalScore.TotalScore < 90 {
+			return nil, nil, nil
+		}
+
+		// Generate signal string
+		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
+
+		// Create signal model
+		signalModel := s.createSignalModel(symbol, side, entry, signalScore, input.M1Candles, input.M15Candles, input.M5Candles)
+
+		return &signalStr, signalModel, nil
+	}
+
+	return nil, nil, nil // No signal
+}
+
+// createSignalModel creates a Scalping1Signal model from the analysis
+func (s *Scalping1Strategy) createSignalModel(symbol, side string, entry float64, signalScore SignalScore, m1Candles, m15Candles, m5Candles []baseCandleModel.BaseCandle) *Scalping1Signal {
+	// Calculate volatility profile
+	volProfile := calculateScalpingVolatilityProfile(m1Candles, m15Candles)
+
+	// Calculate stop loss and take profit
+	stopDistance := volProfile.ATRPercent * 1.5 // 1.5x ATR for stop loss
+	if stopDistance < 0.003 {                   // Minimum 0.3%
+		stopDistance = 0.003
+	}
+
+	takeProfitDistance := stopDistance * volProfile.SuggestedRR
+
+	var stopLoss, takeProfit float64
+	if side == "BUY" {
+		stopLoss = entry * (1 - stopDistance)
+		takeProfit = entry * (1 + takeProfitDistance)
+	} else {
+		stopLoss = entry * (1 + stopDistance)
+		takeProfit = entry * (1 - takeProfitDistance)
+	}
+
+	// Calculate leverage
+	leverage := volProfile.MaxLeverage
+
+	// Determine timeframe trends
+	timeframeTrend := make(map[string]string)
+	if len(m15Candles) >= 200 && len(m5Candles) >= 50 {
+		m15ClosePrices := make([]float64, len(m15Candles))
+		for i, candle := range m15Candles {
+			m15ClosePrices[i] = candle.Close
+		}
+		m15EMA200 := talib.Ema(m15ClosePrices, 200)
+
+		m5ClosePrices := make([]float64, len(m5Candles))
+		for i, candle := range m5Candles {
+			m5ClosePrices[i] = candle.Close
+		}
+		m5EMA50 := talib.Ema(m5ClosePrices, 50)
+
+		if len(m15EMA200) > 0 && len(m5EMA50) > 0 {
+			m15Trend := entry > m15EMA200[len(m15EMA200)-1]
+			m5Trend := entry > m5EMA50[len(m5EMA50)-1]
+
+			if m15Trend {
+				timeframeTrend["M15"] = "BULLISH"
+			} else {
+				timeframeTrend["M15"] = "BEARISH"
+			}
+
+			if m5Trend {
+				timeframeTrend["M5"] = "BULLISH"
+			} else {
+				timeframeTrend["M5"] = "BEARISH"
+			}
+		}
+	}
+
+	return &Scalping1Signal{
+		Symbol:         symbol,
+		Decision:       side,
+		Entry:          entry,
+		StopLoss:       stopLoss,
+		TakeProfit:     takeProfit,
+		Leverage:       leverage,
+		SignalScore:    signalScore,
+		Volatility:     volProfile,
+		TimeframeTrend: timeframeTrend,
+	}
 }
 
 // ==== Pattern Detection Helpers ====
