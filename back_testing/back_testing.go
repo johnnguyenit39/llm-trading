@@ -7,20 +7,16 @@ import (
 	"j_ai_trade/brokers/okx"
 	okxmodel "j_ai_trade/brokers/okx/model"
 	"j_ai_trade/brokers/okx/types"
-	ordermodel "j_ai_trade/modules/order/model"
 	"strings"
 
 	"gorm.io/gorm"
 )
 
 type BackTesting struct {
-	db *gorm.DB
 }
 
 func NewBackTesting(db *gorm.DB) *BackTesting {
-	return &BackTesting{
-		db: db,
-	}
+	return &BackTesting{}
 }
 
 // ExecuteFuturesOrder executes a futures order and records it in the database
@@ -82,32 +78,6 @@ func (b *BackTesting) ExecuteFuturesOrder(symbol string, amount, price float64, 
 	data, ok := responseMap["data"].([]interface{})
 	if !ok || len(data) == 0 {
 		return fmt.Errorf("invalid response data format")
-	}
-
-	firstData, ok := data[0].(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("invalid data item format")
-	}
-
-	orderID, ok := firstData["ordId"].(string)
-	if !ok {
-		return fmt.Errorf("failed to get order ID from response")
-	}
-
-	// Create order record
-	order := &ordermodel.Order{
-		Broker:        "okx",
-		BrokerOrderID: orderID,
-		Decision:      decision,
-		Pair:          currencyPair.Symbol,
-		Type:          "futures",
-		Entry:         price,
-		Strategy:      strategy,
-	}
-
-	// Save order to database
-	if err := b.db.Create(order).Error; err != nil {
-		return fmt.Errorf("failed to save order to database: %v", err)
 	}
 
 	return nil
