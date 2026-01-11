@@ -81,32 +81,40 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 	supportDistance := (currentPrice - support) / currentPrice * 100
 	resistanceDistance := (resistance - currentPrice) / currentPrice * 100
 
+	// SIDEWAY LOGIC: Mean reversion approach (different from trending)
+	// RSI should be in mean reversion zone, not extreme oversold/overbought
 	lenRSI := len(rsi7)
-	isRSIOversold := false
-	isRSIOverbought := false
-	if lenRSI >= 2 {
-		isRSIOversold = rsi7[lenRSI-1] < s.rsiOversold || rsi7[lenRSI-2] < s.rsiOversold
-		isRSIOverbought = rsi7[lenRSI-1] > s.rsiOverbought || rsi7[lenRSI-2] > s.rsiOverbought
-	} else if lenRSI == 1 {
-		isRSIOversold = rsi7[0] < s.rsiOversold
-		isRSIOverbought = rsi7[0] > s.rsiOverbought
+	currentRSI := 50.0
+	if lenRSI > 0 {
+		currentRSI = rsi7[lenRSI-1]
 	}
 
-	// Pattern detection
+	// Mean reversion zones for sideway trading
+	// BUY: RSI recovering from oversold (30-50) - price bouncing from support
+	// SELL: RSI declining from overbought (50-70) - price bouncing from resistance
+	rsiMeanReversionBuy := currentRSI >= 30 && currentRSI <= 50
+	rsiMeanReversionSell := currentRSI >= 50 && currentRSI <= 70
+
+	// Check for price bounce from support/resistance (key for mean reversion)
+	priceBounceFromSupport := s.detectBounceFromSupport(input.M1Candles, support)
+	priceBounceFromResistance := s.detectBounceFromResistance(input.M1Candles, resistance)
+
+	// Pattern detection (supporting signals, less critical than trending)
 	hasBullishEngulfing := s.detectBullishEngulfing(input.M1Candles)
 	hasBearishEngulfing := s.detectBearishEngulfing(input.M1Candles)
 	hasHammer := s.detectHammer(input.M1Candles, 0.333)
 	hasShootingStar := s.detectShootingStar(input.M1Candles, 0.333)
 
-	// BUY Signal: Near support + RSI oversold + bullish patterns
-	if supportDistance < 0.5 && isRSIOversold && (hasBullishEngulfing || hasHammer) {
+	// BUY Signal: Range trading logic - Buy at support with mean reversion
+	// Key: Price near support + RSI mean reversion zone + price bounce + volume
+	if supportDistance < 0.3 && rsiMeanReversionBuy && (priceBounceFromSupport || hasHammer || hasBullishEngulfing) {
 		side := "BUY"
 		entry := currentPrice
 
 		// Calculate signal score for sideway
 		signalScore := s.calculateSidewaySignalScore(input, side, currentPrice, support, resistance, rsi7)
 
-		if signalScore.TotalScore < 80 { // Lower threshold for sideway (80 vs 100 for trending)
+		if signalScore.TotalScore < 80 {
 			return nil, nil
 		}
 
@@ -114,8 +122,9 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 		return &signalStr, nil
 	}
 
-	// SELL Signal: Near resistance + RSI overbought + bearish patterns
-	if resistanceDistance < 0.5 && isRSIOverbought && (hasBearishEngulfing || hasShootingStar) {
+	// SELL Signal: Range trading logic - Sell at resistance with mean reversion
+	// Key: Price near resistance + RSI mean reversion zone + price bounce + volume
+	if resistanceDistance < 0.3 && rsiMeanReversionSell && (priceBounceFromResistance || hasShootingStar || hasBearishEngulfing) {
 		side := "SELL"
 		entry := currentPrice
 
@@ -168,25 +177,33 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 	supportDistance := (currentPrice - support) / currentPrice * 100
 	resistanceDistance := (resistance - currentPrice) / currentPrice * 100
 
+	// SIDEWAY LOGIC: Mean reversion approach (different from trending)
+	// RSI should be in mean reversion zone, not extreme oversold/overbought
 	lenRSI := len(rsi7)
-	isRSIOversold := false
-	isRSIOverbought := false
-	if lenRSI >= 2 {
-		isRSIOversold = rsi7[lenRSI-1] < s.rsiOversold || rsi7[lenRSI-2] < s.rsiOversold
-		isRSIOverbought = rsi7[lenRSI-1] > s.rsiOverbought || rsi7[lenRSI-2] > s.rsiOverbought
-	} else if lenRSI == 1 {
-		isRSIOversold = rsi7[0] < s.rsiOversold
-		isRSIOverbought = rsi7[0] > s.rsiOverbought
+	currentRSI := 50.0
+	if lenRSI > 0 {
+		currentRSI = rsi7[lenRSI-1]
 	}
 
-	// Pattern detection
+	// Mean reversion zones for sideway trading
+	// BUY: RSI recovering from oversold (30-50) - price bouncing from support
+	// SELL: RSI declining from overbought (50-70) - price bouncing from resistance
+	rsiMeanReversionBuy := currentRSI >= 30 && currentRSI <= 50
+	rsiMeanReversionSell := currentRSI >= 50 && currentRSI <= 70
+
+	// Check for price bounce from support/resistance (key for mean reversion)
+	priceBounceFromSupport := s.detectBounceFromSupport(input.M1Candles, support)
+	priceBounceFromResistance := s.detectBounceFromResistance(input.M1Candles, resistance)
+
+	// Pattern detection (supporting signals, less critical than trending)
 	hasBullishEngulfing := s.detectBullishEngulfing(input.M1Candles)
 	hasBearishEngulfing := s.detectBearishEngulfing(input.M1Candles)
 	hasHammer := s.detectHammer(input.M1Candles, 0.333)
 	hasShootingStar := s.detectShootingStar(input.M1Candles, 0.333)
 
-	// BUY Signal: Near support + RSI oversold + bullish patterns
-	if supportDistance < 0.5 && isRSIOversold && (hasBullishEngulfing || hasHammer) {
+	// BUY Signal: Range trading logic - Buy at support with mean reversion
+	// Key: Price near support + RSI mean reversion zone + price bounce + volume
+	if supportDistance < 0.3 && rsiMeanReversionBuy && (priceBounceFromSupport || hasHammer || hasBullishEngulfing) {
 		side := "BUY"
 		entry := currentPrice
 
@@ -206,8 +223,9 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 		return &signalStr, signalModel, nil
 	}
 
-	// SELL Signal: Near resistance + RSI overbought + bearish patterns
-	if resistanceDistance < 0.5 && isRSIOverbought && (hasBearishEngulfing || hasShootingStar) {
+	// SELL Signal: Range trading logic - Sell at resistance with mean reversion
+	// Key: Price near resistance + RSI mean reversion zone + price bounce + volume
+	if resistanceDistance < 0.3 && rsiMeanReversionSell && (priceBounceFromResistance || hasShootingStar || hasBearishEngulfing) {
 		side := "SELL"
 		entry := currentPrice
 
@@ -468,26 +486,28 @@ func (s *SidewayScalpingV1Strategy) scoreRSIMeanReversion(side string, rsi7 []fl
 	currentRSI := rsi7[len(rsi7)-1]
 
 	if side == "BUY" {
-		// RSI should be oversold for mean reversion
-		if currentRSI < 25 {
-			return 20.0 // Very oversold
-		} else if currentRSI < 30 {
-			return 18.0
-		} else if currentRSI < 35 {
-			return 15.0
+		// Mean reversion: RSI recovering from oversold (30-50 zone)
+		// Best: RSI around 35-45 (recovering but not extreme)
+		if currentRSI >= 35 && currentRSI <= 45 {
+			return 20.0 // Perfect mean reversion zone
+		} else if currentRSI >= 30 && currentRSI <= 50 {
+			return 18.0 // Good mean reversion zone
+		} else if currentRSI >= 25 && currentRSI <= 55 {
+			return 15.0 // Acceptable
 		} else {
-			return 5.0
+			return 5.0 // Not in mean reversion zone
 		}
 	} else {
-		// RSI should be overbought for mean reversion
-		if currentRSI > 75 {
-			return 20.0 // Very overbought
-		} else if currentRSI > 70 {
-			return 18.0
-		} else if currentRSI > 65 {
-			return 15.0
+		// Mean reversion: RSI declining from overbought (50-70 zone)
+		// Best: RSI around 55-65 (declining but not extreme)
+		if currentRSI >= 55 && currentRSI <= 65 {
+			return 20.0 // Perfect mean reversion zone
+		} else if currentRSI >= 50 && currentRSI <= 70 {
+			return 18.0 // Good mean reversion zone
+		} else if currentRSI >= 45 && currentRSI <= 75 {
+			return 15.0 // Acceptable
 		} else {
-			return 5.0
+			return 5.0 // Not in mean reversion zone
 		}
 	}
 }
@@ -532,6 +552,56 @@ func (s *SidewayScalpingV1Strategy) scoreRangeQuality(support, resistance float6
 	} else {
 		return 5.0
 	}
+}
+
+// ==== Mean Reversion Detection ====
+
+// detectBounceFromSupport detects if price is bouncing from support level
+func (s *SidewayScalpingV1Strategy) detectBounceFromSupport(candles []baseCandleModel.BaseCandle, support float64) bool {
+	if len(candles) < 3 {
+		return false
+	}
+
+	// Check if price was near support in previous candles and now bouncing up
+	prev2 := candles[len(candles)-3]
+	prev1 := candles[len(candles)-2]
+	curr := candles[len(candles)-1]
+
+	// Support distance threshold (0.5%)
+	supportThreshold := support * 0.005
+
+	// Previous candles were near support
+	prev2NearSupport := math.Abs(prev2.Low-support) < supportThreshold || prev2.Close < support+supportThreshold
+	prev1NearSupport := math.Abs(prev1.Low-support) < supportThreshold || prev1.Close < support+supportThreshold
+
+	// Current price is bouncing up from support
+	bouncingUp := curr.Close > prev1.Close && curr.Close > support
+
+	return (prev2NearSupport || prev1NearSupport) && bouncingUp
+}
+
+// detectBounceFromResistance detects if price is bouncing from resistance level
+func (s *SidewayScalpingV1Strategy) detectBounceFromResistance(candles []baseCandleModel.BaseCandle, resistance float64) bool {
+	if len(candles) < 3 {
+		return false
+	}
+
+	// Check if price was near resistance in previous candles and now bouncing down
+	prev2 := candles[len(candles)-3]
+	prev1 := candles[len(candles)-2]
+	curr := candles[len(candles)-1]
+
+	// Resistance distance threshold (0.5%)
+	resistanceThreshold := resistance * 0.005
+
+	// Previous candles were near resistance
+	prev2NearResistance := math.Abs(prev2.High-resistance) < resistanceThreshold || prev2.Close > resistance-resistanceThreshold
+	prev1NearResistance := math.Abs(prev1.High-resistance) < resistanceThreshold || prev1.Close > resistance-resistanceThreshold
+
+	// Current price is bouncing down from resistance
+	bouncingDown := curr.Close < prev1.Close && curr.Close < resistance
+
+	return (prev2NearResistance || prev1NearResistance) && bouncingDown
 }
 
 // ==== Pattern Detection (reuse from trend strategy) ====
