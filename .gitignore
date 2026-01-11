@@ -2,3 +2,8 @@
 *.env
 firebase-push-sva.json
 
+
+# builds
+bin/
+cmd/__debug_bin*
+main

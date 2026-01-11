@@ -40,7 +40,7 @@ type TrendScalpingV1Strategy struct {
 	rsiOverbought float64
 }
 
-// SignalScore represents the quality score of a trading signal (120-point system)
+// SignalScore represents the quality score of a trading signal (150-point system)
 type SignalScore struct {
 	TotalScore     float64
 	MaxScore       float64
@@ -72,6 +72,12 @@ type MarketRegime struct {
 	Reason       string // Explanation of the detection
 }
 
+// DetectMarketRegime analyzes multiple timeframes to determine market regime (exported for use in routing)
+func DetectMarketRegime(input tradingModels.CandleInput, currentPrice float64) MarketRegime {
+	s := NewScalping1Strategy()
+	return s.detectMarketRegime(input, currentPrice)
+}
+
 // detectMarketRegime analyzes multiple timeframes to determine market regime
 func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleInput, currentPrice float64) MarketRegime {
 	regime := MarketRegime{
@@ -84,8 +90,8 @@ func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleI
 	adxValues := make(map[string]float64)
 	adxCount := 0
 
-	// M15 ADX
-	if len(input.M15Candles) >= 14 {
+	// M15 ADX - Need at least 15 candles for ADX period 14 to return results
+	if len(input.M15Candles) >= 15 {
 		m15High := make([]float64, len(input.M15Candles))
 		m15Low := make([]float64, len(input.M15Candles))
 		m15Close := make([]float64, len(input.M15Candles))
@@ -102,8 +108,8 @@ func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleI
 		}
 	}
 
-	// H1 ADX
-	if len(input.H1Candles) >= 14 {
+	// H1 ADX - Need at least 15 candles for ADX period 14 to return results
+	if len(input.H1Candles) >= 15 {
 		h1High := make([]float64, len(input.H1Candles))
 		h1Low := make([]float64, len(input.H1Candles))
 		h1Close := make([]float64, len(input.H1Candles))
@@ -120,8 +126,8 @@ func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleI
 		}
 	}
 
-	// H4 ADX
-	if len(input.H4Candles) >= 14 {
+	// H4 ADX - Need at least 15 candles for ADX period 14 to return results
+	if len(input.H4Candles) >= 15 {
 		h4High := make([]float64, len(input.H4Candles))
 		h4Low := make([]float64, len(input.H4Candles))
 		h4Close := make([]float64, len(input.H4Candles))
@@ -138,8 +144,8 @@ func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleI
 		}
 	}
 
-	// D1 ADX
-	if len(input.D1Candles) >= 14 {
+	// D1 ADX - Need at least 15 candles for ADX period 14 to return results
+	if len(input.D1Candles) >= 15 {
 		d1High := make([]float64, len(input.D1Candles))
 		d1Low := make([]float64, len(input.D1Candles))
 		d1Close := make([]float64, len(input.D1Candles))
@@ -775,7 +781,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 105 {
+		if signalScore.TotalScore < 100 {
 			return nil, nil
 		}
 
@@ -791,7 +797,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 105 {
+		if signalScore.TotalScore < 100 {
 			return nil, nil
 		}
 
@@ -870,7 +876,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 105 {
+		if signalScore.TotalScore < 100 {
 			return nil, nil, nil
 		}
 
@@ -891,7 +897,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 105 {
+		if signalScore.TotalScore < 100 {
 			return nil, nil, nil
 		}
 
@@ -1235,7 +1241,7 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 	result := fmt.Sprintf("%s Signal: %s\nStrategy: Trend Scalping v1\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\nATR%%(adj): %.4f\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, volProfile.ATRPercent*100)
 	result += fmt.Sprintf("\n📊 SIGNAL SCORE: %.1f/%.0f (%.1f%%)\n", signalScore.TotalScore, signalScore.MaxScore, signalScore.Percentage)
 	result += fmt.Sprintf("💡 Recommendation: %s\n", signalScore.Recommendation)
-	result += "\n�� Score Breakdown (150-point system):\n"
+	result += "\n📈 Score Breakdown (150-point system):\n"
 	for category, score := range signalScore.Breakdown {
 		var maxPoints float64
 		switch category {
@@ -1904,41 +1910,6 @@ func (s *TrendScalpingV1Strategy) scoreSupportResistanceEnhanced(input tradingMo
 	return math.Min(15.0, score)
 }
 
-func (s *TrendScalpingV1Strategy) scoreHarmonicPatterns(input tradingModels.CandleInput, side string) float64 {
-	if len(input.M1Candles) < 10 {
-		return 2.5
-	}
-
-	score := 0.0
-
-	// Simple harmonic pattern detection with side filtering
-	if side == "BUY" {
-		// For BUY signals, look for bullish harmonic patterns
-		if s.detectGartleyPattern(input.M1Candles) {
-			score += 3.0
-		}
-		if s.detectButterflyPattern(input.M1Candles) {
-			score += 2.0
-		}
-		if s.detectBatPattern(input.M1Candles) {
-			score += 2.0
-		}
-	} else {
-		// For SELL signals, look for bearish harmonic patterns
-		if s.detectGartleyPattern(input.M1Candles) {
-			score += 3.0
-		}
-		if s.detectButterflyPattern(input.M1Candles) {
-			score += 2.0
-		}
-		if s.detectBatPattern(input.M1Candles) {
-			score += 2.0
-		}
-	}
-
-	return math.Min(5.0, score)
-}
-
 // Helper functions for enhanced pattern recognition
 func (s *TrendScalpingV1Strategy) detectDoji(candles []baseCandleModel.BaseCandle) bool {
 	if len(candles) < 1 {
@@ -2080,9 +2051,9 @@ func (s *TrendScalpingV1Strategy) detectMomentumDivergence(candles []baseCandleM
 	}
 
 	if side == "BUY" {
-		return momentum < 0 // Price going up but momentum decreasing
+		return momentum > 0 // Bullish momentum detected
 	} else {
-		return momentum > 0 // Price going down but momentum increasing
+		return momentum < 0 // Bearish momentum detected
 	}
 }
 
