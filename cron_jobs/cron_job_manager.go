@@ -76,7 +76,7 @@ func Scalping1Strategy(binanceService *binance.BinanceService, db *gorm.DB) {
 
 				// Analyze strategy cho từng coin
 				scalping1Strategy := trading.NewScalping1Strategy()
-				signal, signalModel, err := scalping1Strategy.AnalyzeWithSignalAndModel(trading.Scalping1Input{
+				signal, signalModel, err := scalping1Strategy.AnalyzeWithSignalAndModel(trading.TrendScalpingV1Input{
 					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles),
 					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles),
 					M5Candles:  utilsConverter.ConvertBinanceCandlesToBase(M5Candles),
@@ -114,7 +114,7 @@ func Scalping1Strategy(binanceService *binance.BinanceService, db *gorm.DB) {
 }
 
 // executeFuturesOrdersForAllKeys executes futures orders for all API keys when a signal is generated
-func executeFuturesOrdersForAllKeys(backTesting *backtesting.BackTesting, symbol string, signalModel *trading.Scalping1Signal) {
+func executeFuturesOrdersForAllKeys(backTesting *backtesting.BackTesting, symbol string, signalModel *trading.TrendScalpingV1Signal) {
 	// Read API keys from file
 	apiKeys, err := loadAPIKeys()
 	if err != nil {
