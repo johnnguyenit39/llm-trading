@@ -68,6 +68,205 @@ func NewScalping1Strategy() *TrendScalpingV1Strategy {
 	}
 }
 
+// MarketRegime represents the detected market condition
+type MarketRegime struct {
+	Regime       string  // "TRENDING", "SIDEWAY", "MIXED"
+	PrimaryTrend string  // "UP", "DOWN", "NONE"
+	Confidence   float64 // 0-1, confidence in the regime detection
+	ADXM15       float64
+	ADXH1        float64
+	ADXH4        float64
+	ADXD1        float64
+	Reason       string // Explanation of the detection
+}
+
+// detectMarketRegime analyzes multiple timeframes to determine market regime
+func (s *TrendScalpingV1Strategy) detectMarketRegime(input TrendScalpingV1Input, currentPrice float64) MarketRegime {
+	regime := MarketRegime{
+		Regime:       "UNKNOWN",
+		PrimaryTrend: "NONE",
+		Confidence:   0.0,
+	}
+
+	// Calculate ADX on multiple timeframes
+	adxValues := make(map[string]float64)
+	adxCount := 0
+
+	// M15 ADX
+	if len(input.M15Candles) >= 14 {
+		m15High := make([]float64, len(input.M15Candles))
+		m15Low := make([]float64, len(input.M15Candles))
+		m15Close := make([]float64, len(input.M15Candles))
+		for i, candle := range input.M15Candles {
+			m15High[i] = candle.High
+			m15Low[i] = candle.Low
+			m15Close[i] = candle.Close
+		}
+		adx := talib.Adx(m15High, m15Low, m15Close, 14)
+		if len(adx) > 0 {
+			regime.ADXM15 = adx[len(adx)-1]
+			adxValues["M15"] = regime.ADXM15
+			adxCount++
+		}
+	}
+
+	// H1 ADX
+	if len(input.H1Candles) >= 14 {
+		h1High := make([]float64, len(input.H1Candles))
+		h1Low := make([]float64, len(input.H1Candles))
+		h1Close := make([]float64, len(input.H1Candles))
+		for i, candle := range input.H1Candles {
+			h1High[i] = candle.High
+			h1Low[i] = candle.Low
+			h1Close[i] = candle.Close
+		}
+		adx := talib.Adx(h1High, h1Low, h1Close, 14)
+		if len(adx) > 0 {
+			regime.ADXH1 = adx[len(adx)-1]
+			adxValues["H1"] = regime.ADXH1
+			adxCount++
+		}
+	}
+
+	// H4 ADX
+	if len(input.H4Candles) >= 14 {
+		h4High := make([]float64, len(input.H4Candles))
+		h4Low := make([]float64, len(input.H4Candles))
+		h4Close := make([]float64, len(input.H4Candles))
+		for i, candle := range input.H4Candles {
+			h4High[i] = candle.High
+			h4Low[i] = candle.Low
+			h4Close[i] = candle.Close
+		}
+		adx := talib.Adx(h4High, h4Low, h4Close, 14)
+		if len(adx) > 0 {
+			regime.ADXH4 = adx[len(adx)-1]
+			adxValues["H4"] = regime.ADXH4
+			adxCount++
+		}
+	}
+
+	// D1 ADX
+	if len(input.D1Candles) >= 14 {
+		d1High := make([]float64, len(input.D1Candles))
+		d1Low := make([]float64, len(input.D1Candles))
+		d1Close := make([]float64, len(input.D1Candles))
+		for i, candle := range input.D1Candles {
+			d1High[i] = candle.High
+			d1Low[i] = candle.Low
+			d1Close[i] = candle.Close
+		}
+		adx := talib.Adx(d1High, d1Low, d1Close, 14)
+		if len(adx) > 0 {
+			regime.ADXD1 = adx[len(adx)-1]
+			adxValues["D1"] = regime.ADXD1
+			adxCount++
+		}
+	}
+
+	// Determine trend direction using EMA on higher timeframes
+	trendUpCount := 0
+	trendDownCount := 0
+
+	// Check H4 trend
+	if len(input.H4Candles) >= 50 {
+		h4ClosePrices := make([]float64, len(input.H4Candles))
+		for i, candle := range input.H4Candles {
+			h4ClosePrices[i] = candle.Close
+		}
+		h4EMA50 := talib.Ema(h4ClosePrices, 50)
+		if len(h4EMA50) > 0 {
+			if currentPrice > h4EMA50[len(h4EMA50)-1] {
+				trendUpCount++
+			} else {
+				trendDownCount++
+			}
+		}
+	}
+
+	// Check D1 trend
+	if len(input.D1Candles) >= 50 {
+		d1ClosePrices := make([]float64, len(input.D1Candles))
+		for i, candle := range input.D1Candles {
+			d1ClosePrices[i] = candle.Close
+		}
+		d1EMA50 := talib.Ema(d1ClosePrices, 50)
+		if len(d1EMA50) > 0 {
+			if currentPrice > d1EMA50[len(d1EMA50)-1] {
+				trendUpCount++
+			} else {
+				trendDownCount++
+			}
+		}
+	}
+
+	// Determine primary trend
+	if trendUpCount > trendDownCount {
+		regime.PrimaryTrend = "UP"
+	} else if trendDownCount > trendUpCount {
+		regime.PrimaryTrend = "DOWN"
+	}
+
+	// Count trending vs sideway timeframes
+	trendingCount := 0
+	sidewayCount := 0
+	for _, adx := range adxValues {
+		if adx >= 20 {
+			trendingCount++
+		} else {
+			sidewayCount++
+		}
+	}
+
+	// Decision logic: Priority to higher timeframes (H4, D1)
+	// If H4 or D1 is sideway, market is considered sideway (even if lower TFs have trend)
+	higherTimeframeSideway := false
+	if regime.ADXH4 > 0 && regime.ADXH4 < 20 {
+		higherTimeframeSideway = true
+		regime.Reason = "H4 is sideway (ADX < 20)"
+	}
+	if regime.ADXD1 > 0 && regime.ADXD1 < 20 {
+		higherTimeframeSideway = true
+		if regime.Reason != "" {
+			regime.Reason += ", D1 is sideway (ADX < 20)"
+		} else {
+			regime.Reason = "D1 is sideway (ADX < 20)"
+		}
+	}
+
+	// Determine regime
+	if higherTimeframeSideway {
+		// Higher timeframes are sideway - market is sideway overall
+		regime.Regime = "SIDEWAY"
+		regime.Confidence = 0.8
+		if regime.Reason == "" {
+			regime.Reason = "Higher timeframes (H4/D1) show sideway market"
+		}
+	} else if trendingCount >= 2 && sidewayCount == 0 {
+		// All timeframes trending
+		regime.Regime = "TRENDING"
+		regime.Confidence = 0.9
+		regime.Reason = fmt.Sprintf("All timeframes trending (M15:%.1f, H1:%.1f, H4:%.1f, D1:%.1f)", regime.ADXM15, regime.ADXH1, regime.ADXH4, regime.ADXD1)
+	} else if trendingCount > sidewayCount {
+		// More timeframes trending than sideway
+		regime.Regime = "TRENDING"
+		regime.Confidence = 0.7
+		regime.Reason = fmt.Sprintf("Mostly trending (trending:%d, sideway:%d)", trendingCount, sidewayCount)
+	} else if sidewayCount >= 2 {
+		// More timeframes sideway
+		regime.Regime = "SIDEWAY"
+		regime.Confidence = 0.7
+		regime.Reason = fmt.Sprintf("Mostly sideway (trending:%d, sideway:%d)", trendingCount, sidewayCount)
+	} else {
+		// Mixed or unclear
+		regime.Regime = "MIXED"
+		regime.Confidence = 0.5
+		regime.Reason = fmt.Sprintf("Mixed signals (trending:%d, sideway:%d)", trendingCount, sidewayCount)
+	}
+
+	return regime
+}
+
 // ==== Signal Scoring System ====
 
 // calculateSignalScore evaluates the quality of a trading signal (150-point system)
@@ -250,13 +449,9 @@ func (s *TrendScalpingV1Strategy) scorePatternRecognition(input TrendScalpingV1I
 	patternScore := s.scoreCandlestickPatternsEnhanced(input, side)
 	score += patternScore
 
-	// Support/Resistance (10 points) - Enhanced
+	// Support/Resistance (15 points) - Enhanced (increased from 10, removed harmonic patterns)
 	supportResistanceScore := s.scoreSupportResistanceEnhanced(input, side)
 	score += supportResistanceScore
-
-	// Harmonic Patterns (5 points) - NEW
-	harmonicScore := s.scoreHarmonicPatterns(input, side)
-	score += harmonicScore
 
 	return score
 }
@@ -390,13 +585,44 @@ func (s *TrendScalpingV1Strategy) scoreVolatilityAssessmentEnhanced(input TrendS
 }
 
 func (s *TrendScalpingV1Strategy) scorePositionSizingEnhanced(input TrendScalpingV1Input, side string) float64 {
-	// Calculate optimal position size based on volatility and risk
-	// For now, return a default score based on side
-	if side == "BUY" {
-		return 5.0
-	} else {
-		return 5.0
+	if len(input.M1Candles) < 20 {
+		return 2.5
 	}
+
+	// Calculate ATR% to determine volatility
+	atrPercent := calcATRPercent(input.M1Candles, 20)
+
+	// Calculate stop loss distance
+	stopDistance := atrPercent * 1.5
+	if stopDistance < 0.003 {
+		stopDistance = 0.003 // Minimum 0.3%
+	}
+
+	score := 0.0
+
+	// Score based on volatility suitability for scalping
+	// Ideal volatility for scalping: 0.2% - 1%
+	if atrPercent > 0.002 && atrPercent < 0.01 {
+		score += 3.0 // Ideal volatility range
+	} else if atrPercent > 0.001 && atrPercent < 0.02 {
+		score += 2.0 // Acceptable volatility
+	} else if atrPercent > 0.0005 && atrPercent < 0.05 {
+		score += 1.0 // Workable but not ideal
+	} else {
+		score += 0.5 // Too low or too high volatility
+	}
+
+	// Score based on stop loss distance (manageable for scalping)
+	// Stop loss should be tight for scalping (< 1%)
+	if stopDistance < 0.01 {
+		score += 2.0 // Good stop loss distance for scalping
+	} else if stopDistance < 0.02 {
+		score += 1.0 // Acceptable but wider than ideal
+	} else {
+		score += 0.5 // Too wide for scalping
+	}
+
+	return math.Min(5.0, score)
 }
 
 // Quick Exit Strategy (5 points) - NEW
@@ -421,8 +647,26 @@ func (s *TrendScalpingV1Strategy) scoreQuickExitStrategy(input TrendScalpingV1In
 	avgPriceRange := priceRange / float64(len(recentCandles))
 	avgVolume := totalVolume / float64(len(recentCandles))
 
-	// Quick exit signals: price not moving despite volume
-	if avgVolume > 1000 && avgPriceRange < 0.001 { // Adjust thresholds as needed
+	// Calculate average volume over longer period for normalization
+	var avgVolume50 float64
+	if len(input.M1Candles) >= 50 {
+		totalVolume50 := 0.0
+		for i := len(input.M1Candles) - 50; i < len(input.M1Candles); i++ {
+			totalVolume50 += input.M1Candles[i].Volume
+		}
+		avgVolume50 = totalVolume50 / 50.0
+	} else {
+		avgVolume50 = avgVolume // Fallback if not enough data
+	}
+
+	// Quick exit signals: price not moving despite high volume (normalized)
+	// Compare current volume to average volume (ratio)
+	volumeRatio := 1.0
+	if avgVolume50 > 0 {
+		volumeRatio = avgVolume / avgVolume50
+	}
+
+	if volumeRatio > 1.5 && avgPriceRange < 0.001 { // Volume 50% higher than average but price not moving
 		score += 2.5
 	}
 
@@ -493,6 +737,22 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input TrendScalpingV1I
 	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
 	currentEMA := ema200[len(ema200)-1]
 	isPriceAboveEMA := currentPrice > currentEMA
+
+	// Multi-timeframe market regime detection
+	marketRegime := s.detectMarketRegime(input, currentPrice)
+
+	// Only trade in trending markets
+	// If higher timeframes (H4/D1) are sideway, skip trading even if lower TFs have trend
+	if marketRegime.Regime == "SIDEWAY" {
+		// Skip trading in sideway markets
+		return nil, nil
+	}
+
+	// For MIXED regime, require at least M15 to be trending
+	if marketRegime.Regime == "MIXED" && marketRegime.ADXM15 < 20 {
+		// Skip if M15 is also sideway in mixed regime
+		return nil, nil
+	}
 
 	// RSI conditions matching TradingView: (rsiOS or rsiOS[1]) and (rsiOB or rsiOB[1])
 	lenRSI := len(rsi7)
@@ -572,6 +832,22 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input TrendScalpingV
 	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
 	currentEMA := ema200[len(ema200)-1]
 	isPriceAboveEMA := currentPrice > currentEMA
+
+	// Multi-timeframe market regime detection
+	marketRegime := s.detectMarketRegime(input, currentPrice)
+
+	// Only trade in trending markets
+	// If higher timeframes (H4/D1) are sideway, skip trading even if lower TFs have trend
+	if marketRegime.Regime == "SIDEWAY" {
+		// Skip trading in sideway markets
+		return nil, nil, nil
+	}
+
+	// For MIXED regime, require at least M15 to be trending
+	if marketRegime.Regime == "MIXED" && marketRegime.ADXM15 < 20 {
+		// Skip if M15 is also sideway in mixed regime
+		return nil, nil, nil
+	}
 
 	// RSI conditions matching TradingView: (rsiOS or rsiOS[1]) and (rsiOB or rsiOB[1])
 	lenRSI := len(rsi7)
@@ -979,6 +1255,8 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 			maxPoints = 25
 		case "Pattern Recognition":
 			maxPoints = 25
+		case "Support/Resistance":
+			maxPoints = 15
 		case "Market Microstructure":
 			maxPoints = 25
 		case "Risk Management":
@@ -1605,7 +1883,33 @@ func (s *TrendScalpingV1Strategy) scoreSupportResistanceEnhanced(input TrendScal
 		}
 	}
 
-	return math.Min(10.0, score)
+	// Additional scoring for H1/H4 timeframe support/resistance alignment
+	if len(input.H1Candles) >= 20 {
+		h1Lows := make([]float64, 0)
+		h1Highs := make([]float64, 0)
+		for i := len(input.H1Candles) - 20; i < len(input.H1Candles); i++ {
+			h1Lows = append(h1Lows, input.H1Candles[i].Low)
+			h1Highs = append(h1Highs, input.H1Candles[i].High)
+		}
+		sort.Float64s(h1Lows)
+		sort.Float64s(h1Highs)
+
+		if side == "BUY" {
+			h1Support := h1Lows[0]
+			h1Distance := math.Abs(currentPrice-h1Support) / currentPrice * 100
+			if h1Distance < 0.5 {
+				score += 1.0 // H1 support alignment bonus
+			}
+		} else {
+			h1Resistance := h1Highs[len(h1Highs)-1]
+			h1Distance := math.Abs(currentPrice-h1Resistance) / currentPrice * 100
+			if h1Distance < 0.5 {
+				score += 1.0 // H1 resistance alignment bonus
+			}
+		}
+	}
+
+	return math.Min(15.0, score)
 }
 
 func (s *TrendScalpingV1Strategy) scoreHarmonicPatterns(input TrendScalpingV1Input, side string) float64 {
@@ -1737,8 +2041,26 @@ func (s *TrendScalpingV1Strategy) scoreOrderFlowAnalysis(input TrendScalpingV1In
 	avgPriceRange := priceRange / float64(len(recentCandles))
 	avgVolume := totalVolume / float64(len(recentCandles))
 
-	// High volume with low price movement suggests absorption
-	if avgVolume > 1000 && avgPriceRange < 0.001 { // Adjust thresholds as needed
+	// Calculate average volume over longer period for normalization
+	var avgVolume50 float64
+	if len(input.M1Candles) >= 50 {
+		totalVolume50 := 0.0
+		for i := len(input.M1Candles) - 50; i < len(input.M1Candles); i++ {
+			totalVolume50 += input.M1Candles[i].Volume
+		}
+		avgVolume50 = totalVolume50 / 50.0
+	} else {
+		avgVolume50 = avgVolume // Fallback if not enough data
+	}
+
+	// High volume with low price movement suggests absorption (normalized)
+	// Compare current volume to average volume (ratio)
+	volumeRatio := 1.0
+	if avgVolume50 > 0 {
+		volumeRatio = avgVolume / avgVolume50
+	}
+
+	if volumeRatio > 1.5 && avgPriceRange < 0.001 { // Volume 50% higher than average but price not moving
 		score += 3.0
 	}
 
