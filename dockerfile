@@ -31,8 +31,7 @@ RUN apk add --no-cache ca-certificates
 # Expose port 80
 EXPOSE 80
 
-# Copy necessary files into the container
-# Note: .env file is not copied as environment variables are set via build args/runtime env
+# Copy the assets folder into the container
 COPY assets ./assets
 
 # Copy the compiled binary from the builder stage
