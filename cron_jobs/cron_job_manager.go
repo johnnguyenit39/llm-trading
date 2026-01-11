@@ -8,6 +8,7 @@ import (
 	"j_ai_trade/brokers/okx/model"
 	"j_ai_trade/telegram"
 	"j_ai_trade/trading"
+	tradingModels "j_ai_trade/trading/models"
 	utilsConverter "j_ai_trade/utils/converter"
 	"os"
 	"strings"
@@ -76,7 +77,7 @@ func Scalping1Strategy(binanceService *binance.BinanceService, db *gorm.DB) {
 
 				// Analyze strategy cho từng coin
 				scalping1Strategy := trading.NewScalping1Strategy()
-				signal, signalModel, err := scalping1Strategy.AnalyzeWithSignalAndModel(trading.TrendScalpingV1Input{
+				signal, signalModel, err := scalping1Strategy.AnalyzeWithSignalAndModel(tradingModels.CandleInput{
 					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles),
 					M1Candles:  utilsConverter.ConvertBinanceCandlesToBase(M1Candles),
 					M5Candles:  utilsConverter.ConvertBinanceCandlesToBase(M5Candles),

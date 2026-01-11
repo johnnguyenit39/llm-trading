@@ -7,20 +7,12 @@ import (
 	"strings"
 
 	baseCandleModel "j_ai_trade/common"
+	tradingModels "j_ai_trade/trading/models"
 
 	"github.com/markcheno/go-talib"
 )
 
 // ==== Structs and Constructor ====
-
-type TrendScalpingV1Input struct {
-	M15Candles []baseCandleModel.BaseCandle // M15 candles for EMA 200 trend filter
-	M5Candles  []baseCandleModel.BaseCandle // M5 candles for EMA 50 and M5-M1 alignment
-	M1Candles  []baseCandleModel.BaseCandle // M1 candles for RSI and patterns (matching TradingView)
-	H1Candles  []baseCandleModel.BaseCandle // H1 candles for trend analysis
-	H4Candles  []baseCandleModel.BaseCandle // H4 candles for major trend
-	D1Candles  []baseCandleModel.BaseCandle // D1 candles for daily trend
-}
 
 // TrendScalpingV1Signal contains all the trading signal information
 type TrendScalpingV1Signal struct {
@@ -81,7 +73,7 @@ type MarketRegime struct {
 }
 
 // detectMarketRegime analyzes multiple timeframes to determine market regime
-func (s *TrendScalpingV1Strategy) detectMarketRegime(input TrendScalpingV1Input, currentPrice float64) MarketRegime {
+func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleInput, currentPrice float64) MarketRegime {
 	regime := MarketRegime{
 		Regime:       "UNKNOWN",
 		PrimaryTrend: "NONE",
@@ -270,7 +262,7 @@ func (s *TrendScalpingV1Strategy) detectMarketRegime(input TrendScalpingV1Input,
 // ==== Signal Scoring System ====
 
 // calculateSignalScore evaluates the quality of a trading signal (150-point system)
-func (s *TrendScalpingV1Strategy) calculateSignalScore(input TrendScalpingV1Input, side string, currentPrice, currentEMA float64, rsi7 []float64) SignalScore {
+func (s *TrendScalpingV1Strategy) calculateSignalScore(input tradingModels.CandleInput, side string, currentPrice, currentEMA float64, rsi7 []float64) SignalScore {
 	score := 0.0
 	maxScore := 150.0 // Increased max score to 150
 	breakdown := make(map[string]float64)
@@ -341,7 +333,7 @@ func (s *TrendScalpingV1Strategy) getRecommendation(percentage float64) string {
 // ==== New Enhanced Scoring Methods (120-point system) ====
 
 // A. Multi-Timeframe Alignment (25 points) - Enhanced
-func (s *TrendScalpingV1Strategy) scoreMultiTimeframeAlignment(input TrendScalpingV1Input, side string, currentPrice float64) float64 {
+func (s *TrendScalpingV1Strategy) scoreMultiTimeframeAlignment(input tradingModels.CandleInput, side string, currentPrice float64) float64 {
 	score := 0.0
 
 	// M15-M5 Alignment (10 points) - Enhanced
@@ -359,7 +351,7 @@ func (s *TrendScalpingV1Strategy) scoreMultiTimeframeAlignment(input TrendScalpi
 	return score
 }
 
-func (s *TrendScalpingV1Strategy) scoreM5M1Alignment(input TrendScalpingV1Input, side string, currentPrice float64) float64 {
+func (s *TrendScalpingV1Strategy) scoreM5M1Alignment(input tradingModels.CandleInput, side string, currentPrice float64) float64 {
 	if len(input.M5Candles) < 5 || len(input.M1Candles) < 5 {
 		return 5.0
 	}
@@ -404,7 +396,7 @@ func (s *TrendScalpingV1Strategy) scoreM5M1Alignment(input TrendScalpingV1Input,
 }
 
 // B. Enhanced Trend Strength (30 points) - Enhanced
-func (s *TrendScalpingV1Strategy) scoreEnhancedTrendStrength(input TrendScalpingV1Input, side string, currentPrice, currentEMA float64) float64 {
+func (s *TrendScalpingV1Strategy) scoreEnhancedTrendStrength(input tradingModels.CandleInput, side string, currentPrice, currentEMA float64) float64 {
 	score := 0.0
 
 	// EMA Multiple Timeframes (15 points) - Enhanced
@@ -423,7 +415,7 @@ func (s *TrendScalpingV1Strategy) scoreEnhancedTrendStrength(input TrendScalping
 }
 
 // C. Advanced RSI Analysis (25 points) - Enhanced
-func (s *TrendScalpingV1Strategy) scoreAdvancedRSI(input TrendScalpingV1Input, side string, rsi7 []float64) float64 {
+func (s *TrendScalpingV1Strategy) scoreAdvancedRSI(input tradingModels.CandleInput, side string, rsi7 []float64) float64 {
 	score := 0.0
 
 	// RSI Divergence (10 points) - Enhanced
@@ -442,7 +434,7 @@ func (s *TrendScalpingV1Strategy) scoreAdvancedRSI(input TrendScalpingV1Input, s
 }
 
 // D. Pattern Recognition (25 points) - Enhanced
-func (s *TrendScalpingV1Strategy) scorePatternRecognition(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scorePatternRecognition(input tradingModels.CandleInput, side string) float64 {
 	score := 0.0
 
 	// Candlestick Patterns (10 points) - Enhanced
@@ -457,7 +449,7 @@ func (s *TrendScalpingV1Strategy) scorePatternRecognition(input TrendScalpingV1I
 }
 
 // E. Market Microstructure (25 points) - Enhanced
-func (s *TrendScalpingV1Strategy) scoreMarketMicrostructure(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreMarketMicrostructure(input tradingModels.CandleInput, side string) float64 {
 	score := 0.0
 
 	// Volume Analysis (10 points) - Enhanced
@@ -475,7 +467,7 @@ func (s *TrendScalpingV1Strategy) scoreMarketMicrostructure(input TrendScalpingV
 	return score
 }
 
-func (s *TrendScalpingV1Strategy) scoreVolumeAnalysisEnhanced(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreVolumeAnalysisEnhanced(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M1Candles) < 5 {
 		return 5.0
 	}
@@ -510,7 +502,7 @@ func (s *TrendScalpingV1Strategy) scoreVolumeAnalysisEnhanced(input TrendScalpin
 	return score
 }
 
-func (s *TrendScalpingV1Strategy) scorePriceActionEnhanced(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scorePriceActionEnhanced(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M1Candles) < 3 {
 		return 5.0
 	}
@@ -545,7 +537,7 @@ func (s *TrendScalpingV1Strategy) scorePriceActionEnhanced(input TrendScalpingV1
 }
 
 // F. Risk Management (20 points) - Enhanced
-func (s *TrendScalpingV1Strategy) scoreRiskManagement(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreRiskManagement(input tradingModels.CandleInput, side string) float64 {
 	score := 0.0
 
 	// Volatility Assessment (10 points) - Enhanced
@@ -563,7 +555,7 @@ func (s *TrendScalpingV1Strategy) scoreRiskManagement(input TrendScalpingV1Input
 	return score
 }
 
-func (s *TrendScalpingV1Strategy) scoreVolatilityAssessmentEnhanced(input TrendScalpingV1Input) float64 {
+func (s *TrendScalpingV1Strategy) scoreVolatilityAssessmentEnhanced(input tradingModels.CandleInput) float64 {
 	if len(input.M1Candles) < 20 {
 		return 4.0
 	}
@@ -584,7 +576,7 @@ func (s *TrendScalpingV1Strategy) scoreVolatilityAssessmentEnhanced(input TrendS
 	return score
 }
 
-func (s *TrendScalpingV1Strategy) scorePositionSizingEnhanced(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scorePositionSizingEnhanced(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M1Candles) < 20 {
 		return 2.5
 	}
@@ -626,7 +618,7 @@ func (s *TrendScalpingV1Strategy) scorePositionSizingEnhanced(input TrendScalpin
 }
 
 // Quick Exit Strategy (5 points) - NEW
-func (s *TrendScalpingV1Strategy) scoreQuickExitStrategy(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreQuickExitStrategy(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M1Candles) < 5 {
 		return 2.5
 	}
@@ -716,7 +708,7 @@ func (s *TrendScalpingV1Strategy) detectMomentumContinuation(candles []baseCandl
 // ==== Main Analyze Logic ====
 
 // AnalyzeWithSignalString analyzes the input and returns a formatted signal string (risk percent version)
-func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input TrendScalpingV1Input, symbol string) (*string, error) {
+func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.CandleInput, symbol string) (*string, error) {
 	if len(input.M15Candles) < s.emaPeriod200 || len(input.M5Candles) < s.emaPeriod50 || len(input.M1Candles) < s.rsiPeriod {
 		return nil, fmt.Errorf("insufficient data: need at least %d M15 candles, %d M5 candles, and %d M1 candles", s.emaPeriod200, s.emaPeriod50, s.rsiPeriod)
 	}
@@ -811,7 +803,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input TrendScalpingV1I
 }
 
 // AnalyzeWithSignalAndModel analyzes the input and returns both signal string and model
-func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input TrendScalpingV1Input, symbol string) (*string, *TrendScalpingV1Signal, error) {
+func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.CandleInput, symbol string) (*string, *TrendScalpingV1Signal, error) {
 	if len(input.M15Candles) < s.emaPeriod200 || len(input.M5Candles) < s.emaPeriod50 || len(input.M1Candles) < s.rsiPeriod {
 		return nil, nil, fmt.Errorf("insufficient data: need at least %d M15 candles, %d M5 candles, and %d M1 candles", s.emaPeriod200, s.emaPeriod50, s.rsiPeriod)
 	}
@@ -1321,7 +1313,7 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 	return strings.TrimSpace(result)
 }
 
-func (s *TrendScalpingV1Strategy) scoreM15M5AlignmentEnhanced(input TrendScalpingV1Input, side string, currentPrice float64) float64 {
+func (s *TrendScalpingV1Strategy) scoreM15M5AlignmentEnhanced(input tradingModels.CandleInput, side string, currentPrice float64) float64 {
 	if len(input.M15Candles) < 10 || len(input.M5Candles) < 10 {
 		return 5.0
 	}
@@ -1369,7 +1361,7 @@ func (s *TrendScalpingV1Strategy) scoreM15M5AlignmentEnhanced(input TrendScalpin
 	return math.Min(10.0, score)
 }
 
-func (s *TrendScalpingV1Strategy) scoreH1M15Alignment(input TrendScalpingV1Input, side string, currentPrice float64) float64 {
+func (s *TrendScalpingV1Strategy) scoreH1M15Alignment(input tradingModels.CandleInput, side string, currentPrice float64) float64 {
 	if len(input.H1Candles) < 10 || len(input.M15Candles) < 10 {
 		return 2.5
 	}
@@ -1425,7 +1417,7 @@ func (s *TrendScalpingV1Strategy) calculateTrendStrength(candles []baseCandleMod
 	return float64(bullishCandles) / float64(period)
 }
 
-func (s *TrendScalpingV1Strategy) scoreEMAMultipleTimeframesEnhanced(input TrendScalpingV1Input, side string, currentPrice float64) float64 {
+func (s *TrendScalpingV1Strategy) scoreEMAMultipleTimeframesEnhanced(input tradingModels.CandleInput, side string, currentPrice float64) float64 {
 	if len(input.M15Candles) < s.emaPeriod200 || len(input.M5Candles) < s.emaPeriod50 {
 		return 7.0
 	}
@@ -1503,7 +1495,7 @@ func (s *TrendScalpingV1Strategy) scoreEMAMultipleTimeframesEnhanced(input Trend
 	return math.Min(15.0, score)
 }
 
-func (s *TrendScalpingV1Strategy) scoreTrendConsistencyEnhanced(input TrendScalpingV1Input, side string, currentPrice, currentEMA float64) float64 {
+func (s *TrendScalpingV1Strategy) scoreTrendConsistencyEnhanced(input tradingModels.CandleInput, side string, currentPrice, currentEMA float64) float64 {
 	if len(input.M15Candles) < 10 {
 		return 5.0
 	}
@@ -1555,7 +1547,7 @@ func (s *TrendScalpingV1Strategy) scoreTrendConsistencyEnhanced(input TrendScalp
 	return consistency * 10.0
 }
 
-func (s *TrendScalpingV1Strategy) scoreADXTrendStrength(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreADXTrendStrength(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M15Candles) < 14 {
 		return 2.5
 	}
@@ -1603,7 +1595,7 @@ func (s *TrendScalpingV1Strategy) scoreADXTrendStrength(input TrendScalpingV1Inp
 	return math.Min(5.0, score)
 }
 
-func (s *TrendScalpingV1Strategy) scoreRSIDivergenceEnhanced(input TrendScalpingV1Input, side string, rsi7 []float64) float64 {
+func (s *TrendScalpingV1Strategy) scoreRSIDivergenceEnhanced(input tradingModels.CandleInput, side string, rsi7 []float64) float64 {
 	if len(rsi7) < 10 || len(input.M1Candles) < 10 {
 		return 5.0
 	}
@@ -1639,7 +1631,7 @@ func (s *TrendScalpingV1Strategy) scoreRSIDivergenceEnhanced(input TrendScalping
 	return score
 }
 
-func (s *TrendScalpingV1Strategy) scoreRSIMultiTimeframeEnhanced(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreRSIMultiTimeframeEnhanced(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M1Candles) < s.rsiPeriod || len(input.M5Candles) < s.rsiPeriod {
 		return 5.0
 	}
@@ -1755,7 +1747,7 @@ func (s *TrendScalpingV1Strategy) scoreRSIMomentum(side string, rsi7 []float64) 
 	return score
 }
 
-func (s *TrendScalpingV1Strategy) scoreCandlestickPatternsEnhanced(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreCandlestickPatternsEnhanced(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M1Candles) < 3 {
 		return 5.0
 	}
@@ -1807,7 +1799,7 @@ func (s *TrendScalpingV1Strategy) scoreCandlestickPatternsEnhanced(input TrendSc
 	return math.Min(10.0, score)
 }
 
-func (s *TrendScalpingV1Strategy) scoreSupportResistanceEnhanced(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreSupportResistanceEnhanced(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M1Candles) < 20 {
 		return 5.0
 	}
@@ -1912,7 +1904,7 @@ func (s *TrendScalpingV1Strategy) scoreSupportResistanceEnhanced(input TrendScal
 	return math.Min(15.0, score)
 }
 
-func (s *TrendScalpingV1Strategy) scoreHarmonicPatterns(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreHarmonicPatterns(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M1Candles) < 10 {
 		return 2.5
 	}
@@ -2020,7 +2012,7 @@ func (s *TrendScalpingV1Strategy) detectBatPattern(candles []baseCandleModel.Bas
 	return false
 }
 
-func (s *TrendScalpingV1Strategy) scoreOrderFlowAnalysis(input TrendScalpingV1Input, side string) float64 {
+func (s *TrendScalpingV1Strategy) scoreOrderFlowAnalysis(input tradingModels.CandleInput, side string) float64 {
 	if len(input.M1Candles) < 5 {
 		return 2.5
 	}
