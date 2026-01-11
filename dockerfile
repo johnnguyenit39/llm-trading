@@ -32,7 +32,7 @@ RUN apk add --no-cache ca-certificates
 EXPOSE 80
 
 # Copy necessary files into the container
-COPY .env ./
+# Note: .env file is not copied as environment variables are set via build args/runtime env
 COPY assets ./assets
 
 # Copy the compiled binary from the builder stage
