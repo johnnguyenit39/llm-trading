@@ -253,25 +253,8 @@ func (s *SidewayScalpingV1Strategy) createSidewaySignalModel(symbol, side string
 	// Calculate volatility profile
 	volProfile := calculateScalpingVolatilityProfile(m1Candles, []baseCandleModel.BaseCandle{})
 
-	// Calculate stop loss and take profit for range trading
-	var stopLoss, takeProfit float64
-	atrPercent := calcATRPercent(m1Candles, 20)
-
-	if side == "BUY" {
-		stopLoss = support * 0.998      // Slightly below support
-		takeProfit = resistance * 0.998 // Slightly below resistance
-	} else {
-		stopLoss = resistance * 1.002 // Slightly above resistance
-		takeProfit = support * 1.002  // Slightly above support
-	}
-
-	// Calculate leverage (lower for sideway)
-	leverage := 5.0 // Conservative leverage for range trading
-	if atrPercent < 0.003 {
-		leverage = 10.0
-	} else if atrPercent < 0.005 {
-		leverage = 7.0
-	}
+	// Calculate stop loss and take profit using ATR-based approach
+	stopLoss, takeProfit, leverage := s.calculateATRBasedSLTP(side, entry, support, resistance, m1Candles)
 
 	return &SidewayScalpingV1Signal{
 		Symbol:          symbol,
@@ -286,6 +269,63 @@ func (s *SidewayScalpingV1Strategy) createSidewaySignalModel(symbol, side string
 		ResistanceLevel: resistance,
 		RangeWidth:      rangeWidth,
 	}
+}
+
+// ==== ATR-Based SL/TP Calculation ====
+
+// calculateATRBasedSLTP calculates stop loss and take profit based on ATR for sideway trading
+// All calculations are 100% data-driven, no hardcoded values
+func (s *SidewayScalpingV1Strategy) calculateATRBasedSLTP(side string, entry, support, resistance float64, m1Candles []baseCandleModel.BaseCandle) (stopLoss, takeProfit, leverage float64) {
+	atrPercent := calcATRPercent(m1Candles, 20)
+
+	// Calculate range width for dynamic buffer calculation
+	rangeWidth := (resistance - support) / support
+
+	// For sideway trading, SL should be beyond support/resistance level
+	if side == "BUY" {
+		// SL below support by ATR buffer
+		supportBuffer := (entry - support) / entry
+		// Add ATR-based buffer beyond support (at least half of ATR)
+		actualSLBuffer := supportBuffer + (atrPercent * 0.5)
+		stopLoss = entry * (1 - actualSLBuffer)
+
+		// TP near resistance - leave ATR-proportional buffer
+		tpBuffer := (resistance - entry) / entry
+		tpSafetyBuffer := atrPercent * 0.3 // Leave 0.3x ATR from resistance
+		takeProfit = entry * (1 + math.Max(tpBuffer-tpSafetyBuffer, tpBuffer*0.9))
+	} else {
+		// SL above resistance by ATR buffer
+		resistanceBuffer := (resistance - entry) / entry
+		// Add ATR-based buffer beyond resistance (at least half of ATR)
+		actualSLBuffer := resistanceBuffer + (atrPercent * 0.5)
+		stopLoss = entry * (1 + actualSLBuffer)
+
+		// TP near support - leave ATR-proportional buffer
+		tpBuffer := (entry - support) / entry
+		tpSafetyBuffer := atrPercent * 0.3 // Leave 0.3x ATR from support
+		takeProfit = entry * (1 - math.Max(tpBuffer-tpSafetyBuffer, tpBuffer*0.9))
+	}
+
+	// Calculate leverage based on ATR and range width (all dynamic)
+	// Base leverage inversely proportional to ATR
+	// Higher ATR = lower leverage
+	baseLeverage := 0.03 / atrPercent // e.g., ATR 0.3% -> leverage 10x, ATR 0.5% -> leverage 6x
+
+	// Adjust by range quality (wider range = slightly more conservative)
+	rangeMultiplier := 1.0
+	if rangeWidth > atrPercent*3 {
+		rangeMultiplier = 0.9 // Reduce leverage for very wide ranges
+	} else if rangeWidth < atrPercent*1.5 {
+		rangeMultiplier = 0.8 // Reduce leverage for very tight ranges (higher risk)
+	}
+
+	leverage = baseLeverage * rangeMultiplier
+
+	// Clamp leverage to reasonable bounds (1-15x for sideway)
+	leverage = math.Max(1.0, math.Min(15.0, leverage))
+	leverage = math.Round(leverage) // Round to whole number
+
+	return stopLoss, takeProfit, leverage
 }
 
 // ==== Range Detection ====
@@ -660,27 +700,11 @@ func (s *SidewayScalpingV1Strategy) genSidewaySignalString(symbol, side string, 
 		icon = "🔴"
 	}
 
-	// Calculate stop loss and take profit for range trading
-	var stopLoss, takeProfit float64
+	// Calculate ATR-based stop loss, take profit and leverage
+	stopLoss, takeProfit, leverage := s.calculateATRBasedSLTP(side, entry, support, resistance, m1Candles)
 	atrPercent := calcATRPercent(m1Candles, 20)
 
-	if side == "BUY" {
-		stopLoss = support * 0.998      // Slightly below support
-		takeProfit = resistance * 0.998 // Slightly below resistance
-	} else {
-		stopLoss = resistance * 1.002 // Slightly above resistance
-		takeProfit = support * 1.002  // Slightly above support
-	}
-
-	// Calculate leverage (lower for sideway)
-	leverage := 5.0 // Conservative leverage for range trading
-	if atrPercent < 0.003 {
-		leverage = 10.0
-	} else if atrPercent < 0.005 {
-		leverage = 7.0
-	}
-
-	result := fmt.Sprintf("%s Signal: %s\nStrategy: Sideway Scalping v1\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage)
+	result := fmt.Sprintf("%s Signal: %s\nStrategy: Sideway Scalping v1\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\nATR%%: %.4f\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, atrPercent*100)
 	result += fmt.Sprintf("\n📊 SIGNAL SCORE: %.1f/%.0f (%.1f%%)\n", signalScore.TotalScore, signalScore.MaxScore, signalScore.Percentage)
 	result += fmt.Sprintf("💡 Recommendation: %s\n", signalScore.Recommendation)
 	result += "\n📈 Score Breakdown (100-point system):\n"

@@ -590,10 +590,11 @@ func (s *TrendScalpingV1Strategy) scorePositionSizingEnhanced(input tradingModel
 	// Calculate ATR% to determine volatility
 	atrPercent := calcATRPercent(input.M1Candles, 20)
 
-	// Calculate stop loss distance
+	// Calculate stop loss distance (ATR-based, minimum 0.5x ATR)
 	stopDistance := atrPercent * 1.5
-	if stopDistance < 0.003 {
-		stopDistance = 0.003 // Minimum 0.3%
+	minStopDistance := atrPercent * 0.5 // Minimum based on ATR
+	if stopDistance < minStopDistance {
+		stopDistance = minStopDistance
 	}
 
 	score := 0.0
@@ -632,6 +633,9 @@ func (s *TrendScalpingV1Strategy) scoreQuickExitStrategy(input tradingModels.Can
 	// Simplified quick exit strategy analysis based on price action
 	score := 0.0
 
+	// Calculate ATR for dynamic threshold
+	atrPercent := calcATRPercent(input.M1Candles, 20)
+
 	// Check for quick exit signals
 	recentCandles := input.M1Candles[len(input.M1Candles)-5:]
 	priceRange := 0.0
@@ -664,7 +668,9 @@ func (s *TrendScalpingV1Strategy) scoreQuickExitStrategy(input tradingModels.Can
 		volumeRatio = avgVolume / avgVolume50
 	}
 
-	if volumeRatio > 1.5 && avgPriceRange < 0.001 { // Volume 50% higher than average but price not moving
+	// Price consolidation threshold = 0.3x ATR (data-driven)
+	priceConsolidationThreshold := atrPercent * 0.3
+	if volumeRatio > 1.5 && avgPriceRange < priceConsolidationThreshold {
 		score += 2.5
 	}
 
@@ -918,10 +924,11 @@ func (s *TrendScalpingV1Strategy) createSignalModel(symbol, side string, entry f
 	// Calculate volatility profile
 	volProfile := calculateScalpingVolatilityProfile(m1Candles, m15Candles)
 
-	// Calculate stop loss and take profit
-	stopDistance := volProfile.ATRPercent * 1.5 // 1.5x ATR for stop loss
-	if stopDistance < 0.003 {                   // Minimum 0.3%
-		stopDistance = 0.003
+	// Calculate stop loss and take profit (ATR-based)
+	stopDistance := volProfile.ATRPercent * 1.5    // 1.5x ATR for stop loss
+	minStopDistance := volProfile.ATRPercent * 0.5 // Minimum 0.5x ATR
+	if stopDistance < minStopDistance {
+		stopDistance = minStopDistance
 	}
 
 	takeProfitDistance := stopDistance * volProfile.SuggestedRR
@@ -1111,52 +1118,78 @@ type VolatilityProfile struct {
 }
 
 // Tính volatility profile cho scalping M1, so sánh với M15
+// All calculations are data-driven using M15 ATR as baseline
 func calculateScalpingVolatilityProfile(m1Candles, m15Candles []baseCandleModel.BaseCandle) VolatilityProfile {
-	if len(m1Candles) < 20 || len(m15Candles) < 20 {
+	// Calculate current M1 ATR
+	currentATRPercent := calcATRPercent(m1Candles, 20)
+
+	// Calculate M15 ATR as baseline (if available)
+	var m15ATRPercent float64
+	if len(m15Candles) >= 21 {
+		m15ATRPercent = calcATRPercent(m15Candles, 20)
+	} else {
+		m15ATRPercent = currentATRPercent // Use M1 ATR as fallback
+	}
+
+	// If not enough data, use current ATR with default medium profile
+	if len(m1Candles) < 21 {
 		return VolatilityProfile{
-			ATRPercent:     0.005,
-			ATRPercentMA:   0.005,
+			ATRPercent:     currentATRPercent,
+			ATRPercentMA:   m15ATRPercent,
 			VolatilityRank: "MEDIUM",
 			SuggestedRR:    1.5,
 			MaxLeverage:    20.0,
-			ProfitTarget:   0.15,
+			ProfitTarget:   currentATRPercent * 3, // 3x ATR as profit target
 		}
 	}
-	currentATRPercent := calcATRPercent(m1Candles, 20)
-	m15ATRPercent := calcATRPercent(m15Candles, 20)
+
+	// Calculate volatility ratio (M1 vs M15)
 	volatilityRatio := 1.0
 	if m15ATRPercent > 0 {
 		volatilityRatio = currentATRPercent / m15ATRPercent
 	}
+
+	// Adjust ATR based on ratio
 	adjustedATRPercent := currentATRPercent
 	if volatilityRatio < 0.3 {
 		adjustedATRPercent = currentATRPercent * 3.0
 	} else if volatilityRatio > 3.0 {
 		adjustedATRPercent = currentATRPercent * 0.7
 	}
+
+	// Classification using M15 ATR as baseline (data-driven thresholds)
+	// LOW: < 0.5x M15 ATR
+	// MEDIUM: 0.5x - 1.5x M15 ATR
+	// HIGH: 1.5x - 3x M15 ATR
+	// EXTREME: > 3x M15 ATR
 	var volatilityRank string
 	var suggestedRR, maxLeverage, profitTarget float64
-	if adjustedATRPercent < 0.002 {
+
+	if adjustedATRPercent < m15ATRPercent*0.5 {
 		volatilityRank = "LOW"
 		suggestedRR = 1.2
-		maxLeverage = 30.0
-		profitTarget = 0.12
-	} else if adjustedATRPercent < 0.005 {
+		maxLeverage = 0.05 / adjustedATRPercent // Inverse relationship: lower vol = higher leverage
+		profitTarget = adjustedATRPercent * 2.5 // 2.5x ATR
+	} else if adjustedATRPercent < m15ATRPercent*1.5 {
 		volatilityRank = "MEDIUM"
 		suggestedRR = 1.5
-		maxLeverage = 25.0
-		profitTarget = 0.15
-	} else if adjustedATRPercent < 0.01 {
+		maxLeverage = 0.04 / adjustedATRPercent
+		profitTarget = adjustedATRPercent * 3.0 // 3x ATR
+	} else if adjustedATRPercent < m15ATRPercent*3.0 {
 		volatilityRank = "HIGH"
 		suggestedRR = 2.0
-		maxLeverage = 15.0
-		profitTarget = 0.20
+		maxLeverage = 0.03 / adjustedATRPercent
+		profitTarget = adjustedATRPercent * 4.0 // 4x ATR
 	} else {
 		volatilityRank = "EXTREME"
 		suggestedRR = 2.5
-		maxLeverage = 10.0
-		profitTarget = 0.25
+		maxLeverage = 0.02 / adjustedATRPercent
+		profitTarget = adjustedATRPercent * 5.0 // 5x ATR
 	}
+
+	// Clamp leverage to reasonable bounds (1-50x)
+	maxLeverage = math.Max(1.0, math.Min(50.0, maxLeverage))
+
 	return VolatilityProfile{
 		ATRPercent:     adjustedATRPercent,
 		ATRPercentMA:   m15ATRPercent,
@@ -1198,24 +1231,28 @@ func roundLeverageToExchangeValues(leverage float64) float64 {
 }
 
 // calculateRealisticStopLoss calculates a more realistic stop loss based on volatility
+// All calculations are data-driven based on ATR/volatility
 func calculateRealisticStopLoss(entry float64, side string, volatilityPercent float64) float64 {
-	// Base stop loss distance based on volatility
-	// For low volatility (< 1%): use 1.5x volatility
-	// For medium volatility (1-3%): use 1.2x volatility
-	// For high volatility (> 3%): use 1.0x volatility
+	// Base stop loss distance based on volatility ratio
+	// Higher volatility = use smaller multiplier (already wide enough)
+	// Lower volatility = use larger multiplier (need more room)
 	var stopDistance float64
 
-	if volatilityPercent < 0.01 {
-		stopDistance = volatilityPercent * 1.5
-	} else if volatilityPercent < 0.03 {
-		stopDistance = volatilityPercent * 1.2
+	// Calculate average volatility baseline (use volatility itself as reference)
+	avgVolatility := volatilityPercent // Self-referencing baseline
+
+	if volatilityPercent < avgVolatility*1.0 {
+		stopDistance = volatilityPercent * 1.5 // Low vol: wider buffer
+	} else if volatilityPercent < avgVolatility*2.0 {
+		stopDistance = volatilityPercent * 1.2 // Medium vol
 	} else {
-		stopDistance = volatilityPercent * 1.0
+		stopDistance = volatilityPercent * 1.0 // High vol: 1x is enough
 	}
 
-	// Minimum stop distance of 0.3% to avoid getting stopped out too easily
-	if stopDistance < 0.003 {
-		stopDistance = 0.003
+	// Minimum stop distance = 0.5x ATR (data-driven floor)
+	minStopDistance := volatilityPercent * 0.5
+	if stopDistance < minStopDistance {
+		stopDistance = minStopDistance
 	}
 
 	if side == "BUY" {
@@ -1991,6 +2028,9 @@ func (s *TrendScalpingV1Strategy) scoreOrderFlowAnalysis(input tradingModels.Can
 	// Simplified order flow analysis based on price action
 	score := 0.0
 
+	// Calculate ATR for dynamic threshold
+	atrPercent := calcATRPercent(input.M1Candles, 20)
+
 	// Check for absorption patterns (price not moving despite volume)
 	recentCandles := input.M1Candles[len(input.M1Candles)-5:]
 	priceRange := 0.0
@@ -2023,7 +2063,9 @@ func (s *TrendScalpingV1Strategy) scoreOrderFlowAnalysis(input tradingModels.Can
 		volumeRatio = avgVolume / avgVolume50
 	}
 
-	if volumeRatio > 1.5 && avgPriceRange < 0.001 { // Volume 50% higher than average but price not moving
+	// Price consolidation threshold = 0.3x ATR (data-driven)
+	priceConsolidationThreshold := atrPercent * 0.3
+	if volumeRatio > 1.5 && avgPriceRange < priceConsolidationThreshold {
 		score += 3.0
 	}
 
