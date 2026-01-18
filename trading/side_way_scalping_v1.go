@@ -704,7 +704,13 @@ func (s *SidewayScalpingV1Strategy) genSidewaySignalString(symbol, side string, 
 	stopLoss, takeProfit, leverage := s.calculateATRBasedSLTP(side, entry, support, resistance, m1Candles)
 	atrPercent := calcATRPercent(m1Candles, 20)
 
-	result := fmt.Sprintf("%s Signal: %s\nStrategy: Sideway Scalping v1\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\nATR%%: %.4f\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, atrPercent*100)
+	// Calculate ATR in actual price
+	atrPrice := atrPercent * entry
+
+	// Calculate range in actual price
+	rangePriceWidth := resistance - support
+
+	result := fmt.Sprintf("%s Signal: %s\nStrategy: Sideway Scalping v1\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage)
 	result += fmt.Sprintf("\n📊 SIGNAL SCORE: %.1f/%.0f (%.1f%%)\n", signalScore.TotalScore, signalScore.MaxScore, signalScore.Percentage)
 	result += fmt.Sprintf("💡 Recommendation: %s\n", signalScore.Recommendation)
 	result += "\n📈 Score Breakdown (100-point system):\n"
@@ -727,15 +733,20 @@ func (s *SidewayScalpingV1Strategy) genSidewaySignalString(symbol, side string, 
 		result += fmt.Sprintf("  • %s: %.1f/%.0f\n", category, score, maxPoints)
 	}
 
-	result += "\n📊 Range Analysis:\n"
+	result += "\n📊 Sideway Range:\n"
+	result += fmt.Sprintf("  • Trading Range: $%.4f - $%.4f\n", support, resistance)
+	result += fmt.Sprintf("  • Range Width: $%.4f (%.2f%%)\n", rangePriceWidth, rangeWidth)
 	result += fmt.Sprintf("  • Support: %.4f\n", support)
 	result += fmt.Sprintf("  • Resistance: %.4f\n", resistance)
-	result += fmt.Sprintf("  • Range Width: %.2f%%\n", rangeWidth)
 	result += fmt.Sprintf("  • Entry Distance: %.2f%%\n", math.Abs(entry-support)/entry*100)
 
+	result += "\n📉 Volatility (ATR):\n"
+	result += fmt.Sprintf("  • ATR: $%.4f (%.4f%%)\n", atrPrice, atrPercent*100)
+	result += fmt.Sprintf("  • Avg candle movement: ±$%.4f\n", atrPrice)
+
 	result += "\n⚡ Risk Management:\n"
-	result += fmt.Sprintf("  • Stop Loss: %.4f (%.2f%%)\n", stopLoss, math.Abs(entry-stopLoss)/entry*100)
-	result += fmt.Sprintf("  • Take Profit: %.4f (%.2f%%)\n", takeProfit, math.Abs(takeProfit-entry)/entry*100)
+	result += fmt.Sprintf("  • Stop Loss: %.4f (%.2f%% | -$%.4f)\n", stopLoss, math.Abs(entry-stopLoss)/entry*100, math.Abs(entry-stopLoss))
+	result += fmt.Sprintf("  • Take Profit: %.4f (%.2f%% | +$%.4f)\n", takeProfit, math.Abs(takeProfit-entry)/entry*100, math.Abs(takeProfit-entry))
 
 	rr := math.Abs(takeProfit-entry) / math.Abs(entry-stopLoss)
 	result += fmt.Sprintf("  • Risk:Reward: 1:%.2f\n", rr)

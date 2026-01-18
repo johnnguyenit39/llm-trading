@@ -1275,7 +1275,11 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 	leverage := roundLeverageToExchangeValues(rawLeverage)
 	suggestedRR := volProfile.SuggestedRR
 	dynamicRRList := []float64{suggestedRR, suggestedRR * 1.5}
-	result := fmt.Sprintf("%s Signal: %s\nStrategy: Trend Scalping v1\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\nATR%%(adj): %.4f\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage, volProfile.ATRPercent*100)
+	
+	// Calculate ATR in actual price
+	atrPrice := volProfile.ATRPercent * entry
+	
+	result := fmt.Sprintf("%s Signal: %s\nStrategy: Trend Scalping v1\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage)
 	result += fmt.Sprintf("\n📊 SIGNAL SCORE: %.1f/%.0f (%.1f%%)\n", signalScore.TotalScore, signalScore.MaxScore, signalScore.Percentage)
 	result += fmt.Sprintf("💡 Recommendation: %s\n", signalScore.Recommendation)
 	result += "\n📈 Score Breakdown (150-point system):\n"
@@ -1301,9 +1305,14 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 		}
 		result += fmt.Sprintf("  • %s: %.1f/%.0f\n", category, score, maxPoints)
 	}
-	result += fmt.Sprintf("\n⚡ Volatility: %s (%.4f%%)\n", volProfile.VolatilityRank, volProfile.ATRPercent*100)
-	result += fmt.Sprintf("🎯 Suggested RR: 1:%.1f\n", suggestedRR)
-	result += fmt.Sprintf("🏆 Profit Target: %.1f%%\n", volProfile.ProfitTarget*100)
+	
+	result += "\n📉 Volatility (ATR):\n"
+	result += fmt.Sprintf("  • ATR: $%.4f (%.4f%%)\n", atrPrice, volProfile.ATRPercent*100)
+	result += fmt.Sprintf("  • Avg candle movement: ±$%.4f\n", atrPrice)
+	result += fmt.Sprintf("  • Volatility Rank: %s\n", volProfile.VolatilityRank)
+	
+	result += fmt.Sprintf("\n🎯 Suggested RR: 1:%.1f\n", suggestedRR)
+	result += fmt.Sprintf("🏆 Profit Target: %.4f%% ($%.4f)\n", volProfile.ProfitTarget*100, volProfile.ProfitTarget*entry)
 
 	// Add multi-timeframe analysis details
 	result += "\n📊 Multi-Timeframe Analysis:\n"
@@ -1335,7 +1344,7 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 		}
 	}
 
-	result += "\n"
+	result += "\n⚡ Risk Management:\n"
 	for _, rr := range dynamicRRList {
 		var sl, tp float64
 		rrStr := fmt.Sprintf("1:%.1f", rr)
@@ -1351,7 +1360,9 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 			tp = entry - (stopDistance * rr * entry)
 		}
 
-		result += fmt.Sprintf("RR: %s\nStop Loss: %.4f\nTake Profit: %.4f\n\n", rrStr, sl, tp)
+		slDistance := math.Abs(entry - sl)
+		tpDistance := math.Abs(tp - entry)
+		result += fmt.Sprintf("RR %s:\n  • SL: %.4f (%.2f%% | -$%.4f)\n  • TP: %.4f (%.2f%% | +$%.4f)\n\n", rrStr, sl, stopDistance*100, slDistance, tp, (tpDistance/entry)*100, tpDistance)
 	}
 	return strings.TrimSpace(result)
 }
