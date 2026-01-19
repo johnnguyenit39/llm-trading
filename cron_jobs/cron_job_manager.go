@@ -22,6 +22,16 @@ import (
 	"gorm.io/gorm"
 )
 
+// TradingSymbols is the shared list of symbols for all strategies
+var TradingSymbols = []string{
+	"BTCUSDT", "ETHUSDT", "BNBUSDT",
+	"SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "MATICUSDT",
+	"LINKUSDT", "DOTUSDT", "ATOMUSDT", "NEARUSDT", "SUIUSDT",
+	"DOGEUSDT", "TRXUSDT", "BCHUSDT", "ZECUSDT", "LTCUSDT",
+	"POLUSDT", "ALGOUSDT", "DASHUSDT", "NEOUSDT",
+	"XAUUSDT",
+}
+
 // InitCronJobs initializes and starts all cron jobs
 func InitCronJobs(db *gorm.DB) {
 	repo := repository.NewBinanceRepository()
@@ -37,21 +47,11 @@ func InitCronJobs(db *gorm.DB) {
 func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 	telegramService := telegram.NewTelegramService()
 	backTesting := backtesting.NewBackTesting(db)
-	symbols := []string{
-		// Large cap - High liquidity
-		"BTCUSDT", "ETHUSDT", "BNBUSDT",
-		// Mid-large cap - Good volume
-		"SOLUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT", "MATICUSDT",
-		// Mid cap - Good volatility
-		"LINKUSDT", "DOTUSDT", "ATOMUSDT", "NEARUSDT", "SUIUSDT",
-		// High volatility
-		"DOGEUSDT",
-	}
 
 	for {
 		now := time.Now()
 		// Chạy logic ngay lập tức
-		for _, symbol := range symbols {
+		for _, symbol := range TradingSymbols {
 			go func(sym string) {
 				// Fetch data cho từng coin
 				M15Candles, err := binanceService.Fetch15mCandles(context.Background(), sym, 300)
@@ -114,10 +114,10 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 				// Route to appropriate strategy based on market regime
 				if marketRegime.Regime == "SIDEWAY" || marketRegime.Regime == "MIXED" {
 					// Use sideway strategy
-					sidewayStrategy := trading.NewSidewayScalpingV1Strategy()
+					sidewayStrategy := scalping.NewSidewayScalpingV1Strategy()
 					signal, sidewaySignalModel, err := sidewayStrategy.AnalyzeWithSignalAndModel(candleInput, sym)
 					if err != nil {
-						log.Error().Err(err).Str("symbol", sym).Msg("Sideway strategy analysis failed")
+						log.Error().Err(err).Str("symbol", sym).Msg("Sideway scalping strategy analysis failed")
 						return
 					}
 
@@ -128,22 +128,22 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 							os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
 							*signal)
 						if err != nil {
-							log.Error().Err(err).Msg("Failed to send sideway signal to Telegram")
+							log.Error().Err(err).Msg("Failed to send sideway scalping signal to Telegram")
 						}
 						log.Info().
 							Str("request_id", uuid.New().String()).
 							Str("strategy", "SidewayScalpingV1").
-							Msg("New sideway signal is sent: " + *signal)
+							Msg("New sideway scalping signal is sent: " + *signal)
 
 						// Execute futures orders for all API keys using the sideway model
-						go executeFuturesOrdersForSidewayKeys(backTesting, sym, sidewaySignalModel)
+						go executeFuturesOrdersForScalpingSidewayKeys(backTesting, sym, sidewaySignalModel)
 					}
 				} else {
 					// Use trending strategy
-					trendingStrategy := trading.NewScalping1Strategy()
+					trendingStrategy := scalping.NewScalping1Strategy()
 					signal, trendSignalModel, err := trendingStrategy.AnalyzeWithSignalAndModel(candleInput, sym)
 					if err != nil {
-						log.Error().Err(err).Str("symbol", sym).Msg("Trending strategy analysis failed")
+						log.Error().Err(err).Str("symbol", sym).Msg("Trend scalping strategy analysis failed")
 						return
 					}
 
@@ -155,15 +155,15 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 							os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
 							*signal)
 						if err != nil {
-							log.Error().Err(err).Msg("Failed to send signal to Telegram")
+							log.Error().Err(err).Msg("Failed to send trend scalping signal to Telegram")
 						}
 						log.Info().
 							Str("request_id", uuid.New().String()).
 							Str("strategy", "TrendScalpingV1").
-							Msg("New trending signal is sent: " + *signal)
+							Msg("New trend scalping signal is sent: " + *signal)
 
 						// Execute futures orders for all API keys using the model
-						go executeFuturesOrdersForAllKeys(backTesting, sym, trendSignalModel)
+						go executeFuturesOrdersForScalpingTrendKeys(backTesting, sym, trendSignalModel)
 					}
 				}
 			}(symbol)
@@ -174,8 +174,190 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 	}
 }
 
-// executeFuturesOrdersForSidewayKeys executes futures orders for sideway signals
-func executeFuturesOrdersForSidewayKeys(backTesting *backtesting.BackTesting, symbol string, signalModel *trading.SidewayScalpingV1Signal) {
+// DayTradingStrategy runs day trading strategies every 15 minutes
+func DayTradingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
+	telegramService := telegram.NewTelegramService()
+	backTesting := backtesting.NewBackTesting(db)
+
+	for {
+		now := time.Now()
+		// Run logic immediately
+		for _, symbol := range TradingSymbols {
+			go func(sym string) {
+				// Fetch data for day trading (need more H4 candles for EMA 200)
+				M15Candles, err := binanceService.Fetch15mCandles(context.Background(), sym, 300)
+				if err != nil || len(M15Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("[DayTrading] Failed to fetch M15 candles or empty data")
+					return
+				}
+
+				H1Candles, err := binanceService.Fetch1hCandles(context.Background(), sym, 100)
+				if err != nil || len(H1Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("[DayTrading] Failed to fetch H1 candles or empty data")
+					return
+				}
+
+				H4Candles, err := binanceService.Fetch4hCandles(context.Background(), sym, 250)
+				if err != nil || len(H4Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("[DayTrading] Failed to fetch H4 candles or empty data")
+					return
+				}
+
+				D1Candles, err := binanceService.Fetch1dCandles(context.Background(), sym, 100)
+				if err != nil || len(D1Candles) == 0 {
+					log.Error().Err(err).Str("symbol", sym).Msg("[DayTrading] Failed to fetch D1 candles or empty data")
+					return
+				}
+
+				// Prepare candle input for day trading
+				candleInput := tradingModels.CandleInput{
+					M15Candles: utilsConverter.ConvertBinanceCandlesToBase(M15Candles),
+					H1Candles:  utilsConverter.ConvertBinanceCandlesToBase(H1Candles),
+					H4Candles:  utilsConverter.ConvertBinanceCandlesToBase(H4Candles),
+					D1Candles:  utilsConverter.ConvertBinanceCandlesToBase(D1Candles),
+				}
+
+				// Detect market regime to route to appropriate strategy
+				currentPrice := candleInput.M15Candles[len(candleInput.M15Candles)-1].Close
+				marketRegime := dayTrading.DetectMarketRegime(candleInput, currentPrice)
+
+				log.Info().
+					Str("symbol", sym).
+					Str("regime", marketRegime.Regime).
+					Float64("confidence", marketRegime.Confidence).
+					Str("reason", marketRegime.Reason).
+					Msg("[DayTrading] Market regime detected")
+
+				// Route to appropriate strategy based on market regime
+				if marketRegime.Regime == "SIDEWAY" || marketRegime.Regime == "MIXED" {
+					// Use sideway day trading strategy
+					sidewayStrategy := dayTrading.NewSidewayDayV1Strategy()
+					signal, sidewaySignalModel, err := sidewayStrategy.AnalyzeWithSignalAndModel(candleInput, sym)
+					if err != nil {
+						log.Error().Err(err).Str("symbol", sym).Msg("[DayTrading] Sideway strategy analysis failed")
+						return
+					}
+
+					if signal != nil && sidewaySignalModel != nil {
+						// Send signal to Telegram
+						err := telegramService.SendMessageToChannel(
+							os.Getenv("J_AI_TRADE_BOT_V1"),
+							os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
+							*signal)
+						if err != nil {
+							log.Error().Err(err).Msg("[DayTrading] Failed to send sideway signal to Telegram")
+						}
+						log.Info().
+							Str("request_id", uuid.New().String()).
+							Str("strategy", "SidewayDayV1").
+							Msg("[DayTrading] New sideway signal is sent: " + *signal)
+
+						// Execute futures orders
+						go executeFuturesOrdersForDaySidewayKeys(backTesting, sym, sidewaySignalModel)
+					}
+				} else {
+					// Use trending day trading strategy
+					trendingStrategy := dayTrading.NewTrendDayV1Strategy()
+					signal, trendSignalModel, err := trendingStrategy.AnalyzeWithSignalAndModel(candleInput, sym)
+					if err != nil {
+						log.Error().Err(err).Str("symbol", sym).Msg("[DayTrading] Trend strategy analysis failed")
+						return
+					}
+
+					if signal != nil && trendSignalModel != nil {
+						// Send signal to Telegram
+						err := telegramService.SendMessageToChannel(
+							os.Getenv("J_AI_TRADE_BOT_V1"),
+							os.Getenv("J_AI_TRADE_BOT_V1_CHAN"),
+							*signal)
+						if err != nil {
+							log.Error().Err(err).Msg("[DayTrading] Failed to send trend signal to Telegram")
+						}
+						log.Info().
+							Str("request_id", uuid.New().String()).
+							Str("strategy", "TrendDayV1").
+							Msg("[DayTrading] New trend signal is sent: " + *signal)
+
+						// Execute futures orders
+						go executeFuturesOrdersForDayTrendKeys(backTesting, sym, trendSignalModel)
+					}
+				}
+			}(symbol)
+		}
+		// Wait until next 15-minute mark
+		next := now.Truncate(15 * time.Minute).Add(15 * time.Minute)
+		time.Sleep(time.Until(next))
+	}
+}
+
+// executeFuturesOrdersForDaySidewayKeys executes futures orders for sideway day trading signals
+func executeFuturesOrdersForDaySidewayKeys(backTesting *backtesting.BackTesting, symbol string, signalModel *dayTrading.SidewayDayV1Signal) {
+	apiKeys, err := loadAPIKeys()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to load API keys")
+		return
+	}
+
+	for _, apiKey := range apiKeys {
+		go func(key model.OkxApiKeysModel) {
+			okxSymbol := convertSymbolToOKX(symbol)
+			decision := convertDecisionToOKX(signalModel.Decision)
+
+			err := backTesting.ExecuteFuturesOrder(
+				okxSymbol,
+				0.001,
+				signalModel.Entry,
+				decision,
+				"SidewayDayV1Strategy",
+				signalModel.TakeProfit,
+				signalModel.StopLoss,
+				&key,
+			)
+
+			if err != nil {
+				log.Error().Err(err).Str("api_key", key.ApiKey).Str("symbol", symbol).Msg("[DayTrading] Failed to execute sideway futures order")
+			} else {
+				log.Info().Str("api_key", key.ApiKey).Str("symbol", symbol).Str("decision", decision).Msg("[DayTrading] Successfully executed sideway futures order")
+			}
+		}(apiKey)
+	}
+}
+
+// executeFuturesOrdersForDayTrendKeys executes futures orders for trend day trading signals
+func executeFuturesOrdersForDayTrendKeys(backTesting *backtesting.BackTesting, symbol string, signalModel *dayTrading.TrendDayV1Signal) {
+	apiKeys, err := loadAPIKeys()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to load API keys")
+		return
+	}
+
+	for _, apiKey := range apiKeys {
+		go func(key model.OkxApiKeysModel) {
+			okxSymbol := convertSymbolToOKX(symbol)
+			decision := convertDecisionToOKX(signalModel.Decision)
+
+			err := backTesting.ExecuteFuturesOrder(
+				okxSymbol,
+				0.001,
+				signalModel.Entry,
+				decision,
+				"TrendDayV1Strategy",
+				signalModel.TakeProfit,
+				signalModel.StopLoss,
+				&key,
+			)
+
+			if err != nil {
+				log.Error().Err(err).Str("api_key", key.ApiKey).Str("symbol", symbol).Msg("[DayTrading] Failed to execute trend futures order")
+			} else {
+				log.Info().Str("api_key", key.ApiKey).Str("symbol", symbol).Str("decision", decision).Msg("[DayTrading] Successfully executed trend futures order")
+			}
+		}(apiKey)
+	}
+}
+
+// executeFuturesOrdersForScalpingSidewayKeys executes futures orders for sideway scalping signals
+func executeFuturesOrdersForScalpingSidewayKeys(backTesting *backtesting.BackTesting, symbol string, signalModel *scalping.SidewayScalpingV1Signal) {
 	// Read API keys from file
 	apiKeys, err := loadAPIKeys()
 	if err != nil {
@@ -213,8 +395,8 @@ func executeFuturesOrdersForSidewayKeys(backTesting *backtesting.BackTesting, sy
 	}
 }
 
-// executeFuturesOrdersForAllKeys executes futures orders for all API keys when a signal is generated
-func executeFuturesOrdersForAllKeys(backTesting *backtesting.BackTesting, symbol string, signalModel *trading.TrendScalpingV1Signal) {
+// executeFuturesOrdersForScalpingTrendKeys executes futures orders for trend scalping signals
+func executeFuturesOrdersForScalpingTrendKeys(backTesting *backtesting.BackTesting, symbol string, signalModel *scalping.TrendScalpingV1Signal) {
 	// Read API keys from file
 	apiKeys, err := loadAPIKeys()
 	if err != nil {

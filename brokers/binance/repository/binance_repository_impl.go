@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	defaultBinanceURL = "https://api.binance.com"
+	defaultBinanceURL = "https://fapi.binance.com"
 )
 
 type binanceRepositoryImpl struct {
@@ -31,7 +31,7 @@ func (r *binanceRepositoryImpl) FetchCandles(ctx context.Context, symbol string,
 
 	formatedSymbol := utils.ConvertPair(symbol)
 
-	url := fmt.Sprintf("%s/api/v3/klines?symbol=%s&interval=%s&limit=%d", r.baseURL, formatedSymbol, interval, limit)
+	url := fmt.Sprintf("%s/fapi/v1/klines?symbol=%s&interval=%s&limit=%d", r.baseURL, formatedSymbol, interval, limit)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
