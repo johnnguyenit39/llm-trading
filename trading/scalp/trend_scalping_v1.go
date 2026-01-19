@@ -8,6 +8,7 @@ import (
 
 	baseCandleModel "j_ai_trade/common"
 	tradingModels "j_ai_trade/trading/models"
+	tradingUtils "j_ai_trade/trading/utils"
 
 	"github.com/markcheno/go-talib"
 )
@@ -795,7 +796,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 		}
 
 		// Check for duplicate signal (ATR-based)
-		dedup := GetDeduplicator()
+		dedup := tradingUtils.GetDeduplicator()
 		if dedup.IsDuplicateSignal(symbol, side, entry, atrPercent) {
 			return nil, nil // Skip duplicate
 		}
@@ -821,7 +822,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 		}
 
 		// Check for duplicate signal (ATR-based)
-		dedup := GetDeduplicator()
+		dedup := tradingUtils.GetDeduplicator()
 		if dedup.IsDuplicateSignal(symbol, side, entry, atrPercent) {
 			return nil, nil // Skip duplicate
 		}
@@ -913,7 +914,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 		}
 
 		// Check for duplicate signal (ATR-based)
-		dedup := GetDeduplicator()
+		dedup := tradingUtils.GetDeduplicator()
 		if dedup.IsDuplicateSignal(symbol, side, entry, atrPercent) {
 			return nil, nil, nil // Skip duplicate
 		}
@@ -943,7 +944,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 		}
 
 		// Check for duplicate signal (ATR-based)
-		dedup := GetDeduplicator()
+		dedup := tradingUtils.GetDeduplicator()
 		if dedup.IsDuplicateSignal(symbol, side, entry, atrPercent) {
 			return nil, nil, nil // Skip duplicate
 		}

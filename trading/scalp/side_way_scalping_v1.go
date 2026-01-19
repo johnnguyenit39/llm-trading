@@ -8,6 +8,7 @@ import (
 
 	baseCandleModel "j_ai_trade/common"
 	tradingModels "j_ai_trade/trading/models"
+	tradingUtils "j_ai_trade/trading/utils"
 
 	"github.com/markcheno/go-talib"
 )
@@ -127,7 +128,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 		}
 
 		// Check for duplicate signal (ATR-based)
-		dedup := GetDeduplicator()
+		dedup := tradingUtils.GetDeduplicator()
 		if dedup.IsDuplicateSidewaySignal(symbol, side, entry, atrPercent, support, resistance) {
 			return nil, nil // Skip duplicate
 		}
@@ -159,7 +160,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 		}
 
 		// Check for duplicate signal (ATR-based)
-		dedup := GetDeduplicator()
+		dedup := tradingUtils.GetDeduplicator()
 		if dedup.IsDuplicateSidewaySignal(symbol, side, entry, atrPercent, support, resistance) {
 			return nil, nil // Skip duplicate
 		}
@@ -256,7 +257,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 		}
 
 		// Check for duplicate signal (ATR-based)
-		dedup := GetDeduplicator()
+		dedup := tradingUtils.GetDeduplicator()
 		if dedup.IsDuplicateSidewaySignal(symbol, side, entry, atrPercent, support, resistance) {
 			return nil, nil, nil // Skip duplicate
 		}
@@ -292,7 +293,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 		}
 
 		// Check for duplicate signal (ATR-based)
-		dedup := GetDeduplicator()
+		dedup := tradingUtils.GetDeduplicator()
 		if dedup.IsDuplicateSidewaySignal(symbol, side, entry, atrPercent, support, resistance) {
 			return nil, nil, nil // Skip duplicate
 		}

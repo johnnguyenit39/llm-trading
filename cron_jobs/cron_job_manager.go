@@ -7,8 +7,8 @@ import (
 	"j_ai_trade/brokers/binance/repository"
 	"j_ai_trade/brokers/okx/model"
 	"j_ai_trade/telegram"
-	"j_ai_trade/trading"
 	tradingModels "j_ai_trade/trading/models"
+	trading "j_ai_trade/trading/scalp"
 	utilsConverter "j_ai_trade/utils/converter"
 	"os"
 	"strings"
@@ -54,7 +54,7 @@ func Scalping1Strategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					return
 				}
 
-				M5Candles, err := binanceService.Fetch1mCandles(context.Background(), sym, 200)
+				M5Candles, err := binanceService.Fetch5mCandles(context.Background(), sym, 200)
 				if err != nil || len(M5Candles) == 0 {
 					log.Error().Err(err).Str("symbol", sym).Msg("Failed to fetch M5 candles or empty data")
 					return
