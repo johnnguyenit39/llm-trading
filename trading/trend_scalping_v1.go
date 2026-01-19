@@ -778,6 +778,9 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 	has2Bulls := s.detect2Bulls(input.M1Candles)
 	has2Bears := s.detect2Bears(input.M1Candles)
 
+	// Calculate ATR for deduplication
+	atrPercent := calcATRPercent(input.M1Candles, 20)
+
 	// TradingView logic + EMA trend filter
 	// BUY: Price above EMA 200 + RSI oversold + bullish patterns
 	if isPriceAboveEMA && isRSIOversold && (hasBullishEngulfing || hasHammer || has2Bulls) {
@@ -791,7 +794,17 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 			return nil, nil
 		}
 
+		// Check for duplicate signal (ATR-based)
+		dedup := GetDeduplicator()
+		if dedup.IsDuplicateSignal(symbol, side, entry, atrPercent) {
+			return nil, nil // Skip duplicate
+		}
+
 		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
+
+		// Record signal for future deduplication
+		dedup.RecordSignal(symbol, side, entry, atrPercent)
+
 		return &signalStr, nil
 	}
 
@@ -807,7 +820,17 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 			return nil, nil
 		}
 
+		// Check for duplicate signal (ATR-based)
+		dedup := GetDeduplicator()
+		if dedup.IsDuplicateSignal(symbol, side, entry, atrPercent) {
+			return nil, nil // Skip duplicate
+		}
+
 		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
+
+		// Record signal for future deduplication
+		dedup.RecordSignal(symbol, side, entry, atrPercent)
+
 		return &signalStr, nil
 	}
 
@@ -873,6 +896,9 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 	has2Bulls := s.detect2Bulls(input.M1Candles)
 	has2Bears := s.detect2Bears(input.M1Candles)
 
+	// Calculate ATR for deduplication
+	atrPercent := calcATRPercent(input.M1Candles, 20)
+
 	// TradingView logic + EMA trend filter
 	// BUY: Price above EMA 200 + RSI oversold + bullish patterns
 	if isPriceAboveEMA && isRSIOversold && (hasBullishEngulfing || hasHammer || has2Bulls) {
@@ -886,11 +912,20 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 			return nil, nil, nil
 		}
 
+		// Check for duplicate signal (ATR-based)
+		dedup := GetDeduplicator()
+		if dedup.IsDuplicateSignal(symbol, side, entry, atrPercent) {
+			return nil, nil, nil // Skip duplicate
+		}
+
 		// Generate signal string
 		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
 
 		// Create signal model
 		signalModel := s.createSignalModel(symbol, side, entry, signalScore, input.M1Candles, input.M15Candles, input.M5Candles)
+
+		// Record signal for future deduplication
+		dedup.RecordSignal(symbol, side, entry, atrPercent)
 
 		return &signalStr, signalModel, nil
 	}
@@ -907,11 +942,20 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 			return nil, nil, nil
 		}
 
+		// Check for duplicate signal (ATR-based)
+		dedup := GetDeduplicator()
+		if dedup.IsDuplicateSignal(symbol, side, entry, atrPercent) {
+			return nil, nil, nil // Skip duplicate
+		}
+
 		// Generate signal string
 		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
 
 		// Create signal model
 		signalModel := s.createSignalModel(symbol, side, entry, signalScore, input.M1Candles, input.M15Candles, input.M5Candles)
+
+		// Record signal for future deduplication
+		dedup.RecordSignal(symbol, side, entry, atrPercent)
 
 		return &signalStr, signalModel, nil
 	}
@@ -1275,76 +1319,10 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 	leverage := roundLeverageToExchangeValues(rawLeverage)
 	suggestedRR := volProfile.SuggestedRR
 	dynamicRRList := []float64{suggestedRR, suggestedRR * 1.5}
-	
-	// Calculate ATR in actual price
-	atrPrice := volProfile.ATRPercent * entry
-	
-	result := fmt.Sprintf("%s Signal: %s\nStrategy: Trend Scalping v1\nSymbol: %s\nEntry: %.4f\nLeverage: %.0fx\n", icon, strings.ToUpper(side), strings.ToUpper(symbol), entry, leverage)
-	result += fmt.Sprintf("\n📊 SIGNAL SCORE: %.1f/%.0f (%.1f%%)\n", signalScore.TotalScore, signalScore.MaxScore, signalScore.Percentage)
-	result += fmt.Sprintf("💡 Recommendation: %s\n", signalScore.Recommendation)
-	result += "\n📈 Score Breakdown (150-point system):\n"
-	for category, score := range signalScore.Breakdown {
-		var maxPoints float64
-		switch category {
-		case "Multi-Timeframe Alignment":
-			maxPoints = 25
-		case "Enhanced Trend Strength":
-			maxPoints = 30
-		case "Advanced RSI Analysis":
-			maxPoints = 25
-		case "Pattern Recognition":
-			maxPoints = 25
-		case "Support/Resistance":
-			maxPoints = 15
-		case "Market Microstructure":
-			maxPoints = 25
-		case "Risk Management":
-			maxPoints = 20
-		default:
-			maxPoints = 25
-		}
-		result += fmt.Sprintf("  • %s: %.1f/%.0f\n", category, score, maxPoints)
-	}
-	
-	result += "\n📉 Volatility (ATR):\n"
-	result += fmt.Sprintf("  • ATR: $%.4f (%.4f%%)\n", atrPrice, volProfile.ATRPercent*100)
-	result += fmt.Sprintf("  • Avg candle movement: ±$%.4f\n", atrPrice)
-	result += fmt.Sprintf("  • Volatility Rank: %s\n", volProfile.VolatilityRank)
-	
-	result += fmt.Sprintf("\n🎯 Suggested RR: 1:%.1f\n", suggestedRR)
-	result += fmt.Sprintf("🏆 Profit Target: %.4f%% ($%.4f)\n", volProfile.ProfitTarget*100, volProfile.ProfitTarget*entry)
 
-	// Add multi-timeframe analysis details
-	result += "\n📊 Multi-Timeframe Analysis:\n"
-	if len(m15Candles) >= emaPeriod200 && len(m5Candles) >= emaPeriod50 {
-		m15ClosePrices := make([]float64, len(m15Candles))
-		for i, candle := range m15Candles {
-			m15ClosePrices[i] = candle.Close
-		}
-		m15EMA200 := talib.Ema(m15ClosePrices, emaPeriod200)
+	result := fmt.Sprintf("%s %s - %s (Trend Scalping v1)\n", icon, strings.ToUpper(side), strings.ToUpper(symbol))
+	result += fmt.Sprintf("Entry: %.4f - %.0fx\n", entry, leverage)
 
-		m5ClosePrices := make([]float64, len(m5Candles))
-		for i, candle := range m5Candles {
-			m5ClosePrices[i] = candle.Close
-		}
-		m5EMA50 := talib.Ema(m5ClosePrices, emaPeriod50)
-
-		if len(m15EMA200) > 0 && len(m5EMA50) > 0 {
-			m15Trend := entry > m15EMA200[len(m15EMA200)-1]
-			m5Trend := entry > m5EMA50[len(m5EMA50)-1]
-
-			result += fmt.Sprintf("  • M15 Trend: %s\n", map[bool]string{true: "🟢 BULLISH", false: "🔴 BEARISH"}[m15Trend])
-			result += fmt.Sprintf("  • M5 Trend: %s\n", map[bool]string{true: "🟢 BULLISH", false: "🔴 BEARISH"}[m5Trend])
-
-			if m15Trend == m5Trend {
-				result += "  • ✅ Timeframes Aligned\n"
-			} else {
-				result += "  • ⚠️ Timeframes Misaligned\n"
-			}
-		}
-	}
-
-	result += "\n⚡ Risk Management:\n"
 	for _, rr := range dynamicRRList {
 		var sl, tp float64
 		rrStr := fmt.Sprintf("1:%.1f", rr)
@@ -1364,6 +1342,9 @@ func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, 
 		tpDistance := math.Abs(tp - entry)
 		result += fmt.Sprintf("RR %s:\n  • SL: %.4f (%.2f%% | -$%.4f)\n  • TP: %.4f (%.2f%% | +$%.4f)\n\n", rrStr, sl, stopDistance*100, slDistance, tp, (tpDistance/entry)*100, tpDistance)
 	}
+
+	result += fmt.Sprintf("📊SIGNAL SCORE: %.1f/%.0f (%.1f%%)", signalScore.TotalScore, signalScore.MaxScore, signalScore.Percentage)
+
 	return strings.TrimSpace(result)
 }
 
