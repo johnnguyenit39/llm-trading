@@ -2,19 +2,20 @@ package cronjobs
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"strings"
+	"time"
+
 	backtesting "j_ai_trade/back_testing"
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
 	"j_ai_trade/brokers/okx/model"
 	"j_ai_trade/telegram"
+	dayTrading "j_ai_trade/trading/day"
 	tradingModels "j_ai_trade/trading/models"
-	trading "j_ai_trade/trading/scalp"
+	scalping "j_ai_trade/trading/scalp"
 	utilsConverter "j_ai_trade/utils/converter"
-	"os"
-	"strings"
-	"time"
-
-	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -25,7 +26,12 @@ import (
 func InitCronJobs(db *gorm.DB) {
 	repo := repository.NewBinanceRepository()
 	binanceService := binance.NewBinanceService(repo)
-	go Scalping1Strategy(binanceService, db)
+
+	// Scalping strategies - run every 1 minute (M1 entry)
+	go ScalpingStrategy(binanceService, db)
+
+	// Day trading strategies - run every 15 minutes (M15 entry)
+	go DayTradingStrategy(binanceService, db)
 }
 
 func Scalping1Strategy(binanceService *binance.BinanceService, db *gorm.DB) {
