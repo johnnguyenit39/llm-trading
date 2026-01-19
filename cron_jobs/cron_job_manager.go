@@ -34,7 +34,7 @@ func InitCronJobs(db *gorm.DB) {
 	go DayTradingStrategy(binanceService, db)
 }
 
-func Scalping1Strategy(binanceService *binance.BinanceService, db *gorm.DB) {
+func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 	telegramService := telegram.NewTelegramService()
 	backTesting := backtesting.NewBackTesting(db)
 	symbols := []string{
@@ -102,7 +102,7 @@ func Scalping1Strategy(binanceService *binance.BinanceService, db *gorm.DB) {
 
 				// Detect market regime to route to appropriate strategy
 				currentPrice := candleInput.M1Candles[len(candleInput.M1Candles)-1].Close
-				marketRegime := trading.DetectMarketRegime(candleInput, currentPrice)
+				marketRegime := scalping.DetectMarketRegime(candleInput, currentPrice)
 
 				log.Info().
 					Str("symbol", sym).
