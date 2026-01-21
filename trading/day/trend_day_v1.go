@@ -90,8 +90,8 @@ func (s *TrendDayV1Strategy) detectMarketRegime(input tradingModels.CandleInput,
 	adxValues := make(map[string]float64)
 	adxCount := 0
 
-	// H1 ADX
-	if len(input.H1Candles) >= 15 {
+	// H1 ADX (need at least 2*period+1 = 29 candles for ADX)
+	if len(input.H1Candles) >= 30 {
 		h1High := make([]float64, len(input.H1Candles))
 		h1Low := make([]float64, len(input.H1Candles))
 		h1Close := make([]float64, len(input.H1Candles))
@@ -109,7 +109,7 @@ func (s *TrendDayV1Strategy) detectMarketRegime(input tradingModels.CandleInput,
 	}
 
 	// H4 ADX
-	if len(input.H4Candles) >= 15 {
+	if len(input.H4Candles) >= 30 {
 		h4High := make([]float64, len(input.H4Candles))
 		h4Low := make([]float64, len(input.H4Candles))
 		h4Close := make([]float64, len(input.H4Candles))
@@ -127,7 +127,7 @@ func (s *TrendDayV1Strategy) detectMarketRegime(input tradingModels.CandleInput,
 	}
 
 	// D1 ADX
-	if len(input.D1Candles) >= 15 {
+	if len(input.D1Candles) >= 30 {
 		d1High := make([]float64, len(input.D1Candles))
 		d1Low := make([]float64, len(input.D1Candles))
 		d1Close := make([]float64, len(input.D1Candles))
@@ -599,7 +599,7 @@ func (s *TrendDayV1Strategy) scoreTrendConsistency(input tradingModels.CandleInp
 }
 
 func (s *TrendDayV1Strategy) scoreADXTrendStrength(input tradingModels.CandleInput, side string) float64 {
-	if len(input.H1Candles) < 14 {
+	if len(input.H1Candles) < 30 {
 		return 2.5
 	}
 

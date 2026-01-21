@@ -91,8 +91,8 @@ func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleI
 	adxValues := make(map[string]float64)
 	adxCount := 0
 
-	// M15 ADX - Need at least 15 candles for ADX period 14 to return results
-	if len(input.M15Candles) >= 15 {
+	// M15 ADX - Need at least 30 candles for ADX period 14 (2*period+1)
+	if len(input.M15Candles) >= 30 {
 		m15High := make([]float64, len(input.M15Candles))
 		m15Low := make([]float64, len(input.M15Candles))
 		m15Close := make([]float64, len(input.M15Candles))
@@ -109,8 +109,8 @@ func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleI
 		}
 	}
 
-	// H1 ADX - Need at least 15 candles for ADX period 14 to return results
-	if len(input.H1Candles) >= 15 {
+	// H1 ADX - Need at least 30 candles for ADX period 14
+	if len(input.H1Candles) >= 30 {
 		h1High := make([]float64, len(input.H1Candles))
 		h1Low := make([]float64, len(input.H1Candles))
 		h1Close := make([]float64, len(input.H1Candles))
@@ -127,8 +127,8 @@ func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleI
 		}
 	}
 
-	// H4 ADX - Need at least 15 candles for ADX period 14 to return results
-	if len(input.H4Candles) >= 15 {
+	// H4 ADX - Need at least 30 candles for ADX period 14
+	if len(input.H4Candles) >= 30 {
 		h4High := make([]float64, len(input.H4Candles))
 		h4Low := make([]float64, len(input.H4Candles))
 		h4Close := make([]float64, len(input.H4Candles))
@@ -145,8 +145,8 @@ func (s *TrendScalpingV1Strategy) detectMarketRegime(input tradingModels.CandleI
 		}
 	}
 
-	// D1 ADX - Need at least 15 candles for ADX period 14 to return results
-	if len(input.D1Candles) >= 15 {
+	// D1 ADX - Need at least 30 candles for ADX period 14
+	if len(input.D1Candles) >= 30 {
 		d1High := make([]float64, len(input.D1Candles))
 		d1Low := make([]float64, len(input.D1Candles))
 		d1Close := make([]float64, len(input.D1Candles))
@@ -1584,7 +1584,7 @@ func (s *TrendScalpingV1Strategy) scoreTrendConsistencyEnhanced(input tradingMod
 }
 
 func (s *TrendScalpingV1Strategy) scoreADXTrendStrength(input tradingModels.CandleInput, side string) float64 {
-	if len(input.M15Candles) < 14 {
+	if len(input.M15Candles) < 30 {
 		return 2.5
 	}
 
