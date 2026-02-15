@@ -49,11 +49,11 @@ func NewSidewayScalpingV1Strategy() *SidewayScalpingV1Strategy {
 
 // AnalyzeWithSignalString analyzes sideway market and returns signal string
 func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.CandleInput, symbol string) (*string, error) {
-	if len(input.M15Candles) < 20 || len(input.M1Candles) < s.rsiPeriod {
-		return nil, fmt.Errorf("insufficient data: need at least 20 M15 candles and %d M1 candles", s.rsiPeriod)
+	if len(input.M15Candles) < 20 || len(input.M15Candles) < s.rsiPeriod {
+		return nil, fmt.Errorf("insufficient data: need at least 20 M15 candles for entry")
 	}
 
-	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
+	currentPrice := input.M15Candles[len(input.M15Candles)-1].Close
 
 	// Detect range (support and resistance)
 	support, resistance, rangeWidth := s.detectRange(input)
@@ -66,15 +66,15 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 		return nil, nil // Price has broken out of range
 	}
 
-	// Calculate RSI
-	m1ClosePrices := make([]float64, len(input.M1Candles))
-	for i, candle := range input.M1Candles {
-		m1ClosePrices[i] = candle.Close
+	// Calculate RSI (entry TF = M15)
+	m15ClosePrices := make([]float64, len(input.M15Candles))
+	for i, candle := range input.M15Candles {
+		m15ClosePrices[i] = candle.Close
 	}
-	rsi7 := talib.Rsi(m1ClosePrices, s.rsiPeriod)
+	rsi7 := talib.Rsi(m15ClosePrices, s.rsiPeriod)
 
 	// Check volume requirement (CRITICAL for sideway)
-	if !s.checkVolumeRequirement(input.M1Candles) {
+	if !s.checkVolumeRequirement(input.M15Candles) {
 		return nil, nil // Volume too low for sideway trading
 	}
 
@@ -97,17 +97,17 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 	rsiMeanReversionSell := currentRSI >= 50 && currentRSI <= 70
 
 	// Check for price bounce from support/resistance (key for mean reversion)
-	priceBounceFromSupport := s.detectBounceFromSupport(input.M1Candles, support)
-	priceBounceFromResistance := s.detectBounceFromResistance(input.M1Candles, resistance)
+	priceBounceFromSupport := s.detectBounceFromSupport(input.M15Candles, support)
+	priceBounceFromResistance := s.detectBounceFromResistance(input.M15Candles, resistance)
 
-	// Pattern detection (supporting signals, less critical than trending)
-	hasBullishEngulfing := s.detectBullishEngulfing(input.M1Candles)
-	hasBearishEngulfing := s.detectBearishEngulfing(input.M1Candles)
-	hasHammer := s.detectHammer(input.M1Candles, 0.333)
-	hasShootingStar := s.detectShootingStar(input.M1Candles, 0.333)
+	// Pattern detection on entry TF (M15)
+	hasBullishEngulfing := s.detectBullishEngulfing(input.M15Candles)
+	hasBearishEngulfing := s.detectBearishEngulfing(input.M15Candles)
+	hasHammer := s.detectHammer(input.M15Candles, 0.333)
+	hasShootingStar := s.detectShootingStar(input.M15Candles, 0.333)
 
-	// Calculate ATR for deduplication
-	atrPercent := calcATRPercent(input.M1Candles, 20)
+	// Calculate ATR for deduplication (entry TF = M15)
+	atrPercent := calcATRPercent(input.M15Candles, 20)
 
 	// BUY Signal: Range trading logic - Buy at support with mean reversion
 	// Key: Price near support + RSI mean reversion zone + price bounce + volume
@@ -123,7 +123,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 		}
 
 		// Validate minimum SL distance before generating signal
-		if !s.validateMinSLDistance(side, entry, support, resistance, input.M1Candles, input.M15Candles) {
+		if !s.validateMinSLDistance(side, entry, support, resistance, input.M15Candles, input.M15Candles) {
 			return nil, nil // SL too tight, skip signal
 		}
 
@@ -133,7 +133,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 			return nil, nil // Skip duplicate
 		}
 
-		signalStr := s.genSidewaySignalString(symbol, side, entry, input.M1Candles, input.M15Candles, signalScore, support, resistance, rangeWidth)
+		signalStr := s.genSidewaySignalString(symbol, side, entry, input.M15Candles, input.M15Candles, signalScore, support, resistance, rangeWidth)
 
 		// Record signal for future deduplication
 		dedup.RecordSidewaySignal(symbol, side, entry, atrPercent, support, resistance, signalScore.TotalScore)
@@ -155,7 +155,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 		}
 
 		// Validate minimum SL distance before generating signal
-		if !s.validateMinSLDistance(side, entry, support, resistance, input.M1Candles, input.M15Candles) {
+		if !s.validateMinSLDistance(side, entry, support, resistance, input.M15Candles, input.M15Candles) {
 			return nil, nil // SL too tight, skip signal
 		}
 
@@ -165,7 +165,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 			return nil, nil // Skip duplicate
 		}
 
-		signalStr := s.genSidewaySignalString(symbol, side, entry, input.M1Candles, input.M15Candles, signalScore, support, resistance, rangeWidth)
+		signalStr := s.genSidewaySignalString(symbol, side, entry, input.M15Candles, input.M15Candles, signalScore, support, resistance, rangeWidth)
 
 		// Record signal for future deduplication
 		dedup.RecordSidewaySignal(symbol, side, entry, atrPercent, support, resistance, signalScore.TotalScore)
@@ -178,11 +178,11 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 
 // AnalyzeWithSignalAndModel analyzes sideway market and returns both signal string and model
 func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.CandleInput, symbol string) (*string, *SidewayScalpingV1Signal, error) {
-	if len(input.M15Candles) < 20 || len(input.M1Candles) < s.rsiPeriod {
-		return nil, nil, fmt.Errorf("insufficient data: need at least 20 M15 candles and %d M1 candles", s.rsiPeriod)
+	if len(input.M15Candles) < 20 || len(input.M15Candles) < s.rsiPeriod {
+		return nil, nil, fmt.Errorf("insufficient data: need at least 20 M15 candles and %d M5 candles for entry", s.rsiPeriod)
 	}
 
-	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
+	currentPrice := input.M15Candles[len(input.M15Candles)-1].Close
 
 	// Detect range (support and resistance)
 	support, resistance, rangeWidth := s.detectRange(input)
@@ -195,15 +195,15 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 		return nil, nil, nil // Price has broken out of range
 	}
 
-	// Calculate RSI
-	m1ClosePrices := make([]float64, len(input.M1Candles))
-	for i, candle := range input.M1Candles {
-		m1ClosePrices[i] = candle.Close
+	// Calculate RSI (entry TF = M15)
+	m15ClosePrices := make([]float64, len(input.M15Candles))
+	for i, candle := range input.M15Candles {
+		m15ClosePrices[i] = candle.Close
 	}
-	rsi7 := talib.Rsi(m1ClosePrices, s.rsiPeriod)
+	rsi7 := talib.Rsi(m15ClosePrices, s.rsiPeriod)
 
 	// Check volume requirement (CRITICAL for sideway)
-	if !s.checkVolumeRequirement(input.M1Candles) {
+	if !s.checkVolumeRequirement(input.M15Candles) {
 		return nil, nil, nil // Volume too low for sideway trading
 	}
 
@@ -226,17 +226,17 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 	rsiMeanReversionSell := currentRSI >= 50 && currentRSI <= 70
 
 	// Check for price bounce from support/resistance (key for mean reversion)
-	priceBounceFromSupport := s.detectBounceFromSupport(input.M1Candles, support)
-	priceBounceFromResistance := s.detectBounceFromResistance(input.M1Candles, resistance)
+	priceBounceFromSupport := s.detectBounceFromSupport(input.M15Candles, support)
+	priceBounceFromResistance := s.detectBounceFromResistance(input.M15Candles, resistance)
 
-	// Pattern detection (supporting signals, less critical than trending)
-	hasBullishEngulfing := s.detectBullishEngulfing(input.M1Candles)
-	hasBearishEngulfing := s.detectBearishEngulfing(input.M1Candles)
-	hasHammer := s.detectHammer(input.M1Candles, 0.333)
-	hasShootingStar := s.detectShootingStar(input.M1Candles, 0.333)
+	// Pattern detection on entry TF (M15)
+	hasBullishEngulfing := s.detectBullishEngulfing(input.M15Candles)
+	hasBearishEngulfing := s.detectBearishEngulfing(input.M15Candles)
+	hasHammer := s.detectHammer(input.M15Candles, 0.333)
+	hasShootingStar := s.detectShootingStar(input.M15Candles, 0.333)
 
-	// Calculate ATR for deduplication
-	atrPercent := calcATRPercent(input.M1Candles, 20)
+	// Calculate ATR for deduplication (entry TF = M15)
+	atrPercent := calcATRPercent(input.M15Candles, 20)
 
 	// BUY Signal: Range trading logic - Buy at support with mean reversion
 	// Key: Price near support + RSI mean reversion zone + price bounce + volume
@@ -252,7 +252,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 		}
 
 		// Validate minimum SL distance before generating signal
-		if !s.validateMinSLDistance(side, entry, support, resistance, input.M1Candles, input.M15Candles) {
+		if !s.validateMinSLDistance(side, entry, support, resistance, input.M15Candles, input.M15Candles) {
 			return nil, nil, nil // SL too tight, skip signal
 		}
 
@@ -263,10 +263,10 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 		}
 
 		// Generate signal string
-		signalStr := s.genSidewaySignalString(symbol, side, entry, input.M1Candles, input.M15Candles, signalScore, support, resistance, rangeWidth)
+		signalStr := s.genSidewaySignalString(symbol, side, entry, input.M15Candles, input.M15Candles, signalScore, support, resistance, rangeWidth)
 
 		// Create signal model
-		signalModel := s.createSidewaySignalModel(symbol, side, entry, signalScore, support, resistance, rangeWidth, input.M1Candles, input.M15Candles)
+		signalModel := s.createSidewaySignalModel(symbol, side, entry, signalScore, support, resistance, rangeWidth, input.M15Candles, input.M15Candles)
 
 		// Record signal for future deduplication
 		dedup.RecordSidewaySignal(symbol, side, entry, atrPercent, support, resistance, signalScore.TotalScore)
@@ -288,7 +288,7 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 		}
 
 		// Validate minimum SL distance before generating signal
-		if !s.validateMinSLDistance(side, entry, support, resistance, input.M1Candles, input.M15Candles) {
+		if !s.validateMinSLDistance(side, entry, support, resistance, input.M15Candles, input.M15Candles) {
 			return nil, nil, nil // SL too tight, skip signal
 		}
 
@@ -299,10 +299,10 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 		}
 
 		// Generate signal string
-		signalStr := s.genSidewaySignalString(symbol, side, entry, input.M1Candles, input.M15Candles, signalScore, support, resistance, rangeWidth)
+		signalStr := s.genSidewaySignalString(symbol, side, entry, input.M15Candles, input.M15Candles, signalScore, support, resistance, rangeWidth)
 
 		// Create signal model
-		signalModel := s.createSidewaySignalModel(symbol, side, entry, signalScore, support, resistance, rangeWidth, input.M1Candles, input.M15Candles)
+		signalModel := s.createSidewaySignalModel(symbol, side, entry, signalScore, support, resistance, rangeWidth, input.M15Candles, input.M15Candles)
 
 		// Record signal for future deduplication
 		dedup.RecordSidewaySignal(symbol, side, entry, atrPercent, support, resistance, signalScore.TotalScore)
@@ -314,12 +314,12 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 }
 
 // createSidewaySignalModel creates a SidewayScalpingV1Signal model from the analysis
-func (s *SidewayScalpingV1Strategy) createSidewaySignalModel(symbol, side string, entry float64, signalScore SignalScore, support, resistance, rangeWidth float64, m1Candles []baseCandleModel.BaseCandle, m15Candles []baseCandleModel.BaseCandle) *SidewayScalpingV1Signal {
-	// Calculate volatility profile
-	volProfile := calculateScalpingVolatilityProfile(m1Candles, m15Candles)
+func (s *SidewayScalpingV1Strategy) createSidewaySignalModel(symbol, side string, entry float64, signalScore SignalScore, support, resistance, rangeWidth float64, entryCandles []baseCandleModel.BaseCandle, m15Candles []baseCandleModel.BaseCandle) *SidewayScalpingV1Signal {
+	// Calculate volatility profile (entry TF = M5 vs M15 baseline)
+	volProfile := calculateScalpingVolatilityProfile(entryCandles, m15Candles)
 
 	// Calculate stop loss and take profit using ATR-based approach
-	stopLoss, takeProfit, leverage := s.calculateATRBasedSLTP(side, entry, support, resistance, m1Candles, m15Candles)
+	stopLoss, takeProfit, leverage := s.calculateATRBasedSLTP(side, entry, support, resistance, entryCandles, m15Candles)
 
 	return &SidewayScalpingV1Signal{
 		Symbol:          symbol,
@@ -340,14 +340,14 @@ func (s *SidewayScalpingV1Strategy) createSidewaySignalModel(symbol, side string
 
 // calculateATRBasedSLTP calculates stop loss and take profit based on ATR for sideway trading
 // All calculations are 100% data-driven, no hardcoded values
-func (s *SidewayScalpingV1Strategy) calculateATRBasedSLTP(side string, entry, support, resistance float64, m1Candles []baseCandleModel.BaseCandle, m15Candles []baseCandleModel.BaseCandle) (stopLoss, takeProfit, leverage float64) {
-	// Use M15 ATR for SL/TP calculation (more stable than M1)
-	// Fall back to M1 ATR if M15 not available
+func (s *SidewayScalpingV1Strategy) calculateATRBasedSLTP(side string, entry, support, resistance float64, entryCandles []baseCandleModel.BaseCandle, m15Candles []baseCandleModel.BaseCandle) (stopLoss, takeProfit, leverage float64) {
+	// Use M15 ATR for SL/TP calculation (more stable)
+	// Fall back to entry TF (M5) ATR if M15 not available
 	var atrPercent float64
 	if len(m15Candles) >= 21 {
 		atrPercent = calcATRPercent(m15Candles, 14)
 	} else {
-		atrPercent = calcATRPercent(m1Candles, 20)
+		atrPercent = calcATRPercent(entryCandles, 20)
 	}
 
 	// Ensure minimum ATR for calculation (0.1% floor)
@@ -407,9 +407,9 @@ func (s *SidewayScalpingV1Strategy) calculateATRBasedSLTP(side string, entry, su
 
 // validateMinSLDistance checks if the calculated SL distance is tradeable
 // Returns false if SL is too tight (would be hit by normal market noise/spread)
-func (s *SidewayScalpingV1Strategy) validateMinSLDistance(side string, entry, support, resistance float64, m1Candles []baseCandleModel.BaseCandle, m15Candles []baseCandleModel.BaseCandle) bool {
+func (s *SidewayScalpingV1Strategy) validateMinSLDistance(side string, entry, support, resistance float64, entryCandles []baseCandleModel.BaseCandle, m15Candles []baseCandleModel.BaseCandle) bool {
 	// Calculate the actual SL
-	stopLoss, _, _ := s.calculateATRBasedSLTP(side, entry, support, resistance, m1Candles, m15Candles)
+	stopLoss, _, _ := s.calculateATRBasedSLTP(side, entry, support, resistance, entryCandles, m15Candles)
 
 	// Calculate SL distance as percentage
 	slDistancePercent := math.Abs(entry-stopLoss) / entry
@@ -419,7 +419,7 @@ func (s *SidewayScalpingV1Strategy) validateMinSLDistance(side string, entry, su
 	if len(m15Candles) >= 21 {
 		atrPercent = calcATRPercent(m15Candles, 14)
 	} else {
-		atrPercent = calcATRPercent(m1Candles, 20)
+		atrPercent = calcATRPercent(entryCandles, 20)
 	}
 
 	// Minimum SL distance requirements:
@@ -516,8 +516,8 @@ func (s *SidewayScalpingV1Strategy) calculateSidewaySignalScore(input tradingMod
 	score += rangeScore
 	breakdown["Range Position"] = rangeScore
 
-	// B. Volume Confirmation (25 points) - CRITICAL for sideway
-	volumeScore := s.scoreVolumeConfirmation(input.M1Candles)
+	// B. Volume Confirmation (25 points) - CRITICAL for sideway (entry TF = M15)
+	volumeScore := s.scoreVolumeConfirmation(input.M15Candles)
 	score += volumeScore
 	breakdown["Volume Confirmation"] = volumeScore
 
@@ -526,8 +526,8 @@ func (s *SidewayScalpingV1Strategy) calculateSidewaySignalScore(input tradingMod
 	score += rsiScore
 	breakdown["RSI Mean Reversion"] = rsiScore
 
-	// D. Pattern Recognition (15 points)
-	patternScore := s.scorePatternRecognition(input.M1Candles, side)
+	// D. Pattern Recognition (15 points) - entry TF = M15
+	patternScore := s.scorePatternRecognition(input.M15Candles, side)
 	score += patternScore
 	breakdown["Pattern Recognition"] = patternScore
 
@@ -797,7 +797,7 @@ func (s *SidewayScalpingV1Strategy) detectShootingStar(candles []baseCandleModel
 
 // ==== Signal Formatting ====
 
-func (s *SidewayScalpingV1Strategy) genSidewaySignalString(symbol, side string, entry float64, m1Candles []baseCandleModel.BaseCandle, m15Candles []baseCandleModel.BaseCandle, signalScore SignalScore, support, resistance, rangeWidth float64) string {
+func (s *SidewayScalpingV1Strategy) genSidewaySignalString(symbol, side string, entry float64, entryCandles []baseCandleModel.BaseCandle, m15Candles []baseCandleModel.BaseCandle, signalScore SignalScore, support, resistance, rangeWidth float64) string {
 	var icon string
 	if side == "BUY" {
 		icon = "🟢"
@@ -806,7 +806,7 @@ func (s *SidewayScalpingV1Strategy) genSidewaySignalString(symbol, side string, 
 	}
 
 	// Calculate ATR-based stop loss, take profit and leverage (using M15 ATR)
-	stopLoss, takeProfit, leverage := s.calculateATRBasedSLTP(side, entry, support, resistance, m1Candles, m15Candles)
+	stopLoss, takeProfit, leverage := s.calculateATRBasedSLTP(side, entry, support, resistance, entryCandles, m15Candles)
 
 	// Calculate range in actual price
 	rangePriceWidth := resistance - support

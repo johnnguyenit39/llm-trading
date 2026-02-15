@@ -563,11 +563,11 @@ func (s *TrendScalpingV1Strategy) scoreRiskManagement(input tradingModels.Candle
 }
 
 func (s *TrendScalpingV1Strategy) scoreVolatilityAssessmentEnhanced(input tradingModels.CandleInput) float64 {
-	if len(input.M1Candles) < 20 {
+	if len(input.M15Candles) < 20 {
 		return 4.0
 	}
 
-	atrPercent := calcATRPercent(input.M1Candles, 20)
+	atrPercent := calcATRPercent(input.M15Candles, 20)
 
 	// Score based on volatility levels
 	score := 0.0
@@ -584,12 +584,12 @@ func (s *TrendScalpingV1Strategy) scoreVolatilityAssessmentEnhanced(input tradin
 }
 
 func (s *TrendScalpingV1Strategy) scorePositionSizingEnhanced(input tradingModels.CandleInput, side string) float64 {
-	if len(input.M1Candles) < 20 {
+	if len(input.M15Candles) < 20 {
 		return 2.5
 	}
 
-	// Calculate ATR% to determine volatility
-	atrPercent := calcATRPercent(input.M1Candles, 20)
+	// Calculate ATR% to determine volatility (entry TF = M15)
+	atrPercent := calcATRPercent(input.M15Candles, 20)
 
 	// Calculate stop loss distance (ATR-based, minimum 0.5x ATR)
 	stopDistance := atrPercent * 1.5
@@ -627,18 +627,18 @@ func (s *TrendScalpingV1Strategy) scorePositionSizingEnhanced(input tradingModel
 
 // Quick Exit Strategy (5 points) - NEW
 func (s *TrendScalpingV1Strategy) scoreQuickExitStrategy(input tradingModels.CandleInput, side string) float64 {
-	if len(input.M1Candles) < 5 {
+	if len(input.M15Candles) < 5 {
 		return 2.5
 	}
 
-	// Simplified quick exit strategy analysis based on price action
+	// Simplified quick exit strategy analysis based on price action (entry TF = M15)
 	score := 0.0
 
 	// Calculate ATR for dynamic threshold
-	atrPercent := calcATRPercent(input.M1Candles, 20)
+	atrPercent := calcATRPercent(input.M15Candles, 20)
 
 	// Check for quick exit signals
-	recentCandles := input.M1Candles[len(input.M1Candles)-5:]
+	recentCandles := input.M15Candles[len(input.M15Candles)-5:]
 	priceRange := 0.0
 	totalVolume := 0.0
 
@@ -652,10 +652,10 @@ func (s *TrendScalpingV1Strategy) scoreQuickExitStrategy(input tradingModels.Can
 
 	// Calculate average volume over longer period for normalization
 	var avgVolume50 float64
-	if len(input.M1Candles) >= 50 {
+	if len(input.M15Candles) >= 50 {
 		totalVolume50 := 0.0
-		for i := len(input.M1Candles) - 50; i < len(input.M1Candles); i++ {
-			totalVolume50 += input.M1Candles[i].Volume
+		for i := len(input.M15Candles) - 50; i < len(input.M15Candles); i++ {
+			totalVolume50 += input.M15Candles[i].Volume
 		}
 		avgVolume50 = totalVolume50 / 50.0
 	} else {
@@ -676,7 +676,7 @@ func (s *TrendScalpingV1Strategy) scoreQuickExitStrategy(input tradingModels.Can
 	}
 
 	// Check for momentum divergence
-	if s.detectMomentumDivergence(input.M1Candles, side) {
+	if s.detectMomentumDivergence(input.M15Candles, side) {
 		score += 2.5
 	}
 
@@ -722,8 +722,8 @@ func (s *TrendScalpingV1Strategy) detectMomentumContinuation(candles []baseCandl
 
 // AnalyzeWithSignalString analyzes the input and returns a formatted signal string (risk percent version)
 func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.CandleInput, symbol string) (*string, error) {
-	if len(input.M15Candles) < s.emaPeriod200 || len(input.M5Candles) < s.emaPeriod50 || len(input.M1Candles) < s.rsiPeriod {
-		return nil, fmt.Errorf("insufficient data: need at least %d M15 candles, %d M5 candles, and %d M1 candles", s.emaPeriod200, s.emaPeriod50, s.rsiPeriod)
+	if len(input.M15Candles) < s.emaPeriod200 || len(input.M15Candles) < s.rsiPeriod {
+		return nil, fmt.Errorf("insufficient data: need at least %d M15 candles for entry", s.emaPeriod200)
 	}
 
 	// Calculate EMA 200 on M15 for trend filter
@@ -733,13 +733,13 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 	}
 	ema200 := talib.Ema(closePrices, s.emaPeriod200)
 
-	m1ClosePrices := make([]float64, len(input.M1Candles))
-	for i, candle := range input.M1Candles {
-		m1ClosePrices[i] = candle.Close
+	m15ClosePrices := make([]float64, len(input.M15Candles))
+	for i, candle := range input.M15Candles {
+		m15ClosePrices[i] = candle.Close
 	}
-	rsi7 := talib.Rsi(m1ClosePrices, s.rsiPeriod)
+	rsi7 := talib.Rsi(m15ClosePrices, s.rsiPeriod)
 
-	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
+	currentPrice := input.M15Candles[len(input.M15Candles)-1].Close
 	currentEMA := ema200[len(ema200)-1]
 	isPriceAboveEMA := currentPrice > currentEMA
 
@@ -771,16 +771,16 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 		isRSIOverbought = rsi7[0] > s.rsiOverbought
 	}
 
-	// Pattern detection matching TradingView logic
-	hasBullishEngulfing := s.detectBullishEngulfing(input.M1Candles)
-	hasBearishEngulfing := s.detectBearishEngulfing(input.M1Candles)
-	hasHammer := s.detectHammer(input.M1Candles, 0.333)
-	hasShootingStar := s.detectShootingStar(input.M1Candles, 0.333)
-	has2Bulls := s.detect2Bulls(input.M1Candles)
-	has2Bears := s.detect2Bears(input.M1Candles)
+	// Pattern detection on M15 (entry timeframe - đỡ nhiễu)
+	hasBullishEngulfing := s.detectBullishEngulfing(input.M15Candles)
+	hasBearishEngulfing := s.detectBearishEngulfing(input.M15Candles)
+	hasHammer := s.detectHammer(input.M15Candles, 0.333)
+	hasShootingStar := s.detectShootingStar(input.M15Candles, 0.333)
+	has2Bulls := s.detect2Bulls(input.M15Candles)
+	has2Bears := s.detect2Bears(input.M15Candles)
 
-	// Calculate ATR for deduplication
-	atrPercent := calcATRPercent(input.M1Candles, 20)
+	// Calculate ATR for deduplication (M15 = entry timeframe)
+	atrPercent := calcATRPercent(input.M15Candles, 20)
 
 	// TradingView logic + EMA trend filter
 	// BUY: Price above EMA 200 + RSI oversold + bullish patterns
@@ -801,7 +801,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 			return nil, nil // Skip duplicate
 		}
 
-		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
+		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M15Candles, signalScore, input.M15Candles, input.M5Candles, input.H1Candles, s.emaPeriod200, s.emaPeriod50)
 
 		// Record signal for future deduplication
 		dedup.RecordSignal(symbol, side, entry, atrPercent)
@@ -827,7 +827,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 			return nil, nil // Skip duplicate
 		}
 
-		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
+		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M15Candles, signalScore, input.M15Candles, input.M5Candles, input.H1Candles, s.emaPeriod200, s.emaPeriod50)
 
 		// Record signal for future deduplication
 		dedup.RecordSignal(symbol, side, entry, atrPercent)
@@ -840,8 +840,8 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 
 // AnalyzeWithSignalAndModel analyzes the input and returns both signal string and model
 func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.CandleInput, symbol string) (*string, *TrendScalpingV1Signal, error) {
-	if len(input.M15Candles) < s.emaPeriod200 || len(input.M5Candles) < s.emaPeriod50 || len(input.M1Candles) < s.rsiPeriod {
-		return nil, nil, fmt.Errorf("insufficient data: need at least %d M15 candles, %d M5 candles, and %d M1 candles", s.emaPeriod200, s.emaPeriod50, s.rsiPeriod)
+	if len(input.M15Candles) < s.emaPeriod200 || len(input.M15Candles) < s.rsiPeriod {
+		return nil, nil, fmt.Errorf("insufficient data: need at least %d M15 candles for entry", s.emaPeriod200)
 	}
 
 	// Calculate EMA 200 on M15 for trend filter
@@ -851,13 +851,13 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 	}
 	ema200 := talib.Ema(closePrices, s.emaPeriod200)
 
-	m1ClosePrices := make([]float64, len(input.M1Candles))
-	for i, candle := range input.M1Candles {
-		m1ClosePrices[i] = candle.Close
+	m15ClosePrices := make([]float64, len(input.M15Candles))
+	for i, candle := range input.M15Candles {
+		m15ClosePrices[i] = candle.Close
 	}
-	rsi7 := talib.Rsi(m1ClosePrices, s.rsiPeriod)
+	rsi7 := talib.Rsi(m15ClosePrices, s.rsiPeriod)
 
-	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
+	currentPrice := input.M15Candles[len(input.M15Candles)-1].Close
 	currentEMA := ema200[len(ema200)-1]
 	isPriceAboveEMA := currentPrice > currentEMA
 
@@ -889,16 +889,16 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 		isRSIOverbought = rsi7[0] > s.rsiOverbought
 	}
 
-	// Pattern detection matching TradingView logic
-	hasBullishEngulfing := s.detectBullishEngulfing(input.M1Candles)
-	hasBearishEngulfing := s.detectBearishEngulfing(input.M1Candles)
-	hasHammer := s.detectHammer(input.M1Candles, 0.333)
-	hasShootingStar := s.detectShootingStar(input.M1Candles, 0.333)
-	has2Bulls := s.detect2Bulls(input.M1Candles)
-	has2Bears := s.detect2Bears(input.M1Candles)
+	// Pattern detection on M15 (entry timeframe - đỡ nhiễu)
+	hasBullishEngulfing := s.detectBullishEngulfing(input.M15Candles)
+	hasBearishEngulfing := s.detectBearishEngulfing(input.M15Candles)
+	hasHammer := s.detectHammer(input.M15Candles, 0.333)
+	hasShootingStar := s.detectShootingStar(input.M15Candles, 0.333)
+	has2Bulls := s.detect2Bulls(input.M15Candles)
+	has2Bears := s.detect2Bears(input.M15Candles)
 
-	// Calculate ATR for deduplication
-	atrPercent := calcATRPercent(input.M1Candles, 20)
+	// Calculate ATR for deduplication (M15 = entry timeframe)
+	atrPercent := calcATRPercent(input.M15Candles, 20)
 
 	// TradingView logic + EMA trend filter
 	// BUY: Price above EMA 200 + RSI oversold + bullish patterns
@@ -920,10 +920,10 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 		}
 
 		// Generate signal string
-		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
+		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M15Candles, signalScore, input.M15Candles, input.M5Candles, input.H1Candles, s.emaPeriod200, s.emaPeriod50)
 
 		// Create signal model
-		signalModel := s.createSignalModel(symbol, side, entry, signalScore, input.M1Candles, input.M15Candles, input.M5Candles)
+		signalModel := s.createSignalModel(symbol, side, entry, signalScore, input.M15Candles, input.M15Candles, input.M5Candles, input.H1Candles)
 
 		// Record signal for future deduplication
 		dedup.RecordSignal(symbol, side, entry, atrPercent)
@@ -950,10 +950,10 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 		}
 
 		// Generate signal string
-		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M1Candles, signalScore, input.M15Candles, input.M5Candles, s.emaPeriod200, s.emaPeriod50)
+		signalStr := genMultiRRSignalStringPercentWithScore(symbol, side, entry, input.M15Candles, signalScore, input.M15Candles, input.M5Candles, input.H1Candles, s.emaPeriod200, s.emaPeriod50)
 
 		// Create signal model
-		signalModel := s.createSignalModel(symbol, side, entry, signalScore, input.M1Candles, input.M15Candles, input.M5Candles)
+		signalModel := s.createSignalModel(symbol, side, entry, signalScore, input.M15Candles, input.M15Candles, input.M5Candles, input.H1Candles)
 
 		// Record signal for future deduplication
 		dedup.RecordSignal(symbol, side, entry, atrPercent)
@@ -965,9 +965,9 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 }
 
 // createSignalModel creates a Scalping1Signal model from the analysis
-func (s *TrendScalpingV1Strategy) createSignalModel(symbol, side string, entry float64, signalScore SignalScore, m1Candles, m15Candles, m5Candles []baseCandleModel.BaseCandle) *TrendScalpingV1Signal {
-	// Calculate volatility profile
-	volProfile := calculateScalpingVolatilityProfile(m1Candles, m15Candles)
+func (s *TrendScalpingV1Strategy) createSignalModel(symbol, side string, entry float64, signalScore SignalScore, entryCandles, m15Candles, m5Candles, baselineVolCandles []baseCandleModel.BaseCandle) *TrendScalpingV1Signal {
+	// Volatility: entry TF (M15) vs baseline (H1) để đỡ nhiễu
+	volProfile := calculateScalpingVolatilityProfile(entryCandles, baselineVolCandles)
 
 	// Calculate stop loss and take profit (ATR-based)
 	stopDistance := volProfile.ATRPercent * 1.5    // 1.5x ATR for stop loss
@@ -1162,33 +1162,33 @@ type VolatilityProfile struct {
 	ProfitTarget   float64 // Target profit % đề xuất
 }
 
-// Tính volatility profile cho scalping M1, so sánh với M15
-// All calculations are data-driven using M15 ATR as baseline
-func calculateScalpingVolatilityProfile(m1Candles, m15Candles []baseCandleModel.BaseCandle) VolatilityProfile {
-	// Calculate current M1 ATR
-	currentATRPercent := calcATRPercent(m1Candles, 20)
+// Tính volatility profile: khung entry so sánh với baseline (entry M15 vs baseline H1)
+// All calculations are data-driven using baseline TF ATR
+func calculateScalpingVolatilityProfile(entryCandles, m15Candles []baseCandleModel.BaseCandle) VolatilityProfile {
+	// Current ATR of entry timeframe (M5)
+	currentATRPercent := calcATRPercent(entryCandles, 20)
 
 	// Calculate M15 ATR as baseline (if available)
 	var m15ATRPercent float64
 	if len(m15Candles) >= 21 {
 		m15ATRPercent = calcATRPercent(m15Candles, 20)
 	} else {
-		m15ATRPercent = currentATRPercent // Use M1 ATR as fallback
+		m15ATRPercent = currentATRPercent // Use entry TF ATR as fallback
 	}
 
 	// If not enough data, use current ATR with default medium profile
-	if len(m1Candles) < 21 {
+	if len(entryCandles) < 21 {
 		return VolatilityProfile{
 			ATRPercent:     currentATRPercent,
 			ATRPercentMA:   m15ATRPercent,
 			VolatilityRank: "MEDIUM",
-			SuggestedRR:    1.5,
+			SuggestedRR:    2.0, // Target more pips per trade
 			MaxLeverage:    20.0,
 			ProfitTarget:   currentATRPercent * 3, // 3x ATR as profit target
 		}
 	}
 
-	// Calculate volatility ratio (M1 vs M15)
+	// Calculate volatility ratio (entry M5 vs M15)
 	volatilityRatio := 1.0
 	if m15ATRPercent > 0 {
 		volatilityRatio = currentATRPercent / m15ATRPercent
@@ -1203,33 +1203,30 @@ func calculateScalpingVolatilityProfile(m1Candles, m15Candles []baseCandleModel.
 	}
 
 	// Classification using M15 ATR as baseline (data-driven thresholds)
-	// LOW: < 0.5x M15 ATR
-	// MEDIUM: 0.5x - 1.5x M15 ATR
-	// HIGH: 1.5x - 3x M15 ATR
-	// EXTREME: > 3x M15 ATR
+	// SuggestedRR tuned for "ăn nhiều pips" (2R-3R per trade)
 	var volatilityRank string
 	var suggestedRR, maxLeverage, profitTarget float64
 
 	if adjustedATRPercent < m15ATRPercent*0.5 {
 		volatilityRank = "LOW"
-		suggestedRR = 1.2
-		maxLeverage = 0.05 / adjustedATRPercent // Inverse relationship: lower vol = higher leverage
-		profitTarget = adjustedATRPercent * 2.5 // 2.5x ATR
+		suggestedRR = 1.5
+		maxLeverage = 0.05 / adjustedATRPercent
+		profitTarget = adjustedATRPercent * 2.5
 	} else if adjustedATRPercent < m15ATRPercent*1.5 {
 		volatilityRank = "MEDIUM"
-		suggestedRR = 1.5
+		suggestedRR = 2.0 // More pips per win
 		maxLeverage = 0.04 / adjustedATRPercent
-		profitTarget = adjustedATRPercent * 3.0 // 3x ATR
+		profitTarget = adjustedATRPercent * 3.0
 	} else if adjustedATRPercent < m15ATRPercent*3.0 {
 		volatilityRank = "HIGH"
-		suggestedRR = 2.0
+		suggestedRR = 2.5
 		maxLeverage = 0.03 / adjustedATRPercent
-		profitTarget = adjustedATRPercent * 4.0 // 4x ATR
+		profitTarget = adjustedATRPercent * 4.0
 	} else {
 		volatilityRank = "EXTREME"
-		suggestedRR = 2.5
+		suggestedRR = 3.0 // Let winners run
 		maxLeverage = 0.02 / adjustedATRPercent
-		profitTarget = adjustedATRPercent * 5.0 // 5x ATR
+		profitTarget = adjustedATRPercent * 5.0
 	}
 
 	// Clamp leverage to reasonable bounds (1-50x)
@@ -1307,15 +1304,15 @@ func calculateRealisticStopLoss(entry float64, side string, volatilityPercent fl
 	}
 }
 
-// Cập nhật hàm này để dùng volatility profile
-func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, m1Candles []baseCandleModel.BaseCandle, signalScore SignalScore, m15Candles []baseCandleModel.BaseCandle, m5Candles []baseCandleModel.BaseCandle, emaPeriod200, emaPeriod50 int) string {
+// Cập nhật hàm này để dùng volatility profile (entry M15 vs baseline H1)
+func genMultiRRSignalStringPercentWithScore(symbol, side string, entry float64, entryCandles []baseCandleModel.BaseCandle, signalScore SignalScore, m15Candles []baseCandleModel.BaseCandle, m5Candles []baseCandleModel.BaseCandle, baselineVolCandles []baseCandleModel.BaseCandle, emaPeriod200, emaPeriod50 int) string {
 	var icon string
 	if side == "BUY" {
 		icon = "🟢"
 	} else {
 		icon = "🔴"
 	}
-	volProfile := calculateScalpingVolatilityProfile(m1Candles, m15Candles)
+	volProfile := calculateScalpingVolatilityProfile(entryCandles, baselineVolCandles)
 	rawLeverage := calculateScalpingLeverage(volProfile)
 	leverage := roundLeverageToExchangeValues(rawLeverage)
 	suggestedRR := volProfile.SuggestedRR
@@ -1784,45 +1781,45 @@ func (s *TrendScalpingV1Strategy) scoreRSIMomentum(side string, rsi7 []float64) 
 }
 
 func (s *TrendScalpingV1Strategy) scoreCandlestickPatternsEnhanced(input tradingModels.CandleInput, side string) float64 {
-	if len(input.M1Candles) < 3 {
+	if len(input.M15Candles) < 3 {
 		return 5.0
 	}
 
 	score := 0.0
 	patterns := 0
 
-	// Enhanced pattern detection with more patterns
-	if s.detectBullishEngulfing(input.M1Candles) && side == "BUY" {
+	// Enhanced pattern detection on entry TF (M15 - đỡ nhiễu)
+	if s.detectBullishEngulfing(input.M15Candles) && side == "BUY" {
 		patterns++
 		score += 4.0
 	}
-	if s.detectBearishEngulfing(input.M1Candles) && side == "SELL" {
+	if s.detectBearishEngulfing(input.M15Candles) && side == "SELL" {
 		patterns++
 		score += 4.0
 	}
-	if s.detectHammer(input.M1Candles, 0.333) && side == "BUY" {
+	if s.detectHammer(input.M15Candles, 0.333) && side == "BUY" {
 		patterns++
 		score += 3.0
 	}
-	if s.detectShootingStar(input.M1Candles, 0.333) && side == "SELL" {
+	if s.detectShootingStar(input.M15Candles, 0.333) && side == "SELL" {
 		patterns++
 		score += 3.0
 	}
-	if s.detect2Bulls(input.M1Candles) && side == "BUY" {
+	if s.detect2Bulls(input.M15Candles) && side == "BUY" {
 		patterns++
 		score += 2.0
 	}
-	if s.detect2Bears(input.M1Candles) && side == "SELL" {
+	if s.detect2Bears(input.M15Candles) && side == "SELL" {
 		patterns++
 		score += 2.0
 	}
 
 	// Add new patterns
-	if s.detectDoji(input.M1Candles) {
+	if s.detectDoji(input.M15Candles) {
 		patterns++
 		score += 1.5
 	}
-	if s.detectSpinningTop(input.M1Candles) {
+	if s.detectSpinningTop(input.M15Candles) {
 		patterns++
 		score += 1.0
 	}
@@ -1836,20 +1833,20 @@ func (s *TrendScalpingV1Strategy) scoreCandlestickPatternsEnhanced(input trading
 }
 
 func (s *TrendScalpingV1Strategy) scoreSupportResistanceEnhanced(input tradingModels.CandleInput, side string) float64 {
-	if len(input.M1Candles) < 20 {
+	if len(input.M15Candles) < 20 {
 		return 5.0
 	}
 
-	currentPrice := input.M1Candles[len(input.M1Candles)-1].Close
+	currentPrice := input.M15Candles[len(input.M15Candles)-1].Close
 	score := 0.0
 
-	// Find recent highs and lows
+	// Find recent highs and lows (entry TF = M15)
 	recentHighs := make([]float64, 0)
 	recentLows := make([]float64, 0)
 
-	for i := len(input.M1Candles) - 20; i < len(input.M1Candles); i++ {
-		recentHighs = append(recentHighs, input.M1Candles[i].High)
-		recentLows = append(recentLows, input.M1Candles[i].Low)
+	for i := len(input.M15Candles) - 20; i < len(input.M15Candles); i++ {
+		recentHighs = append(recentHighs, input.M15Candles[i].High)
+		recentLows = append(recentLows, input.M15Candles[i].Low)
 	}
 
 	// Find resistance levels (recent highs)
@@ -1877,12 +1874,12 @@ func (s *TrendScalpingV1Strategy) scoreSupportResistanceEnhanced(input tradingMo
 			score = 4.0 // Far from support
 		}
 
-		// Bonus for M5 support alignment
-		if len(input.M5Candles) >= 10 {
-			m5Support := s.findM5Support(input.M5Candles)
-			if m5Support > 0 {
-				m5Distance := math.Abs(currentPrice-m5Support) / currentPrice * 100
-				if m5Distance < 0.5 {
+		// Bonus for M15 support alignment (entry TF)
+		if len(input.M15Candles) >= 10 {
+			m15Support := s.findM5Support(input.M15Candles) // helper works on any TF
+			if m15Support > 0 {
+				m15Distance := math.Abs(currentPrice-m15Support) / currentPrice * 100
+				if m15Distance < 0.5 {
 					score += 2.0
 				}
 			}
@@ -1899,12 +1896,12 @@ func (s *TrendScalpingV1Strategy) scoreSupportResistanceEnhanced(input tradingMo
 			score = 4.0 // Far from resistance
 		}
 
-		// Bonus for M5 resistance alignment
-		if len(input.M5Candles) >= 10 {
-			m5Resistance := s.findM5Resistance(input.M5Candles)
-			if m5Resistance > 0 {
-				m5Distance := math.Abs(currentPrice-m5Resistance) / currentPrice * 100
-				if m5Distance < 0.5 {
+		// Bonus for M15 resistance alignment (entry TF)
+		if len(input.M15Candles) >= 10 {
+			m15Resistance := s.findM5Resistance(input.M15Candles)
+			if m15Resistance > 0 {
+				m15Distance := math.Abs(currentPrice-m15Resistance) / currentPrice * 100
+				if m15Distance < 0.5 {
 					score += 2.0
 				}
 			}
@@ -2014,18 +2011,18 @@ func (s *TrendScalpingV1Strategy) detectBatPattern(candles []baseCandleModel.Bas
 }
 
 func (s *TrendScalpingV1Strategy) scoreOrderFlowAnalysis(input tradingModels.CandleInput, side string) float64 {
-	if len(input.M1Candles) < 5 {
+	if len(input.M15Candles) < 5 {
 		return 2.5
 	}
 
-	// Simplified order flow analysis based on price action
+	// Simplified order flow analysis based on price action (entry TF = M15)
 	score := 0.0
 
 	// Calculate ATR for dynamic threshold
-	atrPercent := calcATRPercent(input.M1Candles, 20)
+	atrPercent := calcATRPercent(input.M15Candles, 20)
 
 	// Check for absorption patterns (price not moving despite volume)
-	recentCandles := input.M1Candles[len(input.M1Candles)-5:]
+	recentCandles := input.M15Candles[len(input.M15Candles)-5:]
 	priceRange := 0.0
 	totalVolume := 0.0
 
@@ -2039,10 +2036,10 @@ func (s *TrendScalpingV1Strategy) scoreOrderFlowAnalysis(input tradingModels.Can
 
 	// Calculate average volume over longer period for normalization
 	var avgVolume50 float64
-	if len(input.M1Candles) >= 50 {
+	if len(input.M15Candles) >= 50 {
 		totalVolume50 := 0.0
-		for i := len(input.M1Candles) - 50; i < len(input.M1Candles); i++ {
-			totalVolume50 += input.M1Candles[i].Volume
+		for i := len(input.M15Candles) - 50; i < len(input.M15Candles); i++ {
+			totalVolume50 += input.M15Candles[i].Volume
 		}
 		avgVolume50 = totalVolume50 / 50.0
 	} else {
@@ -2063,7 +2060,7 @@ func (s *TrendScalpingV1Strategy) scoreOrderFlowAnalysis(input tradingModels.Can
 	}
 
 	// Check for momentum divergence
-	if s.detectMomentumDivergence(input.M1Candles, side) {
+	if s.detectMomentumDivergence(input.M15Candles, side) {
 		score += 2.0
 	}
 

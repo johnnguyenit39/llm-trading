@@ -37,7 +37,7 @@ func InitCronJobs(db *gorm.DB) {
 	repo := repository.NewBinanceRepository()
 	binanceService := binance.NewBinanceService(repo)
 
-	// Scalping strategies - run every 1 minute (M1 entry)
+	// Scalping strategies - chạy mỗi 5 phút (entry M15 - đỡ nhiễu)
 	go ScalpingStrategy(binanceService, db)
 
 	// Day trading strategies - run every 15 minutes (M15 entry)
@@ -100,8 +100,8 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 					D1Candles:  utilsConverter.ConvertBinanceCandlesToBase(D1Candles),
 				}
 
-				// Detect market regime to route to appropriate strategy
-				currentPrice := candleInput.M1Candles[len(candleInput.M1Candles)-1].Close
+				// Detect market regime to route to appropriate strategy (entry TF = M15)
+				currentPrice := candleInput.M15Candles[len(candleInput.M15Candles)-1].Close
 				marketRegime := scalping.DetectMarketRegime(candleInput, currentPrice)
 
 				log.Info().
@@ -168,8 +168,8 @@ func ScalpingStrategy(binanceService *binance.BinanceService, db *gorm.DB) {
 				}
 			}(symbol)
 		}
-		// Tính thời gian còn lại đến đầu phút tiếp theo
-		next := now.Truncate(time.Minute).Add(time.Minute)
+		// Chờ đến đầu chu kỳ 5 phút tiếp theo (0, 5, 10, 15, ...)
+		next := now.Truncate(5 * time.Minute).Add(5 * time.Minute)
 		time.Sleep(time.Until(next))
 	}
 }
