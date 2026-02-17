@@ -111,14 +111,14 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 
 	// BUY Signal: Range trading logic - Buy at support with mean reversion
 	// Key: Price near support + RSI mean reversion zone + price bounce + volume
-	if supportDistance < 0.3 && rsiMeanReversionBuy && (priceBounceFromSupport || hasHammer || hasBullishEngulfing) {
+	if supportDistance < 0.5 && rsiMeanReversionBuy && (priceBounceFromSupport || hasHammer || hasBullishEngulfing) {
 		side := "BUY"
 		entry := currentPrice
 
 		// Calculate signal score for sideway
 		signalScore := s.calculateSidewaySignalScore(input, side, currentPrice, support, resistance, rsi7)
 
-		if signalScore.TotalScore < 80 {
+		if signalScore.TotalScore < 70 {
 			return nil, nil
 		}
 
@@ -143,14 +143,14 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.
 
 	// SELL Signal: Range trading logic - Sell at resistance with mean reversion
 	// Key: Price near resistance + RSI mean reversion zone + price bounce + volume
-	if resistanceDistance < 0.3 && rsiMeanReversionSell && (priceBounceFromResistance || hasShootingStar || hasBearishEngulfing) {
+	if resistanceDistance < 0.5 && rsiMeanReversionSell && (priceBounceFromResistance || hasShootingStar || hasBearishEngulfing) {
 		side := "SELL"
 		entry := currentPrice
 
 		// Calculate signal score for sideway
 		signalScore := s.calculateSidewaySignalScore(input, side, currentPrice, support, resistance, rsi7)
 
-		if signalScore.TotalScore < 80 {
+		if signalScore.TotalScore < 70 {
 			return nil, nil
 		}
 
@@ -240,14 +240,14 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 
 	// BUY Signal: Range trading logic - Buy at support with mean reversion
 	// Key: Price near support + RSI mean reversion zone + price bounce + volume
-	if supportDistance < 0.3 && rsiMeanReversionBuy && (priceBounceFromSupport || hasHammer || hasBullishEngulfing) {
+	if supportDistance < 0.5 && rsiMeanReversionBuy && (priceBounceFromSupport || hasHammer || hasBullishEngulfing) {
 		side := "BUY"
 		entry := currentPrice
 
 		// Calculate signal score for sideway
 		signalScore := s.calculateSidewaySignalScore(input, side, currentPrice, support, resistance, rsi7)
 
-		if signalScore.TotalScore < 80 {
+		if signalScore.TotalScore < 70 {
 			return nil, nil, nil
 		}
 
@@ -276,14 +276,14 @@ func (s *SidewayScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModel
 
 	// SELL Signal: Range trading logic - Sell at resistance with mean reversion
 	// Key: Price near resistance + RSI mean reversion zone + price bounce + volume
-	if resistanceDistance < 0.3 && rsiMeanReversionSell && (priceBounceFromResistance || hasShootingStar || hasBearishEngulfing) {
+	if resistanceDistance < 0.5 && rsiMeanReversionSell && (priceBounceFromResistance || hasShootingStar || hasBearishEngulfing) {
 		side := "SELL"
 		entry := currentPrice
 
 		// Calculate signal score for sideway
 		signalScore := s.calculateSidewaySignalScore(input, side, currentPrice, support, resistance, rsi7)
 
-		if signalScore.TotalScore < 80 {
+		if signalScore.TotalScore < 70 {
 			return nil, nil, nil
 		}
 

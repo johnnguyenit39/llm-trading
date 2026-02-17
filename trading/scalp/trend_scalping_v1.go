@@ -55,9 +55,9 @@ func NewScalping1Strategy() *TrendScalpingV1Strategy {
 	return &TrendScalpingV1Strategy{
 		emaPeriod200:  200,
 		emaPeriod50:   50,
-		rsiPeriod:     14, // Match TradingView default
-		rsiOversold:   30,
-		rsiOverbought: 70,
+		rsiPeriod:     14,
+		rsiOversold:   35, // Nới để có thêm tín hiệu (pullback vừa)
+		rsiOverbought: 65,
 	}
 }
 
@@ -753,9 +753,8 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 		return nil, nil
 	}
 
-	// For MIXED regime, require at least M15 to be trending
-	if marketRegime.Regime == "MIXED" && marketRegime.ADXM15 < 20 {
-		// Skip if M15 is also sideway in mixed regime
+	// For MIXED regime, allow trend if M15 has some trend (ADX >= 15)
+	if marketRegime.Regime == "MIXED" && marketRegime.ADXM15 < 15 {
 		return nil, nil
 	}
 
@@ -791,7 +790,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 100 {
+		if signalScore.TotalScore < 90 {
 			return nil, nil
 		}
 
@@ -817,7 +816,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalString(input tradingModels.Ca
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 100 {
+		if signalScore.TotalScore < 90 {
 			return nil, nil
 		}
 
@@ -872,8 +871,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 	}
 
 	// For MIXED regime, require at least M15 to be trending
-	if marketRegime.Regime == "MIXED" && marketRegime.ADXM15 < 20 {
-		// Skip if M15 is also sideway in mixed regime
+	if marketRegime.Regime == "MIXED" && marketRegime.ADXM15 < 15 {
 		return nil, nil, nil
 	}
 
@@ -909,7 +907,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 100 {
+		if signalScore.TotalScore < 90 {
 			return nil, nil, nil
 		}
 
@@ -939,7 +937,7 @@ func (s *TrendScalpingV1Strategy) AnalyzeWithSignalAndModel(input tradingModels.
 		// Calculate signal score
 		signalScore := s.calculateSignalScore(input, side, currentPrice, currentEMA, rsi7)
 
-		if signalScore.TotalScore < 100 {
+		if signalScore.TotalScore < 90 {
 			return nil, nil, nil
 		}
 
