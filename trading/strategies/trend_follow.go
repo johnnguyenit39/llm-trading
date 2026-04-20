@@ -82,14 +82,21 @@ func (s *TrendFollow) Analyze(ctx context.Context, in engine.StrategyInput) (*mo
 		return vote, nil
 	}
 
-	// Require a pullback to EMA20 (within 0.5 ATR) — avoids chasing.
+	// Require price to be "tagging" EMA20 support/resistance FROM THE TREND
+	// SIDE — i.e. in an uptrend, close must be within [EMA20, EMA20+0.5*ATR],
+	// and in a downtrend, close must be within [EMA20-0.5*ATR, EMA20].
+	//
+	// This is deliberately stricter than a classic "pullback to EMA20" which
+	// would also accept a close that dipped BELOW EMA20. We want to catch the
+	// reaction AFTER support holds, not during a knife-catch. Signal frequency
+	// is lower but false-positive rate is lower too.
 	pullbackDist := lastClose - ema20
 	if up && (pullbackDist < 0 || pullbackDist > 0.5*atr) {
-		vote.Reason = "no pullback to EMA20"
+		vote.Reason = "price not tagging EMA20 from above"
 		return vote, nil
 	}
 	if down && (pullbackDist > 0 || -pullbackDist > 0.5*atr) {
-		vote.Reason = "no pullback to EMA20"
+		vote.Reason = "price not tagging EMA20 from below"
 		return vote, nil
 	}
 
@@ -113,7 +120,7 @@ func (s *TrendFollow) Analyze(ctx context.Context, in engine.StrategyInput) (*mo
 		conf = 60
 	}
 	vote.Confidence = conf
-	vote.Reason = fmt.Sprintf("trend aligned, ADX=%.1f, pullback to EMA20", adx)
+	vote.Reason = fmt.Sprintf("trend aligned, ADX=%.1f, tagging EMA20", adx)
 	vote.Details = map[string]interface{}{
 		"adx":     adx,
 		"ema20":   ema20,

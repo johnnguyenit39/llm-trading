@@ -3,15 +3,16 @@ package cronjobs
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
 	baseCandle "j_ai_trade/common"
+	"j_ai_trade/telegram"
 	"j_ai_trade/trading/engine"
 	"j_ai_trade/trading/models"
 	"j_ai_trade/trading/strategies"
-	"j_ai_trade/telegram"
 
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
@@ -27,9 +28,23 @@ var TradingSymbols = []string{
 	"XAUUSDT",
 }
 
-// PaperEquity is the virtual equity used for position-size logging.
-// When real execution is wired in, replace with the actual account equity.
-const PaperEquity = 1000.0
+const (
+	// PaperEquity is the virtual equity used for position-size logging.
+	PaperEquity = 1000.0
+
+	// Concurrency limits for Binance REST (weight 2400/min for klines is
+	// generous, but we play nice).
+	MaxConcurrentFetches = 5
+	FetchTimeout         = 20 * time.Second
+	TierTimeout          = 90 * time.Second
+)
+
+// Per-tier cooldown so a persistent setup doesn't re-alert every cron tick.
+var tierCooldown = map[models.Timeframe]time.Duration{
+	models.TF_H1: 2 * time.Hour,
+	models.TF_H4: 6 * time.Hour,
+	models.TF_D1: 20 * time.Hour,
+}
 
 // InitCronJobs wires up the three-tier analysis schedule.
 // H1 — every hour at minute 01
@@ -39,15 +54,26 @@ func InitCronJobs(db *gorm.DB) {
 	repo := repository.NewBinanceRepository()
 	binanceService := binance.NewBinanceService(repo)
 
-	// Build one ensemble per timeframe tier with appropriate strategy configs.
-	h1Ensemble := buildEnsemble(models.TF_H1, models.TF_H4, models.TF_D1)
-	h4Ensemble := buildEnsemble(models.TF_H4, models.TF_D1, models.TF_D1)
-	d1Ensemble := buildEnsemble(models.TF_D1, models.TF_D1, models.TF_D1)
+	exposure := engine.NewExposureTracker()
+
+	h1Ensemble := buildEnsemble(models.TF_H1, models.TF_H4, models.TF_D1, models.TF_H4, exposure, tierCooldown[models.TF_H1])
+	h4Ensemble := buildEnsemble(models.TF_H4, models.TF_D1, models.TF_D1, models.TF_D1, exposure, tierCooldown[models.TF_H4])
+	d1Ensemble := buildEnsemble(models.TF_D1, models.TF_D1, models.TF_D1, "", exposure, tierCooldown[models.TF_D1])
+
+	h1Dedup := engine.NewSignalDedup(tierCooldown[models.TF_H1])
+	h4Dedup := engine.NewSignalDedup(tierCooldown[models.TF_H4])
+	d1Dedup := engine.NewSignalDedup(tierCooldown[models.TF_D1])
 
 	c := cron.New()
-	_, _ = c.AddFunc("1 * * * *", func() { runTier(context.Background(), binanceService, h1Ensemble, models.TF_H1) })
-	_, _ = c.AddFunc("2 */4 * * *", func() { runTier(context.Background(), binanceService, h4Ensemble, models.TF_H4) })
-	_, _ = c.AddFunc("5 0 * * *", func() { runTier(context.Background(), binanceService, d1Ensemble, models.TF_D1) })
+	_, _ = c.AddFunc("1 * * * *", func() {
+		runTier(context.Background(), binanceService, h1Ensemble, h1Dedup, models.TF_H1)
+	})
+	_, _ = c.AddFunc("2 */4 * * *", func() {
+		runTier(context.Background(), binanceService, h4Ensemble, h4Dedup, models.TF_H4)
+	})
+	_, _ = c.AddFunc("5 0 * * *", func() {
+		runTier(context.Background(), binanceService, d1Ensemble, d1Dedup, models.TF_D1)
+	})
 	c.Start()
 
 	log.Info().
@@ -56,10 +82,17 @@ func InitCronJobs(db *gorm.DB) {
 }
 
 // buildEnsemble constructs an ensemble of 4 orthogonal strategies for a given
-// entry timeframe. `trendTF` / `structureTF` are the higher TFs used for
-// contextual filters.
-func buildEnsemble(entry, trendTF, structureTF models.Timeframe) *engine.Ensemble {
-	e := engine.NewEnsemble(engine.NewDefaultRiskManager(), engine.DefaultEnsembleConfig())
+// entry timeframe. `htfRegime` is an optional HTF used by the ensemble for
+// multi-TF regime confirmation (empty string disables it). `exposureTTL` is
+// how long a committed position stays in the exposure tracker when running
+// in signal-only mode — usually the tier's cooldown so stale signals expire
+// at the same rate new ones can fire.
+func buildEnsemble(entry, trendTF, structureTF, htfRegime models.Timeframe, exposure *engine.ExposureTracker, exposureTTL time.Duration) *engine.Ensemble {
+	cfg := engine.DefaultEnsembleConfig()
+	cfg.HTFRegimeTF = htfRegime
+	cfg.ExposureTTL = exposureTTL
+
+	e := engine.NewEnsemble(engine.NewDefaultRiskManager(), cfg).WithExposureTracker(exposure)
 	e.Register(strategies.NewTrendFollow(entry, trendTF))
 	e.Register(strategies.NewMeanReversion(entry))
 	e.Register(strategies.NewBreakout(entry, 20))
@@ -67,20 +100,39 @@ func buildEnsemble(entry, trendTF, structureTF models.Timeframe) *engine.Ensembl
 	return e
 }
 
-// runTier fetches all required timeframes for every symbol and feeds the ensemble.
-func runTier(ctx context.Context, bs *binance.BinanceService, ens *engine.Ensemble, entryTF models.Timeframe) {
+// runTier fetches required timeframes for every symbol and feeds the ensemble.
+// Concurrency is capped by a semaphore; the whole tier has a deadline so a
+// hung Binance call can't wedge the scheduler.
+func runTier(parent context.Context, bs *binance.BinanceService, ens *engine.Ensemble, dedup *engine.SignalDedup, entryTF models.Timeframe) {
 	start := time.Now()
+	ctx, cancel := context.WithTimeout(parent, TierTimeout)
+	defer cancel()
+
 	log.Info().Str("tier", string(entryTF)).Msg("tier analysis start")
 
-	// Derive required TFs from registered strategies.
 	required := collectRequiredTFs(ens)
-
 	telegramService := telegram.NewTelegramService()
+
+	sem := make(chan struct{}, MaxConcurrentFetches)
+	var wg sync.WaitGroup
 
 	for _, symbol := range TradingSymbols {
 		symbol := symbol
+		wg.Add(1)
 		go func() {
-			market, err := fetchMarketData(ctx, bs, symbol, required)
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				log.Warn().Str("symbol", symbol).Msg("tier deadline reached before acquiring slot")
+				return
+			}
+			defer func() { <-sem }()
+
+			fetchCtx, fetchCancel := context.WithTimeout(ctx, FetchTimeout)
+			defer fetchCancel()
+
+			market, err := fetchMarketData(fetchCtx, bs, symbol, required)
 			if err != nil {
 				log.Warn().Err(err).Str("symbol", symbol).Msg("fetch market data failed")
 				return
@@ -100,16 +152,17 @@ func runTier(ctx context.Context, bs *binance.BinanceService, ens *engine.Ensemb
 			})
 
 			logDecision(entryTF, decision)
-			if decision.Direction != models.DirectionNone {
+			if decision.Direction != models.DirectionNone && dedup.ShouldFire(decision) {
 				notifyTelegram(telegramService, decision)
 			}
 		}()
 	}
 
+	wg.Wait()
 	log.Info().
 		Str("tier", string(entryTF)).
 		Dur("elapsed", time.Since(start)).
-		Msg("tier analysis dispatched")
+		Msg("tier analysis complete")
 }
 
 // collectRequiredTFs unions the RequiredTimeframes across all strategies.
@@ -129,7 +182,10 @@ func collectRequiredTFs(ens *engine.Ensemble) map[models.Timeframe]int {
 func fetchMarketData(ctx context.Context, bs *binance.BinanceService, symbol string, required map[models.Timeframe]int) (models.MarketData, error) {
 	out := models.MarketData{Symbol: symbol, Candles: map[models.Timeframe][]baseCandle.BaseCandle{}}
 	for tf, minCount := range required {
-		limit := minCount + 20 // pad for safe indicator warm-up
+		if err := ctx.Err(); err != nil {
+			return out, err
+		}
+		limit := minCount + 20
 		var (
 			binanceCandles []repository.BinanceCandle
 			err            error
@@ -188,11 +244,13 @@ func logDecision(tf models.Timeframe, d *models.TradeDecision) {
 			Float64("entry", d.Entry).
 			Float64("sl", d.StopLoss).
 			Float64("tp", d.TakeProfit).
+			Float64("netRR", d.NetRR).
 			Float64("qty", d.Quantity).
 			Float64("notional", d.Notional).
 			Float64("leverage", d.Leverage).
 			Float64("sizeFactor", d.SizeFactor).
-			Float64("riskUSD", d.RiskUSD)
+			Float64("riskUSD", d.RiskUSD).
+			Str("cappedBy", d.CappedBy)
 	}
 
 	for _, v := range d.Votes {
@@ -205,13 +263,17 @@ func logDecision(tf models.Timeframe, d *models.TradeDecision) {
 }
 
 func notifyTelegram(ts *telegram.TelegramService, d *models.TradeDecision) {
+	cappedTxt := ""
+	if d.CappedBy != "" {
+		cappedTxt = fmt.Sprintf(" [capped-by %s]", d.CappedBy)
+	}
 	msg := fmt.Sprintf(
-		"%s %s [%s / %s]\nTier: %s (%.0f%% size) | Conf: %.1f\nAgreement: %d/%d eligible (ratio %.2f)\nEntry: %.4f | SL: %.4f | TP: %.4f\nLev %.0fx | Notional $%.2f | Risk $%.2f\nWhy: %s",
+		"%s %s [%s / %s]\nTier: %s (%.0f%% size) | Conf: %.1f | NetRR: %.2f\nAgreement: %d/%d eligible (ratio %.2f)\nEntry: %.4f | SL: %.4f | TP: %.4f\nLev %.0fx | Notional $%.2f | Risk $%.2f%s\nWhy: %s",
 		d.Symbol, d.Direction, d.Timeframe, d.Regime,
-		d.Tier, d.SizeFactor*100, d.Confidence,
+		d.Tier, d.SizeFactor*100, d.Confidence, d.NetRR,
 		d.Agreement, d.EligibleCount, d.AgreeRatio,
 		d.Entry, d.StopLoss, d.TakeProfit,
-		d.Leverage, d.Notional, d.RiskUSD,
+		d.Leverage, d.Notional, d.RiskUSD, cappedTxt,
 		d.Reason,
 	)
 	_ = ts.SendMessage(msg)

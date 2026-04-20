@@ -61,8 +61,6 @@ func (s *Structure) Analyze(ctx context.Context, in engine.StrategyInput) (*mode
 		return vote, nil
 	}
 
-	// Find prior swing high / swing low on structure TF (exclude last 1 bar
-	// which may not yet be a confirmed swing).
 	swingHigh, swingLow := indicators.SwingHighLow(struc[:len(struc)-1], s.SwingK)
 	if swingHigh == 0 || swingLow == 0 {
 		vote.Reason = "no swing points"
@@ -71,6 +69,7 @@ func (s *Structure) Analyze(ctx context.Context, in engine.StrategyInput) (*mode
 
 	last := struc[len(struc)-1]
 	atrE := indicators.ATR(entry, 14)
+	atrS := indicators.ATR(struc, 14)
 
 	bosUp := last.Close > swingHigh
 	bosDown := last.Close < swingLow
@@ -80,8 +79,6 @@ func (s *Structure) Analyze(ctx context.Context, in engine.StrategyInput) (*mode
 		return vote, nil
 	}
 
-	// Require a retest: entry TF recent price must have pulled back CLOSE to
-	// the broken level within last ~10 bars.
 	lastEntry := entry[len(entry)-1].Close
 	var brokenLevel float64
 	if bosUp {
@@ -89,7 +86,9 @@ func (s *Structure) Analyze(ctx context.Context, in engine.StrategyInput) (*mode
 	} else {
 		brokenLevel = swingLow
 	}
-	if !hadRetest(entry, brokenLevel, 10, 0.5*atrE) {
+
+	retestDist, retested := retestCloseness(entry, brokenLevel, 10, 0.5*atrE, bosUp)
+	if !retested {
 		vote.Reason = "BOS without retest"
 		return vote, nil
 	}
@@ -105,14 +104,57 @@ func (s *Structure) Analyze(ctx context.Context, in engine.StrategyInput) (*mode
 		vote.TakeProfit = lastEntry - 2.5*atrE
 	}
 
-	// Confidence scales with how cleanly price retested (tighter retest = higher).
-	vote.Confidence = 70
-	vote.Reason = fmt.Sprintf("BOS %s with retest of %.2f", directionOfBOS(bosUp), brokenLevel)
+	// Confidence scales with two independent factors:
+	//  1. Retest tightness: the closer retest was to the broken level
+	//     (measured in ATR), the cleaner. Perfect retest = distance 0.
+	//  2. BOS magnitude: how decisively price broke the swing level,
+	//     expressed in HTF ATRs. A 2-ATR break is a stronger signal than
+	//     a 0.1-ATR nudge that could be noise.
+	tightness := 1.0
+	if atrE > 0 {
+		tightness = 1.0 - (retestDist / (0.5 * atrE))
+		if tightness < 0 {
+			tightness = 0
+		}
+		if tightness > 1 {
+			tightness = 1
+		}
+	}
+	magnitude := 0.0
+	if atrS > 0 {
+		if bosUp {
+			magnitude = (last.Close - swingHigh) / atrS
+		} else {
+			magnitude = (swingLow - last.Close) / atrS
+		}
+		if magnitude < 0 {
+			magnitude = 0
+		}
+		if magnitude > 2 {
+			magnitude = 2
+		}
+	}
+	conf := 60 + tightness*15 + magnitude*10
+	if conf > 92 {
+		conf = 92
+	}
+	if conf < 55 {
+		conf = 55
+	}
+	vote.Confidence = conf
+	vote.Reason = fmt.Sprintf(
+		"BOS %s broken=%.4f tightness=%.2f mag=%.2fATR",
+		directionOfBOS(bosUp), brokenLevel, tightness, magnitude,
+	)
 	vote.Details = map[string]interface{}{
-		"swingHigh":    swingHigh,
-		"swingLow":     swingLow,
-		"brokenLevel":  brokenLevel,
-		"atrEntry":     atrE,
+		"swingHigh":   swingHigh,
+		"swingLow":    swingLow,
+		"brokenLevel": brokenLevel,
+		"atrEntry":    atrE,
+		"atrStruct":   atrS,
+		"retestDist":  retestDist,
+		"tightness":   tightness,
+		"magnitude":   magnitude,
 	}
 	return vote, nil
 }
@@ -124,21 +166,47 @@ func directionOfBOS(up bool) string {
 	return "down"
 }
 
-// hadRetest returns true if any of the last `lookback` bars had its low (for
-// bullish retest) or high (for bearish retest) within `tolerance` of `level`.
-// This is a lightweight check — it confirms price revisited the broken level.
-func hadRetest(candles []baseCandle.BaseCandle, level float64, lookback int, tolerance float64) bool {
+// retestCloseness returns (minDistance, found) for the closest retest of
+// `level` within the last `lookback` entry-TF bars. For a bullish BOS we
+// measure how close the bar's LOW came to the broken resistance (from above);
+// for bearish BOS we measure the bar's HIGH to the broken support (from below).
+//
+// `tolerance` is the maximum absolute distance considered a retest.
+func retestCloseness(candles []baseCandle.BaseCandle, level float64, lookback int, tolerance float64, bullish bool) (float64, bool) {
 	if len(candles) < 2 || tolerance <= 0 {
-		return false
+		return 0, false
 	}
 	start := len(candles) - lookback
 	if start < 0 {
 		start = 0
 	}
+	bestDist := tolerance + 1
+	found := false
 	for i := start; i < len(candles); i++ {
-		if candles[i].Low <= level+tolerance && candles[i].High >= level-tolerance {
-			return true
+		var probe float64
+		if bullish {
+			probe = candles[i].Low
+		} else {
+			probe = candles[i].High
+		}
+		dist := probe - level
+		if !bullish {
+			dist = level - probe
+		}
+		// Only count bars that came back toward the level from the correct side
+		// (positive "from the outside" distance is tolerated up to tolerance;
+		// bars that never crossed back are not retests).
+		absDist := dist
+		if absDist < 0 {
+			absDist = -absDist
+		}
+		if absDist <= tolerance && absDist < bestDist {
+			bestDist = absDist
+			found = true
 		}
 	}
-	return false
+	if !found {
+		return 0, false
+	}
+	return bestDist, true
 }

@@ -55,3 +55,36 @@ func DetectRegime(candles []baseCandle.BaseCandle, th RegimeThresholds) models.R
 		return models.RegimeChoppy
 	}
 }
+
+// DetectRegimeMulti classifies the regime using BOTH the entry TF and an HTF
+// bias. It returns the entry-TF regime EXCEPT when the HTF strongly disagrees
+// with a trend label — in which case it downgrades to CHOPPY. This prevents
+// a brief H1 pullback from being labelled RANGE while H4/D1 are clearly
+// trending, and vice-versa.
+//
+// Rules:
+//   - If entry is TREND_UP but HTF is TREND_DOWN (or vice-versa) → CHOPPY.
+//   - If entry is RANGE but HTF is a strong trend (ADX ≥ th.TrendADX + 5 with
+//     aligned EMAs) → CHOPPY (don't fade a strong HTF move with mean-rev).
+//   - Otherwise keep the entry-TF label.
+func DetectRegimeMulti(entryCandles, htfCandles []baseCandle.BaseCandle, th RegimeThresholds) models.Regime {
+	entryRegime := DetectRegime(entryCandles, th)
+	if len(htfCandles) < th.MinCandles {
+		return entryRegime
+	}
+	htfRegime := DetectRegime(htfCandles, th)
+
+	// Direct contradiction between TFs = choppy.
+	if (entryRegime == models.RegimeTrendUp && htfRegime == models.RegimeTrendDown) ||
+		(entryRegime == models.RegimeTrendDown && htfRegime == models.RegimeTrendUp) {
+		return models.RegimeChoppy
+	}
+	// Entry says RANGE but HTF has a firm trend → don't mean-revert against HTF.
+	if entryRegime == models.RegimeRange && htfRegime.IsTrend() {
+		closed := indicators.ClosedCandles(htfCandles)
+		if len(closed) > 0 && indicators.ADX(closed, th.ADXPeriod) >= th.TrendADX+5 {
+			return models.RegimeChoppy
+		}
+	}
+	return entryRegime
+}

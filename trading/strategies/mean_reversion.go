@@ -93,9 +93,6 @@ func (s *MeanReversion) Analyze(ctx context.Context, in engine.StrategyInput) (*
 	if vote.Confidence > 90 {
 		vote.Confidence = 90
 	}
-	if vote.Confidence < 0 {
-		vote.Confidence = 0
-	}
 
 	vote.Reason = fmt.Sprintf("range (ADX=%.1f), RSI=%.1f, outside BB", adx, rsi)
 	vote.Details = map[string]interface{}{

@@ -29,11 +29,13 @@ type TradeDecision struct {
 	StopLoss   float64
 	TakeProfit float64
 
-	SizeFactor   float64 // 0..1 — 1.0=full, 0.5=half, 0.25=quarter (strong-solo)
-	RiskUSD      float64 // intended $ risk for this trade
-	Notional     float64 // position notional value
-	Quantity     float64 // qty in base asset
-	Leverage     float64 // applied leverage
+	SizeFactor float64 // 0..1 — 1.0=full, 0.5=half, 0.25=quarter (strong-solo)
+	RiskUSD    float64 // ACTUAL $ risk at SL (post-caps, post-size-factor)
+	Notional   float64 // position notional value
+	Quantity   float64 // qty in base asset
+	Leverage   float64 // applied leverage
+	CappedBy   string  // "" | "leverage" | "volatility" — informs debugging
+	NetRR      float64 // reward/risk after round-trip taker fees
 
 	EligibleCount int // strategies whose ActiveRegimes() included current regime
 	ActiveCount   int // eligible strategies that actually voted non-NONE
