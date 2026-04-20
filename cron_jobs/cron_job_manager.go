@@ -9,6 +9,7 @@ import (
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
 	baseCandle "j_ai_trade/common"
+	"j_ai_trade/notifier"
 	"j_ai_trade/telegram"
 	"j_ai_trade/trading/engine"
 	"j_ai_trade/trading/models"
@@ -50,7 +51,18 @@ var tierCooldown = map[models.Timeframe]time.Duration{
 // H1 — every hour at minute 01
 // H4 — every 4 hours at minute 02
 // D1 — every day at 00:05 UTC
+//
+// The default Telegram pusher is constructed here; callers wanting a
+// different destination (webhook, DB, multi-sink) should use
+// InitCronJobsWithPusher instead.
 func InitCronJobs(db *gorm.DB) {
+	pusher := notifier.NewTelegramPusher(telegram.NewTelegramService())
+	InitCronJobsWithPusher(db, pusher)
+}
+
+// InitCronJobsWithPusher wires the schedule with an injected SignalPusher so
+// the trading pipeline stays free of transport-specific code.
+func InitCronJobsWithPusher(_ *gorm.DB, pusher notifier.SignalPusher) {
 	repo := repository.NewBinanceRepository()
 	binanceService := binance.NewBinanceService(repo)
 
@@ -66,13 +78,13 @@ func InitCronJobs(db *gorm.DB) {
 
 	c := cron.New()
 	_, _ = c.AddFunc("1 * * * *", func() {
-		runTier(context.Background(), binanceService, h1Ensemble, h1Dedup, models.TF_H1)
+		runTier(context.Background(), binanceService, h1Ensemble, h1Dedup, pusher, models.TF_H1)
 	})
 	_, _ = c.AddFunc("2 */4 * * *", func() {
-		runTier(context.Background(), binanceService, h4Ensemble, h4Dedup, models.TF_H4)
+		runTier(context.Background(), binanceService, h4Ensemble, h4Dedup, pusher, models.TF_H4)
 	})
 	_, _ = c.AddFunc("5 0 * * *", func() {
-		runTier(context.Background(), binanceService, d1Ensemble, d1Dedup, models.TF_D1)
+		runTier(context.Background(), binanceService, d1Ensemble, d1Dedup, pusher, models.TF_D1)
 	})
 	c.Start()
 
@@ -102,8 +114,9 @@ func buildEnsemble(entry, trendTF, structureTF, htfRegime models.Timeframe, expo
 
 // runTier fetches required timeframes for every symbol and feeds the ensemble.
 // Concurrency is capped by a semaphore; the whole tier has a deadline so a
-// hung Binance call can't wedge the scheduler.
-func runTier(parent context.Context, bs *binance.BinanceService, ens *engine.Ensemble, dedup *engine.SignalDedup, entryTF models.Timeframe) {
+// hung Binance call can't wedge the scheduler. Fired decisions are handed to
+// the injected pusher — this function never talks to Telegram directly.
+func runTier(parent context.Context, bs *binance.BinanceService, ens *engine.Ensemble, dedup *engine.SignalDedup, pusher notifier.SignalPusher, entryTF models.Timeframe) {
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(parent, TierTimeout)
 	defer cancel()
@@ -111,7 +124,6 @@ func runTier(parent context.Context, bs *binance.BinanceService, ens *engine.Ens
 	log.Info().Str("tier", string(entryTF)).Msg("tier analysis start")
 
 	required := collectRequiredTFs(ens)
-	telegramService := telegram.NewTelegramService()
 
 	sem := make(chan struct{}, MaxConcurrentFetches)
 	var wg sync.WaitGroup
@@ -153,7 +165,9 @@ func runTier(parent context.Context, bs *binance.BinanceService, ens *engine.Ens
 
 			logDecision(entryTF, decision)
 			if decision.Direction != models.DirectionNone && dedup.ShouldFire(decision) {
-				notifyTelegram(telegramService, decision)
+				if err := pusher.Push(ctx, decision); err != nil {
+					log.Warn().Err(err).Str("symbol", symbol).Msg("pusher failed")
+				}
 			}
 		}()
 	}
@@ -260,21 +274,4 @@ func logDecision(tf models.Timeframe, d *models.TradeDecision) {
 		evt = evt.Strs("vetoes", d.VetoReasons)
 	}
 	evt.Msg("ensemble decision")
-}
-
-func notifyTelegram(ts *telegram.TelegramService, d *models.TradeDecision) {
-	cappedTxt := ""
-	if d.CappedBy != "" {
-		cappedTxt = fmt.Sprintf(" [capped-by %s]", d.CappedBy)
-	}
-	msg := fmt.Sprintf(
-		"%s %s [%s / %s]\nTier: %s (%.0f%% size) | Conf: %.1f | NetRR: %.2f\nAgreement: %d/%d eligible (ratio %.2f)\nEntry: %.4f | SL: %.4f | TP: %.4f\nLev %.0fx | Notional $%.2f | Risk $%.2f%s\nWhy: %s",
-		d.Symbol, d.Direction, d.Timeframe, d.Regime,
-		d.Tier, d.SizeFactor*100, d.Confidence, d.NetRR,
-		d.Agreement, d.EligibleCount, d.AgreeRatio,
-		d.Entry, d.StopLoss, d.TakeProfit,
-		d.Leverage, d.Notional, d.RiskUSD, cappedTxt,
-		d.Reason,
-	)
-	_ = ts.SendMessage(msg)
 }

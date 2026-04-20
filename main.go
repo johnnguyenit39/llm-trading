@@ -59,7 +59,7 @@ func main() {
 		pubsub.ListenEvent(redisClient.GetClient(), pubSub)
 	}
 
-	// Initialize OKX service
+	// Initialize  service
 	log.Info().Msg("J AI Trade service initialized successfully")
 
 	db, err := storage.NewConnection()
