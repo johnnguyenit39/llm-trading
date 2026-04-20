@@ -67,8 +67,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to load the database")
 	}
 
-	//Migrate data
-	//storage.AutoMigrate(db)
+	storage.AutoMigrate(db)
 
 	// Initialize Gin router
 	app := gin.Default()

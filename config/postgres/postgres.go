@@ -4,6 +4,7 @@ import (
 	"fmt"
 	orderModel "j_ai_trade/modules/order/model"
 	otpModel "j_ai_trade/modules/otp/model"
+	svModel "j_ai_trade/modules/strategy_version/model"
 	userModel "j_ai_trade/modules/user/model"
 	"log"
 	"os"
@@ -49,6 +50,7 @@ func AutoMigrate(db *gorm.DB) {
 	db.AutoMigrate(
 		&userModel.User{},
 		&otpModel.Otp{},
+		&svModel.StrategyVersion{},
 		&orderModel.Order{},
 	)
 }

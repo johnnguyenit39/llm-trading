@@ -9,11 +9,14 @@ import (
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
 	baseCandle "j_ai_trade/common"
+	svBiz "j_ai_trade/modules/strategy_version/biz"
 	"j_ai_trade/notifier"
 	"j_ai_trade/telegram"
 	"j_ai_trade/trading/engine"
 	"j_ai_trade/trading/models"
 	"j_ai_trade/trading/strategies"
+
+	"github.com/google/uuid"
 
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
@@ -52,12 +55,58 @@ var tierCooldown = map[models.Timeframe]time.Duration{
 // H4 — every 4 hours at minute 02
 // D1 — every day at 00:05 UTC
 //
-// The default Telegram pusher is constructed here; callers wanting a
-// different destination (webhook, DB, multi-sink) should use
-// InitCronJobsWithPusher instead.
+// This constructor assembles the default production pusher stack:
+//  1. Register / activate a StrategyVersion for the current runtime config.
+//  2. Compose a MultiPusher of (DBSignalPusher, TelegramPusher) so fired
+//     signals are persisted AND shipped to Telegram in one call — neither
+//     the cron loop nor the ensemble knows there are two sinks.
+//
+// Tests or alternate deployments can skip this entirely and call
+// InitCronJobsWithPusher with their own SignalPusher (NoopPusher, a custom
+// webhook pusher, etc.).
 func InitCronJobs(db *gorm.DB) {
-	pusher := notifier.NewTelegramPusher(telegram.NewTelegramService())
-	InitCronJobsWithPusher(db, pusher)
+	strategyVersionID := registerStrategyVersion(db)
+
+	var pushers notifier.MultiPusher
+	if db != nil && strategyVersionID != uuid.Nil {
+		pushers = append(pushers, notifier.NewDBSignalPusher(db, strategyVersionID))
+	}
+	pushers = append(pushers, notifier.NewTelegramPusher(telegram.NewTelegramService()))
+
+	InitCronJobsWithPusher(db, pushers)
+}
+
+// registerStrategyVersion snapshots the current runtime config and ensures a
+// matching StrategyVersion row exists, returning its ID so every persisted
+// signal can reference it. On failure (db down, migration missing) we log
+// and return uuid.Nil — signals will still fire, just without DB persistence
+// for this run.
+func registerStrategyVersion(db *gorm.DB) uuid.UUID {
+	if db == nil {
+		return uuid.Nil
+	}
+	tiers := map[string]engine.TierSnapshot{
+		"H1": {EntryTF: models.TF_H1, TrendTF: models.TF_H4, StructureTF: models.TF_D1, HTFRegime: models.TF_H4},
+		"H4": {EntryTF: models.TF_H4, TrendTF: models.TF_D1, StructureTF: models.TF_D1, HTFRegime: models.TF_D1},
+		"D1": {EntryTF: models.TF_D1, TrendTF: models.TF_D1, StructureTF: models.TF_D1, HTFRegime: ""},
+	}
+	snapshot := engine.BuildSnapshot(
+		engine.DefaultEnsembleConfig(),
+		engine.NewDefaultRiskManager(),
+		TradingSymbols,
+		tiers,
+	)
+	reg := svBiz.NewRegistry(db)
+	sv, err := reg.ActivateOrCreate(context.Background(), snapshot)
+	if err != nil {
+		log.Warn().Err(err).Msg("strategy_version register failed; signals will not be persisted")
+		return uuid.Nil
+	}
+	log.Info().
+		Str("version", sv.Version).
+		Str("fingerprint", sv.Fingerprint[:12]).
+		Msg("strategy version active")
+	return sv.ID
 }
 
 // InitCronJobsWithPusher wires the schedule with an injected SignalPusher so
