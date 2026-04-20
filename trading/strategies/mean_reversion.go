@@ -33,6 +33,10 @@ func (s *MeanReversion) MinCandles() map[models.Timeframe]int {
 
 func (s *MeanReversion) UsesFundamental() bool { return false }
 
+func (s *MeanReversion) ActiveRegimes() []models.Regime {
+	return []models.Regime{models.RegimeRange}
+}
+
 func (s *MeanReversion) Analyze(ctx context.Context, in engine.StrategyInput) (*models.StrategyVote, error) {
 	vote := &models.StrategyVote{Name: s.Name(), Direction: models.DirectionNone}
 
@@ -49,9 +53,10 @@ func (s *MeanReversion) Analyze(ctx context.Context, in engine.StrategyInput) (*
 	atr := indicators.ATR(candles, 14)
 	last := candles[len(candles)-1].Close
 
-	// Mean reversion only fires in RANGES.
-	if adx > 20 {
-		vote.Reason = fmt.Sprintf("ADX %.1f > 20 (trending, skip)", adx)
+	// Ensemble gates us to RANGE regime; this is a local sanity check for
+	// entry-TF ADX spiking even when the HTF regime still reads as RANGE.
+	if adx > 25 {
+		vote.Reason = fmt.Sprintf("local ADX %.1f > 25 (avoid mean-rev during breakout)", adx)
 		return vote, nil
 	}
 

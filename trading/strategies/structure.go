@@ -45,6 +45,12 @@ func (s *Structure) MinCandles() map[models.Timeframe]int {
 
 func (s *Structure) UsesFundamental() bool { return false }
 
+func (s *Structure) ActiveRegimes() []models.Regime {
+	// BOS/retest patterns are valid in any non-chaotic regime — they often
+	// mark the TRANSITION from one regime to another.
+	return []models.Regime{models.RegimeRange, models.RegimeTrendUp, models.RegimeTrendDown}
+}
+
 func (s *Structure) Analyze(ctx context.Context, in engine.StrategyInput) (*models.StrategyVote, error) {
 	vote := &models.StrategyVote{Name: s.Name(), Direction: models.DirectionNone}
 

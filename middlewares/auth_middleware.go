@@ -4,55 +4,51 @@ import (
 	"j_ai_trade/common"
 	"j_ai_trade/utils"
 	"net/http"
+	"strings"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )
 
+// AuthMiddleware validates an `Authorization: Bearer <access-token>` header
+// and attaches userID + claims to the gin context.
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-
 		if authHeader == "" {
-			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
-				HttpRequestStatus: http.StatusBadRequest,
-				Success:           false,
-				Message:           "No token provided",
-				Data:              nil,
-			})
-			c.Abort()
+			unauthorized(c, "No token provided")
 			return
 		}
 
-		tokenString := authHeader
-		token, err := utils.ParseJWT(tokenString)
-		if err != nil || !token.Valid {
-			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
-				HttpRequestStatus: http.StatusBadRequest,
-				Success:           false,
-				Message:           "Invalid token",
-				Data:              nil,
-			})
-			c.Abort()
+		tokenString := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+		if tokenString == "" {
+			unauthorized(c, "No token provided")
 			return
 		}
 
-		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-			c.Set("claims", claims)
-		}
-
-		userId, err := utils.GetUserIDromJWT(authHeader)
+		claims, err := utils.ParseAccessToken(tokenString)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
-				HttpRequestStatus: http.StatusBadRequest,
-				Success:           false,
-				Message:           err.Error(),
-				Data:              nil,
-			})
-			c.Abort()
+			unauthorized(c, "Invalid or expired token")
 			return
 		}
-		c.Set("userID", userId)
+
+		userID, err := utils.GetUserIDFromClaims(claims)
+		if err != nil {
+			unauthorized(c, err.Error())
+			return
+		}
+
+		c.Set("claims", claims)
+		c.Set("userID", userID)
 		c.Next()
 	}
+}
+
+func unauthorized(c *gin.Context, message string) {
+	c.JSON(http.StatusUnauthorized, common.BaseApiResponse[any]{
+		HttpRequestStatus: http.StatusUnauthorized,
+		Success:           false,
+		Message:           message,
+		Data:              nil,
+	})
+	c.Abort()
 }

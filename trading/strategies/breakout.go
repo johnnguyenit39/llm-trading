@@ -38,6 +38,13 @@ func (s *Breakout) MinCandles() map[models.Timeframe]int {
 
 func (s *Breakout) UsesFundamental() bool { return false }
 
+func (s *Breakout) ActiveRegimes() []models.Regime {
+	// Breakouts are meaningful when emerging from a range AND when riding a
+	// strong trend (continuation breakouts). We exclude CHOPPY to avoid
+	// chasing false signals when price is just whipping around.
+	return []models.Regime{models.RegimeRange, models.RegimeTrendUp, models.RegimeTrendDown}
+}
+
 func (s *Breakout) Analyze(ctx context.Context, in engine.StrategyInput) (*models.StrategyVote, error) {
 	vote := &models.StrategyVote{Name: s.Name(), Direction: models.DirectionNone}
 

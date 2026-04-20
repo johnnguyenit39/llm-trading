@@ -38,10 +38,21 @@ func RefreshToken() func(*gin.Context) {
 			return
 		}
 
-		userId, err := utils.GetUserIDromJWT(input.Token)
+		claims, err := utils.ParseRefreshToken(input.Token)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, common.BaseApiResponse[any]{
-				HttpRequestStatus: http.StatusBadRequest,
+			c.JSON(http.StatusUnauthorized, common.BaseApiResponse[any]{
+				HttpRequestStatus: http.StatusUnauthorized,
+				Success:           false,
+				Message:           "invalid or expired refresh token",
+				Data:              nil,
+			})
+			c.Abort()
+			return
+		}
+		userId, err := utils.GetUserIDFromClaims(claims)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, common.BaseApiResponse[any]{
+				HttpRequestStatus: http.StatusUnauthorized,
 				Success:           false,
 				Message:           err.Error(),
 				Data:              nil,

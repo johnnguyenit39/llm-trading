@@ -40,6 +40,10 @@ func (s *TrendFollow) MinCandles() map[models.Timeframe]int {
 
 func (s *TrendFollow) UsesFundamental() bool { return false }
 
+func (s *TrendFollow) ActiveRegimes() []models.Regime {
+	return []models.Regime{models.RegimeTrendUp, models.RegimeTrendDown}
+}
+
 func (s *TrendFollow) Analyze(ctx context.Context, in engine.StrategyInput) (*models.StrategyVote, error) {
 	vote := &models.StrategyVote{Name: s.Name(), Direction: models.DirectionNone}
 
@@ -62,9 +66,11 @@ func (s *TrendFollow) Analyze(ctx context.Context, in engine.StrategyInput) (*mo
 	atr := indicators.ATR(entry, 14)
 	lastClose := entry[len(entry)-1].Close
 
-	// ADX gate
-	if adx < 22 {
-		vote.Reason = fmt.Sprintf("ADX %.1f < 22 (not trending)", adx)
+	// Ensemble has already gated us to TREND regime via ActiveRegimes, but we
+	// still require a minimum local-TF ADX to protect against divergence
+	// between higher-TF regime and entry-TF conditions.
+	if adx < 20 {
+		vote.Reason = fmt.Sprintf("local ADX %.1f < 20", adx)
 		return vote, nil
 	}
 
@@ -98,10 +104,13 @@ func (s *TrendFollow) Analyze(ctx context.Context, in engine.StrategyInput) (*mo
 		vote.TakeProfit = lastClose - 3.0*atr
 	}
 
-	// Confidence scales with ADX (22..45 → 60..90)
-	conf := 60 + (adx-22)*2
+	// Confidence scales with ADX (20..45 → 60..90)
+	conf := 60 + (adx-20)*1.6
 	if conf > 90 {
 		conf = 90
+	}
+	if conf < 60 {
+		conf = 60
 	}
 	vote.Confidence = conf
 	vote.Reason = fmt.Sprintf("trend aligned, ADX=%.1f, pullback to EMA20", adx)

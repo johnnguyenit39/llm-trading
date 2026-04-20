@@ -11,22 +11,40 @@ import (
 )
 
 // EnsembleConfig tunes the voting thresholds.
+//
+// The ensemble is RATIO-based (agreement / eligible) rather than absolute,
+// which is the only honest way to measure consensus when some strategies are
+// by design inactive in the current market regime (e.g. mean_reversion in a
+// trend, trend_follow in a range). Without this, a 4-strategy ensemble with
+// mutually-exclusive regimes can never reach 4/4.
 type EnsembleConfig struct {
-	FullSizeMinAgreement int     // e.g. 4 → all strategies must agree for full size
-	HalfSizeMinAgreement int     // e.g. 3 → 3/4 agreement → half size
-	FullSizeMinAvgConf   float64 // e.g. 70
-	HalfSizeMinAvgConf   float64 // e.g. 75
-	DissentVetoConf      float64 // e.g. 85 — if a dissenter has ≥ this confidence, veto
+	FullAgreement  int     // min absolute BUY/SELL agreeing voices
+	FullRatio      float64 // min agreement / eligible
+	FullAvgConf    float64 // min average confidence among agreeing voices
+
+	HalfAgreement  int
+	HalfRatio      float64
+	HalfAvgConf    float64
+
+	QuarterMinConf float64 // single strong voice still fires this tier
+
+	DissentVetoConf float64 // any eligible opposite vote with conf >= this → veto
+
+	Regime RegimeThresholds // how the regime is classified
 }
 
 // DefaultEnsembleConfig returns recommended voting thresholds.
 func DefaultEnsembleConfig() EnsembleConfig {
 	return EnsembleConfig{
-		FullSizeMinAgreement: 4,
-		HalfSizeMinAgreement: 3,
-		FullSizeMinAvgConf:   70,
-		HalfSizeMinAvgConf:   75,
-		DissentVetoConf:      85,
+		FullAgreement:   3,
+		FullRatio:       0.75,
+		FullAvgConf:     70,
+		HalfAgreement:   2,
+		HalfRatio:       0.60,
+		HalfAvgConf:     75,
+		QuarterMinConf:  85,
+		DissentVetoConf: 85,
+		Regime:          DefaultRegimeThresholds(),
 	}
 }
 
@@ -49,48 +67,64 @@ func (e *Ensemble) Register(s Strategy) {
 // Strategies returns registered strategies (for introspection/logging).
 func (e *Ensemble) Strategies() []Strategy { return e.strategies }
 
-// Analyze runs all strategies in parallel and aggregates into a TradeDecision.
+// Analyze detects the regime, filters eligible strategies, runs them in parallel,
+// and aggregates their votes into a TradeDecision.
 func (e *Ensemble) Analyze(ctx context.Context, input StrategyInput) *models.TradeDecision {
-	votes := e.collectVotes(ctx, input)
+	// 1. Detect regime on the entry timeframe (used for logging + strategy gating).
+	regime := DetectRegime(input.Market.Get(input.EntryTF), e.cfg.Regime)
+	input.Regime = regime
 
 	decision := &models.TradeDecision{
 		Symbol:    input.Market.Symbol,
 		Timeframe: input.EntryTF,
+		Regime:    regime,
 		Direction: models.DirectionNone,
-		Votes:     votes,
 	}
 
-	buyVotes, sellVotes, noneCount := tallyVotes(votes)
+	// 2. Collect votes from ALL strategies (parallel) — keep full breakdown for logs.
+	allVotes := e.collectVotes(ctx, input)
+	decision.Votes = allVotes
 
-	buyCount := len(buyVotes)
-	sellCount := len(sellVotes)
+	// 3. Identify eligible strategies for the current regime.
+	eligibleVotes, eligibleCount := e.filterEligibleVotes(allVotes, regime)
+	decision.EligibleCount = eligibleCount
 
-	// Determine majority direction
-	var chosen []models.StrategyVote
+	if eligibleCount == 0 {
+		decision.Reason = fmt.Sprintf("no eligible strategies for regime=%s", regime)
+		return decision
+	}
+
+	// 4. Tally eligible votes by direction.
+	buys, sells, abstain := tallyVotes(eligibleVotes)
+	active := len(buys) + len(sells)
+	decision.ActiveCount = active
+
+	if active == 0 {
+		decision.Reason = fmt.Sprintf("regime=%s, all %d eligible abstained (%d)", regime, eligibleCount, abstain)
+		return decision
+	}
+
+	// 5. Pick majority direction.
+	var chosen, opposite []models.StrategyVote
 	var direction string
 	switch {
-	case buyCount > sellCount:
-		chosen = buyVotes
-		direction = models.DirectionBuy
-	case sellCount > buyCount:
-		chosen = sellVotes
-		direction = models.DirectionSell
+	case len(buys) > len(sells):
+		chosen, opposite, direction = buys, sells, models.DirectionBuy
+	case len(sells) > len(buys):
+		chosen, opposite, direction = sells, buys, models.DirectionSell
 	default:
-		decision.Reason = fmt.Sprintf("no majority (buy=%d sell=%d none=%d)", buyCount, sellCount, noneCount)
+		decision.Reason = fmt.Sprintf("split decision buy=%d sell=%d (regime=%s)", len(buys), len(sells), regime)
 		return decision
 	}
 
 	agreement := len(chosen)
+	agreeRatio := float64(agreement) / float64(eligibleCount)
 	avgConf := averageConfidence(chosen)
+	decision.Agreement = agreement
+	decision.AgreeRatio = agreeRatio
 
-	// Dissenter veto: if any opposite-direction vote has confidence >= threshold, skip.
-	var opposites []models.StrategyVote
-	if direction == models.DirectionBuy {
-		opposites = sellVotes
-	} else {
-		opposites = buyVotes
-	}
-	for _, v := range opposites {
+	// 6. Dissent veto: any eligible opposite vote with high conviction kills the trade.
+	for _, v := range opposite {
 		if v.Confidence >= e.cfg.DissentVetoConf {
 			decision.VetoReasons = append(decision.VetoReasons,
 				fmt.Sprintf("dissent veto: %s=%s conf=%.1f", v.Name, v.Direction, v.Confidence))
@@ -99,19 +133,18 @@ func (e *Ensemble) Analyze(ctx context.Context, input StrategyInput) *models.Tra
 		}
 	}
 
-	// Decide size tier
-	var sizeFactor float64
-	switch {
-	case agreement >= e.cfg.FullSizeMinAgreement && avgConf >= e.cfg.FullSizeMinAvgConf:
-		sizeFactor = 1.0
-	case agreement >= e.cfg.HalfSizeMinAgreement && avgConf >= e.cfg.HalfSizeMinAvgConf:
-		sizeFactor = 0.5
-	default:
-		decision.Reason = fmt.Sprintf("weak consensus (agreement=%d avgConf=%.1f)", agreement, avgConf)
+	// 7. Size tier — ratio-based, with a quarter tier for lone strong signals.
+	sizeFactor, tier := e.classifyTier(agreement, agreeRatio, avgConf)
+	if sizeFactor == 0 {
+		decision.Reason = fmt.Sprintf(
+			"weak consensus (regime=%s, %d/%d eligible, ratio=%.2f, avgConf=%.1f)",
+			regime, agreement, eligibleCount, agreeRatio, avgConf,
+		)
 		return decision
 	}
+	decision.Tier = tier
 
-	// Aggregate entry / SL / TP by median (robust to outliers).
+	// 8. Aggregate entry / SL / TP by median (robust to outliers).
 	entry := medianOf(chosen, func(v models.StrategyVote) float64 { return v.Entry })
 	sl := medianOf(chosen, func(v models.StrategyVote) float64 { return v.StopLoss })
 	tp := medianOf(chosen, func(v models.StrategyVote) float64 { return v.TakeProfit })
@@ -122,9 +155,12 @@ func (e *Ensemble) Analyze(ctx context.Context, input StrategyInput) *models.Tra
 	decision.StopLoss = sl
 	decision.TakeProfit = tp
 	decision.SizeFactor = sizeFactor
-	decision.Reason = fmt.Sprintf("%d/%d agreement, avgConf=%.1f", agreement, len(votes), avgConf)
+	decision.Reason = fmt.Sprintf(
+		"%s signal in regime=%s: %d/%d eligible agree, ratio=%.2f, avgConf=%.1f, tier=%s",
+		direction, regime, agreement, eligibleCount, agreeRatio, avgConf, tier,
+	)
 
-	// Position sizing via risk manager
+	// 9. Position sizing via risk manager.
 	if e.risk != nil && entry > 0 && sl > 0 {
 		atrPct := 0.0
 		if candles := input.Market.Get(input.EntryTF); len(candles) >= 15 {
@@ -146,6 +182,23 @@ func (e *Ensemble) Analyze(ctx context.Context, input StrategyInput) *models.Tra
 }
 
 // ----- helpers -----
+
+// classifyTier returns the size factor and tier label for a given consensus,
+// or (0, "") if consensus is too weak to trade.
+func (e *Ensemble) classifyTier(agreement int, ratio, avgConf float64) (float64, string) {
+	switch {
+	case agreement >= e.cfg.FullAgreement && ratio >= e.cfg.FullRatio && avgConf >= e.cfg.FullAvgConf:
+		return 1.0, "full"
+	case agreement >= e.cfg.HalfAgreement && ratio >= e.cfg.HalfRatio && avgConf >= e.cfg.HalfAvgConf:
+		return 0.5, "half"
+	case agreement >= 1 && avgConf >= e.cfg.QuarterMinConf:
+		// High-conviction solo signal (e.g. lone mean_reversion hitting a clean
+		// BB extreme in range). Size kept small because no corroboration exists.
+		return 0.25, "quarter"
+	default:
+		return 0, ""
+	}
+}
 
 func (e *Ensemble) collectVotes(ctx context.Context, input StrategyInput) []models.StrategyVote {
 	n := len(e.strategies)
@@ -174,6 +227,23 @@ func (e *Ensemble) collectVotes(ctx context.Context, input StrategyInput) []mode
 	}
 	wg.Wait()
 	return results
+}
+
+// filterEligibleVotes returns only the votes from strategies that opted into
+// the current regime. This is what the ratio-based consensus uses as its
+// denominator. Non-eligible strategies are not counted as abstain or dissent.
+func (e *Ensemble) filterEligibleVotes(votes []models.StrategyVote, regime models.Regime) ([]models.StrategyVote, int) {
+	if len(e.strategies) != len(votes) {
+		// Defensive: indexing mismatch. Fall back to using all votes.
+		return votes, len(votes)
+	}
+	out := make([]models.StrategyVote, 0, len(votes))
+	for i, s := range e.strategies {
+		if StrategyEligibleIn(s, regime) {
+			out = append(out, votes[i])
+		}
+	}
+	return out, len(out)
 }
 
 func tallyVotes(votes []models.StrategyVote) (buys, sells []models.StrategyVote, noneCount int) {
@@ -209,7 +279,6 @@ func medianOf(votes []models.StrategyVote, getter func(models.StrategyVote) floa
 	for _, v := range votes {
 		vals = append(vals, getter(v))
 	}
-	// simple sort
 	for i := 1; i < len(vals); i++ {
 		for j := i; j > 0 && vals[j-1] > vals[j]; j-- {
 			vals[j-1], vals[j] = vals[j], vals[j-1]

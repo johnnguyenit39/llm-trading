@@ -173,8 +173,14 @@ func logDecision(tf models.Timeframe, d *models.TradeDecision) {
 	evt := log.Info().
 		Str("tier", string(tf)).
 		Str("symbol", d.Symbol).
+		Str("regime", string(d.Regime)).
 		Str("direction", d.Direction).
+		Int("eligible", d.EligibleCount).
+		Int("active", d.ActiveCount).
+		Int("agreement", d.Agreement).
+		Float64("ratio", d.AgreeRatio).
 		Float64("confidence", d.Confidence).
+		Str("consensusTier", d.Tier).
 		Str("reason", d.Reason)
 
 	if d.Direction != models.DirectionNone {
@@ -189,7 +195,6 @@ func logDecision(tf models.Timeframe, d *models.TradeDecision) {
 			Float64("riskUSD", d.RiskUSD)
 	}
 
-	// Log every vote for transparency / debugging.
 	for _, v := range d.Votes {
 		evt = evt.Str("vote_"+v.Name, fmt.Sprintf("%s@%.0f", v.Direction, v.Confidence))
 	}
@@ -201,11 +206,13 @@ func logDecision(tf models.Timeframe, d *models.TradeDecision) {
 
 func notifyTelegram(ts *telegram.TelegramService, d *models.TradeDecision) {
 	msg := fmt.Sprintf(
-		"📊 %s %s (%s)\nConfidence: %.1f | Size: %.0f%%\nEntry: %.4f\nSL: %.4f\nTP: %.4f\nLeverage: %.0fx | Notional: $%.2f\nReason: %s",
-		d.Symbol, d.Direction, d.Timeframe,
-		d.Confidence, d.SizeFactor*100,
+		"%s %s [%s / %s]\nTier: %s (%.0f%% size) | Conf: %.1f\nAgreement: %d/%d eligible (ratio %.2f)\nEntry: %.4f | SL: %.4f | TP: %.4f\nLev %.0fx | Notional $%.2f | Risk $%.2f\nWhy: %s",
+		d.Symbol, d.Direction, d.Timeframe, d.Regime,
+		d.Tier, d.SizeFactor*100, d.Confidence,
+		d.Agreement, d.EligibleCount, d.AgreeRatio,
 		d.Entry, d.StopLoss, d.TakeProfit,
-		d.Leverage, d.Notional, d.Reason,
+		d.Leverage, d.Notional, d.RiskUSD,
+		d.Reason,
 	)
 	_ = ts.SendMessage(msg)
 }

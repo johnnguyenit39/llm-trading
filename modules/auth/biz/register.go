@@ -11,8 +11,6 @@ import (
 	"j_ai_trade/utils"
 	"log"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type RegisterStorage interface {
@@ -39,8 +37,6 @@ func (biz *createRegisterBiz) Register(ctx context.Context, data *userModel.User
 		return err
 	}
 	data.Password = hashedPassword
-	//FIXME: Get data from redis inthe future
-	data.SubscriptionID = uuid.MustParse("4b60a017-0e68-4102-a9dc-b14f56d37294")
 	data.Role = string(common.User)
 	data.Status = string(common.Active)
 

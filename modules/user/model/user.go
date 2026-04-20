@@ -4,9 +4,6 @@ import (
 	"j_ai_trade/common"
 	"log"
 
-	subscriptionModel "j_ai_trade/modules/subscription/model"
-
-	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -26,10 +23,8 @@ type User struct {
 	PhoneNumber     string                         `gorm:"type:varchar(50)" json:"phone_number"`
 	ProfileImageUrl string                         `gorm:"type:text" json:"profile_imageUrl"`
 	Role            string                         `gorm:"type:varchar(50)" json:"role" example:"super_admin"`
-	Metadata        datatypes.JSON                 `gorm:"type:jsonb" json:"-"`
-	SubscriptionID  uuid.UUID                      `gorm:"column:subscription_id" json:"-"`
-	Subscription    subscriptionModel.Subscription `gorm:"foreignKey:SubscriptionID" json:"-"`
-	IsEmailVerified bool                           `gorm:"type:boolean" json:"is_email_verified"`
+	Metadata        datatypes.JSON `gorm:"type:jsonb" json:"-"`
+	IsEmailVerified bool           `gorm:"type:boolean" json:"is_email_verified"`
 }
 
 func (*User) TableName() string {

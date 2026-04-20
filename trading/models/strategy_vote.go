@@ -22,17 +22,24 @@ type StrategyVote struct {
 type TradeDecision struct {
 	Symbol     string
 	Timeframe  Timeframe
+	Regime     Regime
 	Direction  string  // BUY | SELL | NONE
 	Confidence float64 // aggregated 0-100
 	Entry      float64
 	StopLoss   float64
 	TakeProfit float64
 
-	SizeFactor   float64 // 0..1 — 1.0 = full size, 0.5 = half (partial consensus)
+	SizeFactor   float64 // 0..1 — 1.0=full, 0.5=half, 0.25=quarter (strong-solo)
 	RiskUSD      float64 // intended $ risk for this trade
 	Notional     float64 // position notional value
 	Quantity     float64 // qty in base asset
 	Leverage     float64 // applied leverage
+
+	EligibleCount int // strategies whose ActiveRegimes() included current regime
+	ActiveCount   int // eligible strategies that actually voted non-NONE
+	Agreement     int // eligible strategies voting in the chosen direction
+	AgreeRatio    float64
+	Tier          string // "full" | "half" | "quarter" | ""
 
 	Votes       []StrategyVote // every strategy's raw vote, including NONE/dissent
 	VetoReasons []string       // reasons the trade was vetoed (if Direction==NONE)

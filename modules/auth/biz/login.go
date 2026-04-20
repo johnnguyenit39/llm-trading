@@ -30,12 +30,12 @@ func (biz *createLoginBiz) Login(ctx context.Context, input *userModel.User) (*d
 		return nil, common.ErrorSimpleMessage("The password is incorrect please try again.")
 	}
 
-	token, err := utils.GenerateSubscriptionJWT(exsitedUser.BaseModel.ID.String())
+	token, err := utils.GenerateAccessToken(exsitedUser.BaseModel.ID.String())
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := utils.GenerateSubscriptionRefreshToken(exsitedUser.BaseModel.ID.String())
+	refreshToken, err := utils.GenerateRefreshToken(exsitedUser.BaseModel.ID.String())
 	if err != nil {
 		return nil, err
 	}

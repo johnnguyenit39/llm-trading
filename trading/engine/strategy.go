@@ -14,6 +14,7 @@ type StrategyInput struct {
 	Equity       float64                 // current account equity (USD)
 	CurrentPrice float64                 // latest price on entry timeframe
 	EntryTF      models.Timeframe        // the timeframe driving this analysis tick
+	Regime       models.Regime           // pre-computed regime for this tick
 }
 
 // Strategy is the contract every strategy must implement.
@@ -32,7 +33,23 @@ type Strategy interface {
 	// The engine can use this as a hint (e.g. to skip fetching for strategies that don't need it).
 	UsesFundamental() bool
 
+	// ActiveRegimes returns the market regimes in which this strategy's signals
+	// are considered meaningful. The ensemble uses this to compute the correct
+	// "expected voters" denominator when measuring consensus — strategies not
+	// applicable to the current regime are treated as abstained, not as dissent.
+	ActiveRegimes() []models.Regime
+
 	// Analyze inspects the input and returns a vote. A NONE vote with Confidence=0
 	// is a valid result meaning "no opinion / conditions not met".
 	Analyze(ctx context.Context, input StrategyInput) (*models.StrategyVote, error)
+}
+
+// StrategyEligibleIn reports whether the strategy opted into the given regime.
+func StrategyEligibleIn(s Strategy, r models.Regime) bool {
+	for _, active := range s.ActiveRegimes() {
+		if active == r {
+			return true
+		}
+	}
+	return false
 }

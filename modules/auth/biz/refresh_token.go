@@ -18,12 +18,12 @@ type getRefreshTokenBiz struct {
 }
 
 func (biz *getRefreshTokenBiz) RefreshToken(userId string) (accessToken string, refreshToken string, err error) {
-	accessToken, err = utils.GenerateSubscriptionJWT(userId)
+	accessToken, err = utils.GenerateAccessToken(userId)
 	if err != nil {
 		return "", "", err
 	}
 
-	refreshToken, err = utils.GenerateSubscriptionRefreshToken(userId)
+	refreshToken, err = utils.GenerateRefreshToken(userId)
 	if err != nil {
 		return "", "", err
 	}
