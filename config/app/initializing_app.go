@@ -8,7 +8,6 @@ import (
 	ginAuth "j_ai_trade/modules/auth/transport/gin"
 	ginFutures "j_ai_trade/modules/futures"
 	ginJbot "j_ai_trade/modules/j_bot/transport/gin"
-	ginOkx "j_ai_trade/modules/okx/transport/gin"
 	ginOrder "j_ai_trade/modules/order/transport/gin"
 	ginOtp "j_ai_trade/modules/otp/transport/gin"
 	ginPermission "j_ai_trade/modules/permission/transport/gin"
@@ -190,26 +189,6 @@ func InitializeApp(appContext appContext.AppContext) {
 			protected.PUT("/jbot/update/:id", ginJbot.UpdateJbot(appContext.GetMainDBConnection()))
 			protected.DELETE("/jbot/delete/:id", ginJbot.DeleteJbot(appContext.GetMainDBConnection()))
 			protected.PUT("/jbot/password/update/:id", ginJbot.UpdateJbot(appContext.GetMainDBConnection()))
-		}
-	}
-
-	// Register OKX routes
-	{
-		okxGroup := protected.Group("/okx")
-		{
-			// Spot trading routes
-			spotGroup := okxGroup.Group("/spot")
-			{
-				spotGroup.POST("/order/create", ginOkx.CreateOkxSpotOrder(appContext.GetMainDBConnection()))
-				spotGroup.POST("/order/cancel", ginOkx.CancelOkxSpotOrder(appContext.GetMainDBConnection()))
-			}
-
-			// Futures trading routes
-			futuresGroup := okxGroup.Group("/futures")
-			{
-				futuresGroup.POST("/order/create", ginOkx.CreateOkxFuturesOrder(appContext.GetMainDBConnection()))
-				futuresGroup.POST("/order/cancel", ginOkx.CancelOkxFuturesOrder(appContext.GetMainDBConnection()))
-			}
 		}
 	}
 
