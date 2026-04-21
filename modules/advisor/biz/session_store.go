@@ -26,11 +26,15 @@ type SessionStore interface {
 	// Clear wipes the session for the chat (used by /reset commands).
 	Clear(ctx context.Context, chatID string) error
 
-	// HasGreeted reports whether we've already greeted this chat. Used to
-	// decide whether to send a welcome message on first interaction.
-	HasGreeted(ctx context.Context, chatID string) (bool, error)
+	// TryGreet atomically claims the "greeted" slot for this chat. Returns
+	// true iff this call was the first to acquire it — the caller should
+	// then send the welcome message. Concurrent callers are guaranteed
+	// that at most one receives true, avoiding duplicate welcomes when a
+	// user sends several messages in quick succession.
+	TryGreet(ctx context.Context, chatID string) (bool, error)
 
-	// MarkGreeted persists the "welcome sent" flag so we don't repeat it
-	// on every new session window.
+	// MarkGreeted persists the "welcome sent" flag unconditionally. Used
+	// by /start where we always want to re-arm the flag after showing the
+	// welcome on demand.
 	MarkGreeted(ctx context.Context, chatID string) error
 }

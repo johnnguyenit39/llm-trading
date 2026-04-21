@@ -91,12 +91,10 @@ func (s *SessionStore) Clear(ctx context.Context, chatID string) error {
 	return s.rdb.Del(ctx, sessionKey(chatID)).Err()
 }
 
-func (s *SessionStore) HasGreeted(ctx context.Context, chatID string) (bool, error) {
-	n, err := s.rdb.Exists(ctx, greetedKey(chatID)).Result()
-	if err != nil {
-		return false, err
-	}
-	return n > 0, nil
+// TryGreet uses SET NX so the "greeted" flag is claimed atomically even
+// when several concurrent handlers race on a burst of messages.
+func (s *SessionStore) TryGreet(ctx context.Context, chatID string) (bool, error) {
+	return s.rdb.SetNX(ctx, greetedKey(chatID), "1", GreetedTTL).Result()
 }
 
 func (s *SessionStore) MarkGreeted(ctx context.Context, chatID string) error {

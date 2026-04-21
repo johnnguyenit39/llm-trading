@@ -90,10 +90,20 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 
 	h.maybeGreet(ctx, chatID)
 
-	// Typing indicator keeps the chat feeling alive while we wait for the
-	// first streamed token. Always stop it before returning.
+	// Typing indicator covers the wait for the first streamed token. Once
+	// any content arrives we stop the ticker immediately — Telegram will
+	// clear the indicator as soon as the first bubble paints, and keeping
+	// the ticker alive would re-trigger "typing…" on top of the visible
+	// bubble every 4s.
 	stopTyping := h.transport.KeepTyping(ctx, chatID)
-	defer stopTyping()
+	typingStopped := false
+	stopTypingOnce := func() {
+		if !typingStopped {
+			stopTyping()
+			typingStopped = true
+		}
+	}
+	defer stopTypingOnce()
 
 	history, err := h.store.Load(ctx, chatID)
 	if err != nil {
@@ -106,13 +116,16 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	chunks, errCh := h.llm.Stream(ctx, msgs)
 
 	bubble := h.transport.NewBubble(chatID)
-	if err := bubble.Start(ctx, "…"); err != nil {
+	// Empty initial keeps the "typing…" indicator visible until the first
+	// token arrives — the bubble materialises on first Append/Finish.
+	if err := bubble.Start(ctx, ""); err != nil {
 		log.Error().Err(err).Str("chat_id", chatID).Msg("advisor: failed to open reply bubble")
 		return
 	}
 
 	var full strings.Builder
 	for chunk := range chunks {
+		stopTypingOnce()
 		full.WriteString(chunk)
 		bubble.Append(ctx, full.String())
 	}
@@ -130,7 +143,7 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 		}
 	}
 
-	stopTyping()
+	stopTypingOnce()
 	bubble.Finish(ctx)
 
 	// Only persist the turn pair on a non-empty assistant reply; we don't
@@ -163,18 +176,11 @@ func (h *ChatHandler) handleCommand(ctx context.Context, chatID, text string) bo
 }
 
 func (h *ChatHandler) maybeGreet(ctx context.Context, chatID string) {
-	greeted, err := h.store.HasGreeted(ctx, chatID)
-	if err != nil {
-		// Redis hiccup — skip greeting rather than spam duplicates.
+	acquired, err := h.store.TryGreet(ctx, chatID)
+	if err != nil || !acquired {
 		return
 	}
-	if greeted {
-		return
-	}
-	if err := h.transport.SendMessage(ctx, chatID, WelcomeMessage); err != nil {
-		return
-	}
-	_ = h.store.MarkGreeted(ctx, chatID)
+	_ = h.transport.SendMessage(ctx, chatID, WelcomeMessage)
 }
 
 func (h *ChatHandler) persistTurns(ctx context.Context, chatID, userText, assistantText string) {

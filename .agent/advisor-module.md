@@ -55,8 +55,10 @@ Key invariants:
 
 - One Telegram update -> one goroutine in `ChatHandler.handleMessage`. Slow
   DeepSeek replies for user A never block user B.
-- `editMessageText` is throttled to one call per ~900ms per chat to stay
-  well under Telegram's per-chat edit rate limit (~1/s).
+- `editMessageText` is throttled to one call per ~500ms per chat. The
+  first `sendMessage` call is subject to the same window so the opening
+  paint carries substantive text instead of a 1–2 character flash; the
+  typing indicator covers the pre-paint gap.
 - Session history is rolling — oldest turns are trimmed, TTL slides on
   every append. Restart-safe because state lives in Redis, not RAM.
 - Non-fatal everywhere: missing `DEEP_SEEK_API_KEY`, missing bot token, or
@@ -135,13 +137,13 @@ platform names are resolved at construction time in `advisor_init.go`.
 2. ChatHandler.Run          receives msg, fans out to handleMessage goroutine
 3. UserFilter.ShouldHandle  msg.IsDM && (allowlist empty || userID allowed)
 4. handleCommand            /start /reset /help short-circuit the LLM
-5. maybeGreet               !HasGreeted -> SendMessage(WelcomeMessage), MarkGreeted
+5. maybeGreet               TryGreet (atomic SETNX) -> SendMessage(WelcomeMessage)
 6. ChatTransport.KeepTyping spawn ticker sending "typing" every 4s
 7. SessionStore.Load        LRANGE advisor:session:<chat_id>
 8. BuildMessages            [system, ...history, {user, text}]
 9. LLMProvider.Stream       returns <-chan string, <-chan error
 10. ChatTransport.NewBubble  biz.MessageBubble backed by the platform
-11. bubble.Start("…") -> Append on each chunk -> Finish at end of stream
+11. bubble.Start("") -> bubble sends lazily on first Append -> Finish flushes last edit (typing indicator stays visible until first token)
 12. SessionStore.Append     RPUSH user turn, RPUSH assistant turn, LTRIM, EXPIRE
 ```
 
