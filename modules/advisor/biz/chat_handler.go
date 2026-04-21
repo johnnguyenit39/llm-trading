@@ -135,15 +135,32 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	// SendMessage so the user sees progress before the LLM starts
 	// streaming. Any failure here is non-fatal — fall through to the
 	// chat-only flow.
+	//
+	// We also feed the chat's pinned LastSymbol into the analyzer so
+	// follow-up questions that omit the symbol ("bây giờ bao nhiêu",
+	// "còn giờ thế nào") still trigger a fresh live fetch. Without
+	// this, the LLM would just quote the stale number from its own
+	// previous reply and the bot would feel frozen in time.
 	marketBlob := ""
 	if h.analyzer != nil {
-		blob, ack, aerr := h.analyzer.MaybeEnrich(ctx, userText)
+		lastSymbol, lserr := h.store.GetLastSymbol(ctx, chatID)
+		if lserr != nil {
+			log.Debug().Err(lserr).Str("chat_id", chatID).Msg("advisor: last-symbol load failed (non-fatal)")
+		}
+		result, aerr := h.analyzer.MaybeEnrich(ctx, userText, EnrichmentHints{LastSymbol: lastSymbol})
 		if aerr != nil {
 			log.Warn().Err(aerr).Str("chat_id", chatID).Msg("advisor: market analyzer error")
 		}
-		marketBlob = blob
-		if ack != "" {
-			_ = h.transport.SendMessage(ctx, chatID, ack)
+		marketBlob = result.Digest
+		if result.Ack != "" {
+			_ = h.transport.SendMessage(ctx, chatID, result.Ack)
+		}
+		// Pin the freshly analysed symbol so the NEXT message — even
+		// a bare "bây giờ sao" — can resolve back to this same pair.
+		if result.Symbol != "" {
+			if err := h.store.SetLastSymbol(ctx, chatID, result.Symbol); err != nil {
+				log.Debug().Err(err).Str("chat_id", chatID).Msg("advisor: last-symbol save failed (non-fatal)")
+			}
 		}
 	}
 
@@ -209,8 +226,10 @@ func (h *ChatHandler) handleCommand(ctx context.Context, chatID, text string) bo
 				"/start — lời chào\n"+
 				"/reset — xoá ngữ cảnh\n"+
 				"/help — xem lệnh\n"+
-				"/analyze SYMBOL [TF] — phân tích kỹ thuật realtime (ví dụ: /analyze BTC H4, /analyze XAU)\n\n"+
-				"Còn lại cứ nhắn tự nhiên. Khi bạn hỏi buy/sell/vào lệnh kèm tên coin mình sẽ tự fetch dữ liệu và phân tích.")
+				"/analyze SYMBOL [TF] — phân tích kỹ thuật realtime (default scalping M15).\n"+
+				"  Ví dụ: /analyze BTC, /analyze XAU H4, /analyze ETH D1.\n"+
+				"  TF hỗ trợ: M15 (scalping — mặc định), H1, H4, D1 (swing / position).\n\n"+
+				"Còn lại cứ nhắn tự nhiên. Khi bạn hỏi buy/sell/vào lệnh kèm tên coin mình tự fetch và phân tích M15 + trend context H1/H4/D1.")
 		return true
 	}
 	return false

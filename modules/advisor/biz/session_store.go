@@ -37,4 +37,18 @@ type SessionStore interface {
 	// by /start where we always want to re-arm the flag after showing the
 	// welcome on demand.
 	MarkGreeted(ctx context.Context, chatID string) error
+
+	// GetLastSymbol returns the symbol most recently analysed in this
+	// chat (e.g. "BTCUSDT"), or "" when the chat has no pinned symbol
+	// (new chat, expired TTL, or the user never asked for analysis).
+	// The advisor uses this so a follow-up like "bây giờ bao nhiêu"
+	// (no explicit symbol) still triggers a fresh live-data fetch
+	// instead of the LLM recycling the stale price from its own prior
+	// reply. Non-fatal on error — caller falls back to empty string.
+	GetLastSymbol(ctx context.Context, chatID string) (string, error)
+
+	// SetLastSymbol pins a symbol as the chat's current focus. TTL
+	// mirrors the session TTL so the memory naturally expires with
+	// the rest of the conversation context.
+	SetLastSymbol(ctx context.Context, chatID string, symbol string) error
 }

@@ -75,12 +75,19 @@ type EnsembleDigest struct {
 // It carries everything the prompt needs — raw indicators per TF, the
 // rule engine's decision, timing context. Render(snapshot) turns this
 // into the actual prompt string.
+//
+// CurrentPrice is the LIVE last-trade price from the entry TF's most
+// recent (possibly unclosed) candle. All per-TF TFSummary.Close values
+// are last CLOSED-bar closes so indicators stay anti-repaint — those
+// are distinct numbers mid-candle and confusing them was the Phase-2
+// bug users flagged.
 type PairSnapshot struct {
-	Symbol     string
-	EntryTF    models.Timeframe
-	GeneratedAt time.Time
-	Summaries  []TFSummary     // one per fetched timeframe, ordered H1→H4→D1
-	Ensemble   EnsembleDigest
+	Symbol       string
+	EntryTF      models.Timeframe
+	GeneratedAt  time.Time
+	CurrentPrice float64     // live price on the entry TF (from the unclosed bar)
+	Summaries    []TFSummary // ordered entry TF first, then higher TFs for context
+	Ensemble     EnsembleDigest
 }
 
 // Build produces a PairSnapshot by running the canonical ensemble plus
@@ -107,15 +114,17 @@ func Build(ctx context.Context, market models.MarketData, entryTF models.Timefra
 	})
 
 	snap := &PairSnapshot{
-		Symbol:      market.Symbol,
-		EntryTF:     entryTF,
-		GeneratedAt: now.UTC(),
-		Ensemble:    ensembleDigestFrom(decision),
+		Symbol:       market.Symbol,
+		EntryTF:      entryTF,
+		GeneratedAt:  now.UTC(),
+		CurrentPrice: currentPrice,
+		Ensemble:     ensembleDigestFrom(decision),
 	}
 
-	// Always summarise in a stable H1→H4→D1 order so the LLM reads them
-	// from lowest to highest TF. Unfetched TFs are skipped silently.
-	for _, tf := range []models.Timeframe{models.TF_H1, models.TF_H4, models.TF_D1} {
+	// Entry TF first (what the user cares about executing on), then
+	// higher TFs for trend context. Unfetched TFs are skipped silently.
+	tfOrder := summaryOrder(entryTF)
+	for _, tf := range tfOrder {
 		candles := market.Get(tf)
 		if len(candles) == 0 {
 			continue
@@ -123,6 +132,36 @@ func Build(ctx context.Context, market models.MarketData, entryTF models.Timefra
 		snap.Summaries = append(snap.Summaries, summariseTF(candles, tf))
 	}
 	return snap, nil
+}
+
+// summaryOrder returns the canonical ordering for per-TF blocks given
+// an entry TF: entry TF first (the one the LLM should focus on for
+// execution), then strictly higher TFs for macro context. Listing the
+// entry TF up front matters because the LLM naturally anchors on the
+// first block it reads.
+func summaryOrder(entryTF models.Timeframe) []models.Timeframe {
+	all := []models.Timeframe{models.TF_M15, models.TF_H1, models.TF_H4, models.TF_D1}
+	// Find entry TF index. If the entry TF is unknown (shouldn't
+	// happen — Build already validated), fall back to chronological.
+	startIdx := -1
+	for i, tf := range all {
+		if tf == entryTF {
+			startIdx = i
+			break
+		}
+	}
+	if startIdx < 0 {
+		return all
+	}
+	out := make([]models.Timeframe, 0, len(all))
+	out = append(out, all[startIdx])
+	for i, tf := range all {
+		if i == startIdx {
+			continue
+		}
+		out = append(out, tf)
+	}
+	return out
 }
 
 // summariseTF computes every indicator the digest reports. We anti-
@@ -207,6 +246,13 @@ func Render(snap *PairSnapshot) string {
 	fmt.Fprintf(&b, "[MARKET_DATA] %s · generated %s UTC · entry_tf=%s\n",
 		snap.Symbol, snap.GeneratedAt.Format("2006-01-02 15:04"), snap.EntryTF)
 
+	// LIVE price — the single number the LLM should quote whenever the
+	// user asks "giá hiện tại?". Distinguished from per-TF closed-bar
+	// closes so the bot can't accidentally serve a stale number.
+	if snap.CurrentPrice > 0 {
+		fmt.Fprintf(&b, "Current price (live, %s): %s\n", snap.EntryTF, f4(snap.CurrentPrice))
+	}
+
 	// Next-close clocks help the LLM frame confirmation timing. Only
 	// emit lines for TFs we actually fetched — otherwise the LLM sees
 	// "H1=16:00" in a digest that has no H1 block and gets confused.
@@ -218,6 +264,8 @@ func Render(snap *PairSnapshot) string {
 	}
 	if len(clocks) > 0 {
 		fmt.Fprintf(&b, "Next closes: %s\n\n", strings.Join(clocks, ", "))
+	} else {
+		b.WriteString("\n")
 	}
 
 	// Per-TF prose blocks.
@@ -240,7 +288,7 @@ func Render(snap *PairSnapshot) string {
 
 func writeTFBlock(b *strings.Builder, s TFSummary) {
 	fmt.Fprintf(b, "%s (regime: %s, ADX %s)\n", s.Timeframe, s.Regime, f0(s.ADX14))
-	fmt.Fprintf(b, "  Price %s", f4(s.Close))
+	fmt.Fprintf(b, "  LastClose %s", f4(s.Close))
 	if s.EMA20 > 0 {
 		fmt.Fprintf(b, "  EMA20 %s", f4(s.EMA20))
 	}
@@ -319,6 +367,7 @@ func buildFooter(snap *PairSnapshot) string {
 	payload := map[string]any{
 		"symbol":   snap.Symbol,
 		"entry_tf": string(snap.EntryTF),
+		"price":    snap.CurrentPrice,
 		"ensemble": snap.Ensemble.Direction,
 		"reason":   snap.Ensemble.Reason,
 	}

@@ -2,32 +2,55 @@ package biz
 
 import "context"
 
+// EnrichmentHints are optional context the handler hands to the
+// analyzer so it can recover user intent across turns. Today there's
+// only one field, but the struct leaves room to grow (per-user
+// preferences, regional settings, etc.) without breaking the interface.
+type EnrichmentHints struct {
+	// LastSymbol is the canonical symbol most recently analysed in
+	// this chat (e.g. "BTCUSDT"). It lets the analyzer carry over
+	// focus across follow-up questions that don't re-mention the
+	// symbol ("bây giờ bao nhiêu", "thế nào rồi", etc.) — otherwise
+	// the LLM would just quote its own stale previous response and
+	// users would (rightly) think the data isn't refreshing.
+	LastSymbol string
+}
+
+// EnrichmentResult is everything MaybeEnrich returns to the handler.
+// Using a struct keeps the signature forward-compatible as we add
+// more per-call metadata (latency, fetch stats, ...).
+type EnrichmentResult struct {
+	// Digest is the pre-rendered [MARKET_DATA]...[/MARKET_DATA] blob
+	// the handler injects into the LLM prompt as an extra user turn.
+	// Empty string means "no market data for this message" — the
+	// handler proceeds with chat-only behaviour.
+	Digest string
+
+	// Ack is an optional short pre-reply surfaced to the user before
+	// the LLM stream starts ("Đang kiểm tra BTCUSDT M15..."). Empty
+	// string means "no ack".
+	Ack string
+
+	// Symbol is the canonical symbol that was actually analysed, so
+	// the handler can pin it as the chat's new LastSymbol. Empty
+	// when Digest is empty.
+	Symbol string
+}
+
 // MarketAnalyzer is the seam between the ChatHandler and the Phase-2
 // market-data pipeline. The handler calls MaybeEnrich BEFORE every
-// LLM request; the analyzer decides (based on the user's text) whether
-// to fetch candles, cook them into a digest, and return the digest as
-// a string that the handler will inject as an extra user-role turn
-// just before the real question.
-//
-// Returning an empty string means "no market data needed for this
-// message" — the handler proceeds exactly as it did in Phase 1.
+// LLM request; the analyzer decides (based on the user's text + hints)
+// whether to fetch candles, cook them into a digest, and return it.
 //
 // Keeping this interface in biz/ (domain core) means the concrete
 // implementation (modules/advisor/biz/market) stays swappable: tests
 // use a fake, future adapters (different exchanges, cached layers)
 // drop in without touching the handler.
+//
+// Implementations MUST be non-fatal: transient fetch errors return
+// a zero EnrichmentResult and nil error; the handler then falls back
+// to the chat-only flow. An error is reserved for programmer bugs
+// the caller must know about.
 type MarketAnalyzer interface {
-	// MaybeEnrich inspects the user's raw text and, when it detects a
-	// request that would benefit from live market context, returns a
-	// pre-rendered digest string to inject into the LLM prompt. The
-	// second return value is an optional short acknowledgement to
-	// surface to the user before the LLM starts streaming (e.g. "Đang
-	// kiểm tra XAUUSDT H4..."); callers treat an empty ack as "no
-	// pre-reply needed".
-	//
-	// Implementations MUST be non-fatal: transient fetch errors
-	// return ("", "", nil) and the handler falls back to Phase-1
-	// chat-only behaviour. An error is only returned for bugs the
-	// caller should know about.
-	MaybeEnrich(ctx context.Context, text string) (digest, ack string, err error)
+	MaybeEnrich(ctx context.Context, text string, hints EnrichmentHints) (EnrichmentResult, error)
 }

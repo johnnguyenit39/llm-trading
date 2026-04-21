@@ -95,7 +95,8 @@ modules/advisor/
     chat_transport.go             interface ChatTransport + MessageBubble +
                                       IncomingMessage DTO
     session_store.go              interface SessionStore
-    market_analyzer.go            interface MarketAnalyzer (MaybeEnrich) — Phase 2
+    market_analyzer.go            interface MarketAnalyzer (MaybeEnrich)
+                                      + EnrichmentHints / EnrichmentResult — Phase 2
     chat_handler.go               orchestrator: depends ONLY on the 4 above
     user_filter.go                platform-neutral DM/allowlist rule
     prompt_builder.go             SystemPrompt + BuildMessagesWithMarket()
@@ -162,14 +163,21 @@ platform names are resolved at construction time in `advisor_init.go`.
 5. maybeGreet                     TryGreet (atomic SETNX) -> SendMessage(WelcomeMessage)
 6. ChatTransport.KeepTyping       spawn ticker sending "typing" every 4s
 7. SessionStore.Load              LRANGE advisor:session:<chat_id>
-8. MarketAnalyzer.MaybeEnrich     intent detect -> fetch candles -> ensemble -> digest
-                                    returns (blob, ack). Any failure -> fall through.
-9. (optional) SendMessage ack     "Đang kiểm tra XAUUSDT H4..." to signal progress
-10. BuildMessagesWithMarket       [system, ...history, [MARKET_DATA]? , {user,text}]
-11. LLMProvider.Stream            returns <-chan string, <-chan error
-12. ChatTransport.NewBubble       biz.MessageBubble backed by the platform
-13. bubble.Start("") -> first Append sends lazily -> Finish flushes last edit
-14. SessionStore.Append           RPUSH user turn, RPUSH assistant turn, LTRIM, EXPIRE
+8. SessionStore.GetLastSymbol     GET advisor:lastsym:<chat_id> (may be "")
+9. MarketAnalyzer.MaybeEnrich     intent detect (+ lastSymbol fallback for
+                                    follow-ups like "bây giờ bao nhiêu") ->
+                                    fetch candles -> ensemble -> digest.
+                                    Returns EnrichmentResult{Digest,Ack,Symbol}.
+                                    Any failure -> fall through.
+10. (optional) SendMessage ack    "Đang kiểm tra XAUUSDT H4..." to signal progress
+11. SessionStore.SetLastSymbol    pin result.Symbol (TTL = SessionTTL) so the
+                                    NEXT turn can resolve a bare "giờ sao"
+                                    back to the same pair
+12. BuildMessagesWithMarket       [system, ...history, [MARKET_DATA]? , {user,text}]
+13. LLMProvider.Stream            returns <-chan string, <-chan error
+14. ChatTransport.NewBubble       biz.MessageBubble backed by the platform
+15. bubble.Start("") -> first Append sends lazily -> Finish flushes last edit
+16. SessionStore.Append           RPUSH user turn, RPUSH assistant turn, LTRIM, EXPIRE
                                     (market blob is NOT persisted — goes stale fast)
 ```
 
@@ -187,6 +195,13 @@ rules pinned there (edit ONLY via that constant — single source of truth):
   they appear inside a `[MARKET_DATA]...[/MARKET_DATA]` block. Outside
   that block — including when Phase 2 fails to fetch — it must say so
   and refuse to invent figures.
+- **Never recycle stale prices from prior replies.** When the current
+  turn has `[MARKET_DATA]`, the bot must quote from the NEW block even
+  if the number looks identical to a previous reply (crypto/gold moves
+  every second). When the current turn has NO `[MARKET_DATA]`, the bot
+  must refuse to quote past numbers as "current" — say "chưa có data
+  mới" and suggest `/analyze`. This is the invariant that makes
+  follow-ups like "bây giờ bao nhiêu" actually refresh.
 - Default stance: explain + endorse the rule engine's verdict. Gentle
   dissent is allowed but must cite a specific fact from the digest.
 - Structured footer (emoji + Entry/SL/TP/RR/Conf/Tier lines) is required

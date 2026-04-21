@@ -11,6 +11,7 @@ import (
 	"j_ai_trade/modules/advisor/biz"
 	"j_ai_trade/trading/ensembles"
 	"j_ai_trade/trading/marketdata"
+	"j_ai_trade/trading/models"
 )
 
 // Analyzer is the Phase-2 implementation of biz.MarketAnalyzer: it
@@ -50,37 +51,52 @@ func NewAnalyzer(intent *IntentDetector, fetcher marketdata.CandleFetcher) *Anal
 }
 
 // MaybeEnrich implements biz.MarketAnalyzer. It decides whether to run
-// the market pipeline for the given user text; when yes, it returns
-// the rendered [MARKET_DATA]...[/MARKET_DATA] blob plus a short ack
-// line the handler can surface before the LLM starts streaming.
+// the market pipeline for the given user text + hints; when yes, it
+// returns a populated EnrichmentResult (digest + ack + symbol).
 //
 // Errors are strictly for programmer bugs — ANY runtime failure
 // (intent miss, unsupported symbol/TF, Binance timeout, empty candles)
-// returns ("", "", nil) so the handler falls back gracefully to the
-// Phase-1 chat-only flow.
-func (a *Analyzer) MaybeEnrich(ctx context.Context, text string) (string, string, error) {
-	intent := a.resolveIntent(text)
+// returns a zero EnrichmentResult with nil error so the handler falls
+// back gracefully to the chat-only flow.
+func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.EnrichmentHints) (biz.EnrichmentResult, error) {
+	intent := a.resolveIntent(text, hints.LastSymbol)
 	if !intent.WantsAnalysis() {
 		// Explicit /analyze with no symbol gets a dedicated ack so the
 		// LLM can tell the user what went wrong; the digest stays empty
 		// so the LLM answers using just the ack + system prompt.
 		if intent.Explicit {
-			return "", fmt.Sprintf(
-				"Mình không nhận ra pair nào trong '%s'. Thử: /analyze BTC, /analyze XAU H4, /analyze ETH D1. Hiện đang support: %s.",
-				strings.TrimSpace(text),
-				strings.Join(ensembles.DefaultSymbols, ", "),
-			), nil
+			return biz.EnrichmentResult{
+				Ack: fmt.Sprintf(
+					"Mình không nhận ra pair nào trong '%s'. Thử: /analyze BTC, /analyze XAU H4, /analyze ETH D1. Hiện đang support: %s.",
+					strings.TrimSpace(text),
+					strings.Join(ensembles.DefaultSymbols, ", "),
+				),
+			}, nil
 		}
-		return "", "", nil
+		return biz.EnrichmentResult{}, nil
 	}
 
 	ens := ensembles.DefaultEnsembleFor(intent.Timeframe)
 	if ens == nil {
 		// Unsupported entry TF — again, leave an ack so the bot can
 		// explain rather than silently dropping the market context.
-		return "", fmt.Sprintf("Timeframe %s chưa support (hiện chỉ H1/H4/D1).", intent.Timeframe), nil
+		return biz.EnrichmentResult{
+			Ack: fmt.Sprintf("Timeframe %s chưa support (hiện có M15/H1/H4/D1).", intent.Timeframe),
+		}, nil
 	}
 	required := ensembles.CollectRequiredTFs(ens)
+
+	// Advisor-specific: always fetch H1/H4/D1 on top of whatever the
+	// ensemble strictly needs, so the digest can include higher-TF
+	// "trend context" even for a scalping M15 setup. The bot uses this
+	// to answer questions like "M15 cho buy nhưng D1 đang trend gì?".
+	// 120 bars is enough for EMA50/RSI14/ADX14 on every TF and cheap
+	// on the Binance weight budget (cap 2400 / min).
+	for _, tf := range []models.Timeframe{models.TF_H1, models.TF_H4, models.TF_D1} {
+		if n, ok := required[tf]; !ok || n < 120 {
+			required[tf] = 120
+		}
+	}
 
 	fetchCtx, cancel := context.WithTimeout(ctx, a.fetchTimeout)
 	defer cancel()
@@ -94,7 +110,7 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string) (string, string
 		// Non-fatal: bot still replies without market context. The
 		// system prompt instructs it to say "tạm thời không lấy được
 		// dữ liệu" in that case.
-		return "", "", nil
+		return biz.EnrichmentResult{}, nil
 	}
 
 	snap, err := Build(fetchCtx, market, intent.Timeframe, time.Now())
@@ -103,23 +119,26 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string) (string, string
 			Str("symbol", intent.Symbol).
 			Str("tf", string(intent.Timeframe)).
 			Msg("advisor: digest build failed; falling back to chat-only")
-		return "", "", nil
+		return biz.EnrichmentResult{}, nil
 	}
 
-	blob := Render(snap)
-	ack := fmt.Sprintf("Đang kiểm tra %s %s...", intent.Symbol, intent.Timeframe)
-	return blob, ack, nil
+	return biz.EnrichmentResult{
+		Digest: Render(snap),
+		Ack:    fmt.Sprintf("Đang kiểm tra %s %s...", intent.Symbol, intent.Timeframe),
+		Symbol: intent.Symbol,
+	}, nil
 }
 
 // resolveIntent prefers the explicit /analyze command when present —
 // even if it parses to no symbol, so the bot can respond with usage
 // help instead of silently falling through to chat. Otherwise we run
-// the keyword heuristic over the raw text.
-func (a *Analyzer) resolveIntent(text string) Intent {
+// the fallback-aware heuristic so follow-up questions ("bây giờ bao
+// nhiêu") still resolve to the chat's last analysed symbol.
+func (a *Analyzer) resolveIntent(text, lastSymbol string) Intent {
 	if cmd := a.intent.ParseCommand(text); cmd.Explicit {
 		return cmd
 	}
-	return a.intent.Detect(text)
+	return a.intent.DetectWithFallback(text, lastSymbol)
 }
 
 // Compile-time assertion so changes to biz.MarketAnalyzer surface as

@@ -54,6 +54,8 @@ func (f *BinanceFetcher) Fetch(ctx context.Context, symbol string, required map[
 			err     error
 		)
 		switch tf {
+		case models.TF_M15:
+			candles, err = f.bs.Fetch15mCandles(ctx, symbol, limit)
 		case models.TF_H1:
 			candles, err = f.bs.Fetch1hCandles(ctx, symbol, limit)
 		case models.TF_H4:

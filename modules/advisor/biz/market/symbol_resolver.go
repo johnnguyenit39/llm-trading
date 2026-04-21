@@ -146,6 +146,7 @@ func tokenize(text string) []string {
 
 // tfAliases recognises common ways users reference timeframes in chat.
 var tfAliases = map[string]models.Timeframe{
+	"m15": models.TF_M15, "15m": models.TF_M15, "15": models.TF_M15, "scalp": models.TF_M15, "scalping": models.TF_M15,
 	"h1": models.TF_H1, "1h": models.TF_H1, "hourly": models.TF_H1,
 	"h4": models.TF_H4, "4h": models.TF_H4,
 	"d1": models.TF_D1, "1d": models.TF_D1, "daily": models.TF_D1, "day": models.TF_D1,

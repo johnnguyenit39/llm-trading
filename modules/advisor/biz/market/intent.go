@@ -15,10 +15,10 @@ type Intent struct {
 	// or "" if the user didn't mention any symbol we know about.
 	Symbol string
 
-	// Timeframe is the explicit TF the user asked for (H1/H4/D1). When
-	// the user only mentions a symbol without a TF, we set a default
-	// of TF_H4 — a reasonable "swing" bias that matches how most retail
-	// questions are phrased ("BTC nay thế nào?").
+	// Timeframe is the explicit TF the user asked for (M15/H1/H4/D1).
+	// When the user only mentions a symbol without a TF, we default to
+	// TF_M15 — the advisor's current scalping bias. Users who want
+	// swing analysis type "BTC H4" or "/analyze BTC D1" explicitly.
 	Timeframe models.Timeframe
 
 	// Explicit is true when the intent was triggered by /analyze
@@ -57,8 +57,12 @@ func NewIntentDetector(resolver *SymbolResolver) *IntentDetector {
 // known symbol — make us confident the user wants a live analysis. The
 // list is deliberately compact: adding noise words here causes
 // false-positives that cost Binance + DeepSeek tokens.
+//
+// A live price query ("BTC giá bao nhiêu", "ETH price now") also
+// qualifies — we need to fetch candles anyway to answer it, and the
+// extra indicators cost ~nothing once the fetch is done.
 var intentKeywords = []string{
-	// Vietnamese
+	// Vietnamese — trade intent
 	"mua", "bán", "ban",
 	"vào lệnh", "vao lenh", "vào", "vao",
 	"long", "short",
@@ -69,11 +73,47 @@ var intentKeywords = []string{
 	"sao rồi", "sao roi", "thế nào", "the nao", "giờ sao", "gio sao",
 	"view", "outlook", "trend",
 	"dự đoán", "du doan", "prediction",
+	"scalp", "scalping",
+	// Vietnamese — price / state query
+	"giá", "gia",
+	"bao nhiêu", "bao nhieu",
+	"hiện tại", "hien tai",
 	// English
 	"buy", "sell",
 	"analyze", "analysis",
 	"should i", "worth",
 	"breakout", "reversal", "bullish", "bearish",
+	"price", "quote", "how much", "current",
+}
+
+// followUpKeywords are phrases strong enough to imply "the user is
+// continuing the current analysis thread" even without re-naming the
+// symbol. Paired with a remembered LastSymbol, they let queries like
+// "bây giờ bao nhiêu", "giờ thì sao", "còn giờ thế nào" fire a fresh
+// fetch instead of letting the LLM recycle its stale previous reply.
+//
+// This list is a STRICT SUBSET of the continuation-y entries in
+// intentKeywords — we deliberately avoid generic tokens like "mua"
+// or "long" so a user asking "có nên mua nhà không" doesn't
+// accidentally pull up BTCUSDT just because they asked about BTC
+// earlier in the same 30-min session.
+var followUpKeywords = []string{
+	// Vietnamese — "what's it doing now?"
+	"bao nhiêu", "bao nhieu",
+	"bây giờ", "bay gio",
+	"hiện tại", "hien tai",
+	"giá", "gia",
+	"giờ sao", "gio sao",
+	"giờ thế nào", "gio the nao",
+	"giờ thì sao", "gio thi sao",
+	"thì sao", "thi sao",
+	"sao rồi", "sao roi",
+	"thế nào", "the nao",
+	"còn", "con",
+	"vẫn", "van",
+	"update", "check", "check lại", "check lai", "refresh", "xem lại", "xem lai",
+	// English
+	"price", "how much", "current", "now", "still", "again", "recheck",
 }
 
 // Detect runs the keyword+symbol heuristic on free-form text. Returns
@@ -91,9 +131,46 @@ func (d *IntentDetector) Detect(text string) Intent {
 	}
 	tf, ok := ResolveTimeframe(text)
 	if !ok {
-		tf = models.TF_H4
+		tf = models.TF_M15
 	}
 	return Intent{Symbol: sym, Timeframe: tf, Explicit: false}
+}
+
+// DetectWithFallback first tries the strict Detect pass; if it misses
+// because the user didn't re-mention a symbol, we fall back to the
+// chat's pinned LastSymbol provided the message still carries a
+// follow-up keyword. This is the path that makes "bây giờ bao nhiêu"
+// correctly re-fetch the last analysed pair — without it, the LLM
+// happily quotes its own previous response and users (rightly)
+// conclude the data isn't live.
+//
+// lastSymbol must already be canonicalised (e.g. "BTCUSDT"); the
+// caller is responsible for fetching it from the session store.
+// Passing "" simply disables the fallback, so callers with no session
+// memory behave exactly like plain Detect.
+func (d *IntentDetector) DetectWithFallback(text, lastSymbol string) Intent {
+	if intent := d.Detect(text); intent.WantsAnalysis() {
+		return intent
+	}
+	if lastSymbol == "" {
+		return Intent{}
+	}
+	// If the message itself already mentions a *different* known
+	// symbol, we prefer that over the pinned one — Detect would have
+	// caught it unless the user omitted an intent keyword. Re-check
+	// to avoid quietly pulling BTC data while the user is clearly
+	// asking about ETH.
+	if sym := d.resolver.Resolve(text); sym != "" && sym != lastSymbol {
+		return Intent{}
+	}
+	if !hasAnyKeyword(text, followUpKeywords) {
+		return Intent{}
+	}
+	tf, ok := ResolveTimeframe(text)
+	if !ok {
+		tf = models.TF_M15
+	}
+	return Intent{Symbol: lastSymbol, Timeframe: tf, Explicit: false}
 }
 
 // ParseCommand recognises "/analyze SYMBOL [TF]" (and its alias
@@ -123,7 +200,7 @@ func (d *IntentDetector) ParseCommand(text string) Intent {
 	sym := d.resolver.Resolve(rest)
 	tf, ok := ResolveTimeframe(rest)
 	if !ok {
-		tf = models.TF_H4
+		tf = models.TF_M15
 	}
 	return Intent{Symbol: sym, Timeframe: tf, Explicit: true}
 }

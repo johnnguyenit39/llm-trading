@@ -33,11 +33,17 @@ type DefaultTierWiring struct {
 // DefaultTierWirings returns the canonical per-tier timeframe wiring used
 // by both the cron tiers and the advisor on-demand analyser. The keys are
 // the entry timeframes the system currently supports.
+//
+// M15 is the scalping-style entry: triggers come from M15 price action
+// and momentum, confirmed against the H1 trend and H4 regime. The
+// ExposureTTL is kept short (30 min) because M15 setups invalidate fast
+// if the next couple of bars don't follow through.
 func DefaultTierWirings() map[models.Timeframe]DefaultTierWiring {
 	return map[models.Timeframe]DefaultTierWiring{
-		models.TF_H1: {EntryTF: models.TF_H1, TrendTF: models.TF_H4, StructureTF: models.TF_D1, HTFRegime: models.TF_H4, ExposureTTL: 2 * time.Hour},
-		models.TF_H4: {EntryTF: models.TF_H4, TrendTF: models.TF_D1, StructureTF: models.TF_D1, HTFRegime: models.TF_D1, ExposureTTL: 6 * time.Hour},
-		models.TF_D1: {EntryTF: models.TF_D1, TrendTF: models.TF_D1, StructureTF: models.TF_D1, HTFRegime: "", ExposureTTL: 20 * time.Hour},
+		models.TF_M15: {EntryTF: models.TF_M15, TrendTF: models.TF_H1, StructureTF: models.TF_H4, HTFRegime: models.TF_H1, ExposureTTL: 30 * time.Minute},
+		models.TF_H1:  {EntryTF: models.TF_H1, TrendTF: models.TF_H4, StructureTF: models.TF_D1, HTFRegime: models.TF_H4, ExposureTTL: 2 * time.Hour},
+		models.TF_H4:  {EntryTF: models.TF_H4, TrendTF: models.TF_D1, StructureTF: models.TF_D1, HTFRegime: models.TF_D1, ExposureTTL: 6 * time.Hour},
+		models.TF_D1:  {EntryTF: models.TF_D1, TrendTF: models.TF_D1, StructureTF: models.TF_D1, HTFRegime: "", ExposureTTL: 20 * time.Hour},
 	}
 }
 
