@@ -8,13 +8,13 @@ import (
 
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
-	baseCandle "j_ai_trade/common"
 	svBiz "j_ai_trade/modules/strategy_version/biz"
 	"j_ai_trade/notifier"
 	"j_ai_trade/telegram"
 	"j_ai_trade/trading/engine"
+	"j_ai_trade/trading/ensembles"
+	"j_ai_trade/trading/marketdata"
 	"j_ai_trade/trading/models"
-	"j_ai_trade/trading/strategies"
 
 	"github.com/google/uuid"
 
@@ -23,14 +23,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// TradingSymbols is the universe of symbols we analyze.
-var TradingSymbols = []string{
-	"BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT",
-	"XRPUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT",
-	"DOTUSDT", "ATOMUSDT", "NEARUSDT", "SUIUSDT",
-	"DOGEUSDT", "TRXUSDT", "BCHUSDT", "LTCUSDT",
-	"XAUUSDT",
-}
+// TradingSymbols re-exports the canonical universe from
+// trading/ensembles so existing cron code keeps its familiar name while
+// the actual source of truth lives alongside the shared ensemble
+// factory. The advisor module imports the same slice directly.
+var TradingSymbols = ensembles.DefaultSymbols
 
 const (
 	// PaperEquity is the virtual equity used for position-size logging.
@@ -85,10 +82,13 @@ func registerStrategyVersion(db *gorm.DB) uuid.UUID {
 	if db == nil {
 		return uuid.Nil
 	}
+	// Feed the same wiring we hand to the cron ensembles so the fingerprint
+	// stays in sync with what's actually running.
+	wirings := ensembles.DefaultTierWirings()
 	tiers := map[string]engine.TierSnapshot{
-		"H1": {EntryTF: models.TF_H1, TrendTF: models.TF_H4, StructureTF: models.TF_D1, HTFRegime: models.TF_H4},
-		"H4": {EntryTF: models.TF_H4, TrendTF: models.TF_D1, StructureTF: models.TF_D1, HTFRegime: models.TF_D1},
-		"D1": {EntryTF: models.TF_D1, TrendTF: models.TF_D1, StructureTF: models.TF_D1, HTFRegime: ""},
+		"H1": {EntryTF: wirings[models.TF_H1].EntryTF, TrendTF: wirings[models.TF_H1].TrendTF, StructureTF: wirings[models.TF_H1].StructureTF, HTFRegime: wirings[models.TF_H1].HTFRegime},
+		"H4": {EntryTF: wirings[models.TF_H4].EntryTF, TrendTF: wirings[models.TF_H4].TrendTF, StructureTF: wirings[models.TF_H4].StructureTF, HTFRegime: wirings[models.TF_H4].HTFRegime},
+		"D1": {EntryTF: wirings[models.TF_D1].EntryTF, TrendTF: wirings[models.TF_D1].TrendTF, StructureTF: wirings[models.TF_D1].StructureTF, HTFRegime: wirings[models.TF_D1].HTFRegime},
 	}
 	snapshot := engine.BuildSnapshot(
 		engine.DefaultEnsembleConfig(),
@@ -114,12 +114,16 @@ func registerStrategyVersion(db *gorm.DB) uuid.UUID {
 func InitCronJobsWithPusher(_ *gorm.DB, pusher notifier.SignalPusher) {
 	repo := repository.NewBinanceRepository()
 	binanceService := binance.NewBinanceService(repo)
+	fetcher := marketdata.NewBinanceFetcher(binanceService)
 
 	exposure := engine.NewExposureTracker()
 
-	h1Ensemble := buildEnsemble(models.TF_H1, models.TF_H4, models.TF_D1, models.TF_H4, exposure, tierCooldown[models.TF_H1])
-	h4Ensemble := buildEnsemble(models.TF_H4, models.TF_D1, models.TF_D1, models.TF_D1, exposure, tierCooldown[models.TF_H4])
-	d1Ensemble := buildEnsemble(models.TF_D1, models.TF_D1, models.TF_D1, "", exposure, tierCooldown[models.TF_D1])
+	// Cron attaches the shared exposure tracker so portfolio-level caps
+	// apply across tiers. The advisor uses the same DefaultEnsembleFor
+	// factory but WITHOUT a tracker (read-only advice, not position-taking).
+	h1Ensemble := ensembles.DefaultEnsembleFor(models.TF_H1).WithExposureTracker(exposure)
+	h4Ensemble := ensembles.DefaultEnsembleFor(models.TF_H4).WithExposureTracker(exposure)
+	d1Ensemble := ensembles.DefaultEnsembleFor(models.TF_D1).WithExposureTracker(exposure)
 
 	h1Dedup := engine.NewSignalDedup(tierCooldown[models.TF_H1])
 	h4Dedup := engine.NewSignalDedup(tierCooldown[models.TF_H4])
@@ -127,13 +131,13 @@ func InitCronJobsWithPusher(_ *gorm.DB, pusher notifier.SignalPusher) {
 
 	c := cron.New()
 	_, _ = c.AddFunc("1 * * * *", func() {
-		runTier(context.Background(), binanceService, h1Ensemble, h1Dedup, pusher, models.TF_H1)
+		runTier(context.Background(), fetcher, h1Ensemble, h1Dedup, pusher, models.TF_H1)
 	})
 	_, _ = c.AddFunc("2 */4 * * *", func() {
-		runTier(context.Background(), binanceService, h4Ensemble, h4Dedup, pusher, models.TF_H4)
+		runTier(context.Background(), fetcher, h4Ensemble, h4Dedup, pusher, models.TF_H4)
 	})
 	_, _ = c.AddFunc("5 0 * * *", func() {
-		runTier(context.Background(), binanceService, d1Ensemble, d1Dedup, pusher, models.TF_D1)
+		runTier(context.Background(), fetcher, d1Ensemble, d1Dedup, pusher, models.TF_D1)
 	})
 	c.Start()
 
@@ -142,37 +146,18 @@ func InitCronJobsWithPusher(_ *gorm.DB, pusher notifier.SignalPusher) {
 		Msg("cron scheduled: H1@:01, H4@:02/4h, D1@00:05 UTC")
 }
 
-// buildEnsemble constructs an ensemble of 4 orthogonal strategies for a given
-// entry timeframe. `htfRegime` is an optional HTF used by the ensemble for
-// multi-TF regime confirmation (empty string disables it). `exposureTTL` is
-// how long a committed position stays in the exposure tracker when running
-// in signal-only mode — usually the tier's cooldown so stale signals expire
-// at the same rate new ones can fire.
-func buildEnsemble(entry, trendTF, structureTF, htfRegime models.Timeframe, exposure *engine.ExposureTracker, exposureTTL time.Duration) *engine.Ensemble {
-	cfg := engine.DefaultEnsembleConfig()
-	cfg.HTFRegimeTF = htfRegime
-	cfg.ExposureTTL = exposureTTL
-
-	e := engine.NewEnsemble(engine.NewDefaultRiskManager(), cfg).WithExposureTracker(exposure)
-	e.Register(strategies.NewTrendFollow(entry, trendTF))
-	e.Register(strategies.NewMeanReversion(entry))
-	e.Register(strategies.NewBreakout(entry, 20))
-	e.Register(strategies.NewStructure(entry, structureTF, 3))
-	return e
-}
-
 // runTier fetches required timeframes for every symbol and feeds the ensemble.
 // Concurrency is capped by a semaphore; the whole tier has a deadline so a
 // hung Binance call can't wedge the scheduler. Fired decisions are handed to
 // the injected pusher — this function never talks to Telegram directly.
-func runTier(parent context.Context, bs *binance.BinanceService, ens *engine.Ensemble, dedup *engine.SignalDedup, pusher notifier.SignalPusher, entryTF models.Timeframe) {
+func runTier(parent context.Context, fetcher marketdata.CandleFetcher, ens *engine.Ensemble, dedup *engine.SignalDedup, pusher notifier.SignalPusher, entryTF models.Timeframe) {
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(parent, TierTimeout)
 	defer cancel()
 
 	log.Info().Str("tier", string(entryTF)).Msg("tier analysis start")
 
-	required := collectRequiredTFs(ens)
+	required := ensembles.CollectRequiredTFs(ens)
 
 	sem := make(chan struct{}, MaxConcurrentFetches)
 	var wg sync.WaitGroup
@@ -193,7 +178,7 @@ func runTier(parent context.Context, bs *binance.BinanceService, ens *engine.Ens
 			fetchCtx, fetchCancel := context.WithTimeout(ctx, FetchTimeout)
 			defer fetchCancel()
 
-			market, err := fetchMarketData(fetchCtx, bs, symbol, required)
+			market, err := fetcher.Fetch(fetchCtx, symbol, required)
 			if err != nil {
 				log.Warn().Err(err).Str("symbol", symbol).Msg("fetch market data failed")
 				return
@@ -226,66 +211,6 @@ func runTier(parent context.Context, bs *binance.BinanceService, ens *engine.Ens
 		Str("tier", string(entryTF)).
 		Dur("elapsed", time.Since(start)).
 		Msg("tier analysis complete")
-}
-
-// collectRequiredTFs unions the RequiredTimeframes across all strategies.
-func collectRequiredTFs(ens *engine.Ensemble) map[models.Timeframe]int {
-	req := map[models.Timeframe]int{}
-	for _, s := range ens.Strategies() {
-		for tf, min := range s.MinCandles() {
-			if cur, ok := req[tf]; !ok || min > cur {
-				req[tf] = min
-			}
-		}
-	}
-	return req
-}
-
-// fetchMarketData pulls candles for each required timeframe from Binance.
-func fetchMarketData(ctx context.Context, bs *binance.BinanceService, symbol string, required map[models.Timeframe]int) (models.MarketData, error) {
-	out := models.MarketData{Symbol: symbol, Candles: map[models.Timeframe][]baseCandle.BaseCandle{}}
-	for tf, minCount := range required {
-		if err := ctx.Err(); err != nil {
-			return out, err
-		}
-		limit := minCount + 20
-		var (
-			binanceCandles []repository.BinanceCandle
-			err            error
-		)
-		switch tf {
-		case models.TF_H1:
-			binanceCandles, err = bs.Fetch1hCandles(ctx, symbol, limit)
-		case models.TF_H4:
-			binanceCandles, err = bs.Fetch4hCandles(ctx, symbol, limit)
-		case models.TF_D1:
-			binanceCandles, err = bs.Fetch1dCandles(ctx, symbol, limit)
-		default:
-			continue
-		}
-		if err != nil {
-			return out, fmt.Errorf("fetch %s %s: %w", symbol, tf, err)
-		}
-		out.Candles[tf] = convertBinanceCandles(symbol, binanceCandles)
-	}
-	return out, nil
-}
-
-func convertBinanceCandles(symbol string, src []repository.BinanceCandle) []baseCandle.BaseCandle {
-	out := make([]baseCandle.BaseCandle, len(src))
-	for i, c := range src {
-		out[i] = baseCandle.BaseCandle{
-			Symbol:    symbol,
-			OpenTime:  c.OpenTime,
-			Open:      c.Open,
-			High:      c.High,
-			Low:       c.Low,
-			Close:     c.Close,
-			Volume:    c.Volume,
-			CloseTime: c.CloseTime,
-		}
-	}
-	return out
 }
 
 func logDecision(tf models.Timeframe, d *models.TradeDecision) {

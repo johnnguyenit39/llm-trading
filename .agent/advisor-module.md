@@ -7,15 +7,26 @@
 
 The **advisor** module is a conversational Telegram bot — a trader-buddy
 chat companion — that lives inside the existing `j_ai_trade` Go binary.
-Phase 1 scope is deliberately narrow: users DM a separate bot, the backend
-long-polls Telegram, streams replies from **DeepSeek**, and edits the
-Telegram bubble progressively so the UX feels like texting a person.
-Phase 1 has **no market-data pipe yet** — when a user asks for a concrete
-signal ("XAU buy hay sell?") the bot honestly says the feature is coming
-and keeps the conversation going. Phases 2/3 (listed in §12) add candle
-digests, ensemble-on-demand, proactive alerts, etc. The existing cron-based
-signal broadcaster is completely untouched and runs in parallel under a
-different bot token.
+Users DM a separate bot, the backend long-polls Telegram, streams replies
+from **DeepSeek**, and edits the Telegram bubble progressively so the UX
+feels like texting a person.
+
+**Phase 1 (shipped):** chat-only; bot explicitly declines to invent
+numbers.
+
+**Phase 2 (shipped):** on-demand technical analysis. When the user asks
+for a concrete signal ("XAU giờ buy hay sell?") the backend fetches
+candles from Binance, runs the canonical 4-strategy ensemble + indicator
+suite, renders a compact `[MARKET_DATA]` digest, and injects it as an
+extra user-role turn before the LLM call. The bot explains the rule
+engine's verdict in natural language. Same logic is triggered explicitly
+by `/analyze SYMBOL [TF]`.
+
+**Phase 3 (roadmap, §12):** proactive push, news digest, cost tracking.
+
+The existing cron-based signal broadcaster runs in parallel under a
+different bot token and now shares the ensemble/market-data factories
+with the advisor (see `trading/ensembles` + `trading/marketdata`).
 
 ## 2. Who orchestrates what (IMPORTANT)
 
@@ -42,7 +53,10 @@ flowchart LR
     CH --> F["biz/user_filter.go<br/>(DM + allowlist)"]
     F --> G["biz/greeter.go<br/>(welcome once per chat)"]
     G --> S["biz.SessionStore<br/>(storage/redis today)"]
-    S --> P["biz/prompt_builder.go<br/>system prompt + history"]
+    S --> MA["biz.MarketAnalyzer<br/>(biz/market today, optional)"]
+    MA -.->|"intent hit: fetch candles"| BN["marketdata.BinanceFetcher"]
+    MA -.->|"run ensemble"| ENS["ensembles.DefaultEnsembleFor"]
+    MA --> P["biz/prompt_builder.go<br/>system prompt + history +<br/>[MARKET_DATA] blob"]
     P --> LLM["biz.LLMProvider<br/>(provider/deepseek today)<br/>POST + SSE stream"]
     LLM -->|"chunk string channel"| BUB["biz.MessageBubble<br/>(throttled edit-in-place)"]
     BUB --> TX
@@ -81,10 +95,18 @@ modules/advisor/
     chat_transport.go             interface ChatTransport + MessageBubble +
                                       IncomingMessage DTO
     session_store.go              interface SessionStore
-    chat_handler.go               orchestrator: depends ONLY on the 3 above
+    market_analyzer.go            interface MarketAnalyzer (MaybeEnrich) — Phase 2
+    chat_handler.go               orchestrator: depends ONLY on the 4 above
     user_filter.go                platform-neutral DM/allowlist rule
-    prompt_builder.go             SystemPrompt constant + BuildMessages()
+    prompt_builder.go             SystemPrompt + BuildMessagesWithMarket()
     greeter.go                    WelcomeMessage constant
+
+    market/                       Phase-2 concrete MarketAnalyzer impl
+      symbol_resolver.go          VI/EN alias map -> Binance ticker
+      intent.go                   keyword heuristic + /analyze command parser
+      market_clock.go             next H1/H4/D1 close helpers (UTC-aligned)
+      digest.go                   PairSnapshot + Build + Render (hybrid prose+JSON)
+      analyzer.go                 top-level MaybeEnrich (intent -> fetch -> digest)
 
   model/
     turn.go                       Turn{Role,Content,Time} — OpenAI-shape DTO
@@ -133,18 +155,22 @@ Every step below references ONLY interface types — concrete vendor/
 platform names are resolved at construction time in `advisor_init.go`.
 
 ```
-1. ChatTransport.Updates()  normalized biz.IncomingMessage on channel
-2. ChatHandler.Run          receives msg, fans out to handleMessage goroutine
-3. UserFilter.ShouldHandle  msg.IsDM && (allowlist empty || userID allowed)
-4. handleCommand            /start /reset /help short-circuit the LLM
-5. maybeGreet               TryGreet (atomic SETNX) -> SendMessage(WelcomeMessage)
-6. ChatTransport.KeepTyping spawn ticker sending "typing" every 4s
-7. SessionStore.Load        LRANGE advisor:session:<chat_id>
-8. BuildMessages            [system, ...history, {user, text}]
-9. LLMProvider.Stream       returns <-chan string, <-chan error
-10. ChatTransport.NewBubble  biz.MessageBubble backed by the platform
-11. bubble.Start("") -> bubble sends lazily on first Append -> Finish flushes last edit (typing indicator stays visible until first token)
-12. SessionStore.Append     RPUSH user turn, RPUSH assistant turn, LTRIM, EXPIRE
+1. ChatTransport.Updates()        normalized biz.IncomingMessage on channel
+2. ChatHandler.Run                receives msg, fans out to handleMessage goroutine
+3. UserFilter.ShouldHandle        msg.IsDM && (allowlist empty || userID allowed)
+4. handleCommand                  /start /reset /help /analyze short-circuit the LLM
+5. maybeGreet                     TryGreet (atomic SETNX) -> SendMessage(WelcomeMessage)
+6. ChatTransport.KeepTyping       spawn ticker sending "typing" every 4s
+7. SessionStore.Load              LRANGE advisor:session:<chat_id>
+8. MarketAnalyzer.MaybeEnrich     intent detect -> fetch candles -> ensemble -> digest
+                                    returns (blob, ack). Any failure -> fall through.
+9. (optional) SendMessage ack     "Đang kiểm tra XAUUSDT H4..." to signal progress
+10. BuildMessagesWithMarket       [system, ...history, [MARKET_DATA]? , {user,text}]
+11. LLMProvider.Stream            returns <-chan string, <-chan error
+12. ChatTransport.NewBubble       biz.MessageBubble backed by the platform
+13. bubble.Start("") -> first Append sends lazily -> Finish flushes last edit
+14. SessionStore.Append           RPUSH user turn, RPUSH assistant turn, LTRIM, EXPIRE
+                                    (market blob is NOT persisted — goes stale fast)
 ```
 
 Per-message budget: 90s (context.WithTimeout). Even if the LLM hangs the
@@ -156,13 +182,34 @@ The system prompt is in `biz/prompt_builder.go` as `SystemPrompt`. Key
 rules pinned there (edit ONLY via that constant — single source of truth):
 
 - Respond in user's language (VI or EN auto-detected by DeepSeek itself).
-- Short replies (2–5 sentences) for chat vibe; no heavy markdown.
-- **Never fabricate market data.** When asked for a concrete signal the
-  bot must acknowledge Phase 1 has no data feed and ask for context.
-- Friendly trader-buddy tone; ≤1 emoji per reply.
+- Short replies (3–6 sentences) for chat vibe; no heavy markdown.
+- **Never fabricate market data.** The bot may cite numbers ONLY when
+  they appear inside a `[MARKET_DATA]...[/MARKET_DATA]` block. Outside
+  that block — including when Phase 2 fails to fetch — it must say so
+  and refuse to invent figures.
+- Default stance: explain + endorse the rule engine's verdict. Gentle
+  dissent is allowed but must cite a specific fact from the digest.
+- Structured footer (emoji + Entry/SL/TP/RR/Conf/Tier lines) is required
+  ONLY when the bot actually proposes a setup; casual questions stay
+  free-form prose.
 
-Each DeepSeek call receives: `[system, ...history_from_redis, user_message]`.
-No other metadata is injected in Phase 1 (no market blob, no news digest).
+Each DeepSeek call receives:
+`[system, ...history_from_redis, maybe [MARKET_DATA] user-turn, user_message]`.
+
+The `[MARKET_DATA]` blob is built by `biz/market/digest.go#Render`. Shape:
+
+1. Header line with symbol, UTC timestamp, entry TF.
+2. "Next closes" for each TF in the snapshot.
+3. One prose block per TF: regime, ADX, price, EMA20/50/200, RSI14, ATR,
+   Bollinger bands, Donchian, swing high/low.
+4. Rule engine verdict block: Direction, tier, conf, netRR, Entry/SL/TP,
+   agreement ratio, per-strategy votes, veto reasons.
+5. Compact JSON footer with the exact numbers the bot may echo verbatim.
+6. Closing `[/MARKET_DATA]` tag.
+
+The blob is injected as an **extra user-role turn**, not baked into the
+system prompt, so (a) prompt-caching still kicks in and (b) the blob
+doesn't leak into persisted history (stale data risk).
 
 ## 7. Reuse of existing code
 
@@ -177,8 +224,23 @@ No other metadata is injected in Phase 1 (no market blob, no news digest).
 - **`logger`** (zerolog) — standard `log.Info()/Warn()/Error()` used
   throughout the module.
 
-Advisor does NOT (yet) touch: `trading/engine`, `brokers/binance`,
-`notifier`, `modules/order`. Phase 2 wires those in.
+Phase 2 reuse (shipped):
+
+- **`trading/ensembles`** — shared `DefaultEnsembleFor(tf)` + `DefaultSymbols`.
+  Both the cron broadcaster and the advisor market analyzer import from
+  here. Adding/removing a pair or tweaking a tier wiring happens once.
+- **`trading/marketdata`** — `CandleFetcher` interface + `BinanceFetcher`
+  impl. Advisor calls it on every user query with analysis intent; cron
+  calls it on every tier tick. Same code, same semantics.
+- **`trading/indicators`** — EMA/RSI/ATR/ADX/BB/Donchian/SwingHighLow
+  invoked by `biz/market/digest.go` to build the per-TF prose blocks.
+- **`trading/engine`** — `DetectRegime` for the per-TF regime column in
+  the digest; `StrategyInput` / `Ensemble.Analyze` for the rule-engine
+  verdict embedded in the digest.
+- **`brokers/binance`** — REST client wrapped by `marketdata.BinanceFetcher`.
+
+Not yet touched: `notifier`, `modules/order`. Phase 3 proactive push
+will use `notifier`.
 
 ## 7a. How to add a new adapter
 
@@ -277,19 +339,35 @@ of the three interfaces**, no real vendor calls:
   (in-memory channel) + miniredis-backed store. End-to-end: greeting
   only once, reset clears, bubble sees >=1 append.
 
-## 12. Phase 2/3 roadmap (tracked here so we don't forget)
+## 12. Phase 2/3 roadmap
 
-### Phase 2 — market data + structured signals
+### Phase 2 — on-demand market analysis (SHIPPED)
 
-- Extract `buildEnsemble` from `cron_jobs/` to `trading/engine.DefaultEnsembleFor(tf)`
-  so cron + advisor share one strategy set.
-- `biz/symbol_normalizer.go` — "XAU USD" / "GOLD" / "BTC" -> Binance symbol.
-- `biz/digest_candles.go` — EMA/RSI/ATR/S-R digest per TF.
-- `biz/market_clock.go` — next H1/H4/D1 close + recommended recheck minutes.
-- `biz/pair_snapshot.go` — fetch -> digest -> ensemble -> compact JSON blob
-  injected as an extra user message before the actual question.
-- Strict JSON output schema (BUY/SELL/WAIT + TP/SL/confidence/rationale).
-- Audit table `advisor_sessions` in Postgres.
+- [x] Extract `DefaultEnsembleFor(tf)` into `trading/ensembles`
+      (shared by cron + advisor).
+- [x] Extract candle-fetch into `trading/marketdata` (`CandleFetcher`
+      interface + `BinanceFetcher` impl).
+- [x] `biz/market/symbol_resolver.go` — VI/EN aliases, universe bounded
+      by `ensembles.DefaultSymbols`.
+- [x] `biz/market/intent.go` — keyword heuristic + `/analyze SYMBOL [TF]`
+      command parser.
+- [x] `biz/market/market_clock.go` — next H1/H4/D1 close helpers.
+- [x] `biz/market/digest.go` — `PairSnapshot` + `Render` hybrid
+      prose+JSON blob.
+- [x] `biz/market/analyzer.go` — `MaybeEnrich` top-level wiring,
+      non-fatal on fetch errors.
+- [x] `biz.MarketAnalyzer` interface + optional hook in `ChatHandler`.
+- [x] `SystemPrompt` updated: bot cites numbers only inside
+      `[MARKET_DATA]`, defaults to explaining rule engine verdict, uses
+      structured footer only when proposing a setup.
+- [x] Graceful degradation: Binance outage -> chat-only fallback.
+
+### Phase 2.5 — deferred
+
+- [ ] Audit table `advisor_sessions` in Postgres for conversation logs
+      + cost tracking.
+- [ ] Digest unit tests (fake candles -> golden prompt).
+- [ ] Per-user session quota / rate limit.
 
 ### Phase 3 — proactive + multi-modal
 
@@ -297,6 +375,7 @@ of the three interfaces**, no real vendor calls:
   matching their watchlist ("Hey, XAU just printed a bullish BOS on H1...").
 - Switch DeepSeek model to `deepseek-reasoner` for signal-generation
   requests (keep `deepseek-chat` for small talk to save tokens).
-- Per-user rate limiting / cost tracking.
+- News digest (fundamentals, macro calendar) as a second MarketAnalyzer-
+  shaped enrichment hook.
 - Optional webhook mode (`setWebhook`) for lower first-token latency in
   prod (polling is fine for local dev).

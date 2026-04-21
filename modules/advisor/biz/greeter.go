@@ -1,10 +1,20 @@
 package biz
 
-// WelcomeMessage is the one-time greeting for a new Telegram chat. Kept
+// WelcomeMessage is the one-time greeting for a new chat. Kept
 // deliberately short + bilingual so it works for both VI and EN users
-// without a language-detection layer at this stage.
-const WelcomeMessage = `Chào bạn 👋 Mình là advisor bot — có thể chat với mình về trading, phân tích kỹ thuật, chiến lược, risk management, v.v.
+// without a language-detection layer.
+//
+// Phase-2 update: now the bot CAN pull live data, so the message sells
+// that capability and shows the exact command user can type. We keep
+// the "just chat about trading" framing so new users don't feel
+// obligated to formulate a structured request.
+const WelcomeMessage = `Chào bạn 👋 Mình là advisor bot — trợ lý trading.
 
-Hiện mình đang ở Phase 1 nên CHƯA có kết nối data thị trường real-time — sẽ có ở phase tiếp theo. Giờ cứ hỏi gì cũng được, mình sẽ trò chuyện tự nhiên. Khi hỏi tín hiệu cụ thể (ví dụ "XAU nên buy hay sell") mình sẽ nói thật là chưa có data nhé.
+Mình có thể:
+• Chat tự nhiên về trading, chiến lược, risk, tâm lý giao dịch.
+• Phân tích kỹ thuật realtime khi bạn hỏi ví dụ "XAU giờ buy hay sell?" hoặc "BTC H4 thế nào?" — mình sẽ tự fetch candle, tính EMA/RSI/ATR/regime, chạy qua rule engine 4-chiến-thuật rồi giải thích.
+• Lệnh: /analyze <SYMBOL> [TF] để ép phân tích (ví dụ /analyze BTC H4, /analyze XAU). /reset xoá ngữ cảnh. /help xem lệnh.
 
-(Hi! I'm your trading advisor bot. Real-time market data is coming in the next phase — for now let's just chat about trading concepts, strategies, or whatever you have in mind.)`
+Pair đang support: BTC, ETH, SOL, XAU (gold), BNB, XRP, ADA, AVAX, LINK, DOT, ATOM, NEAR, SUI, DOGE, TRX, BCH, LTC. Timeframe: H1, H4, D1.
+
+(Hi! I can chat about trading and run live technical analysis on the pairs above. Try /analyze BTC H4 or just ask "should I buy XAU?")`

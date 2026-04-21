@@ -11,16 +11,25 @@ import (
 )
 
 // ChatHandler wires every per-message decision together: filter, greet,
-// build prompt, stream the LLM, edit the reply bubble, persist the turn
-// pair. It depends ONLY on the biz interfaces (ChatTransport, LLMProvider,
-// SessionStore) — no platform or vendor types leak in. Swapping Telegram
-// for another platform or the LLM for another vendor requires zero code
+// optionally enrich with market data (Phase 2), build prompt, stream
+// the LLM, edit the reply bubble, persist the turn pair. It depends
+// ONLY on the biz interfaces (ChatTransport, LLMProvider, SessionStore,
+// MarketAnalyzer) — no platform or vendor types leak in. Swapping
+// Telegram for another platform, the LLM for another vendor, or the
+// market pipeline for a cached/mocked version requires zero code
 // changes here.
+//
+// The `analyzer` field is OPTIONAL: when nil the handler behaves
+// exactly like Phase 1 (chat only). advisor_init.go constructs a real
+// analyzer in production and falls back to nil if the Binance client
+// can't be built — so a Binance outage only disables market enrichment
+// without taking down the chat bot.
 type ChatHandler struct {
 	transport ChatTransport
 	store     SessionStore
 	llm       LLMProvider
 	filter    *UserFilter
+	analyzer  MarketAnalyzer // may be nil — chat-only fallback
 }
 
 func NewChatHandler(
@@ -35,6 +44,15 @@ func NewChatHandler(
 		llm:       llm,
 		filter:    filter,
 	}
+}
+
+// WithMarketAnalyzer turns on Phase-2 market enrichment. Kept as a
+// separate setter (rather than a constructor arg) so the existing
+// callsite signature doesn't change and so analyzers constructed after
+// the handler (e.g. lazy Binance dial) can be attached at any time.
+func (h *ChatHandler) WithMarketAnalyzer(a MarketAnalyzer) *ChatHandler {
+	h.analyzer = a
+	return h
 }
 
 // Run consumes messages from the transport until ctx is cancelled or the
@@ -111,7 +129,25 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 		history = nil
 	}
 
-	msgs := BuildMessages(history, userText)
+	// Phase-2 enrichment: when the analyzer detects an analysis request,
+	// it returns a rendered [MARKET_DATA] blob to prepend as an extra
+	// user-role turn, plus an optional ack string we send via
+	// SendMessage so the user sees progress before the LLM starts
+	// streaming. Any failure here is non-fatal — fall through to the
+	// chat-only flow.
+	marketBlob := ""
+	if h.analyzer != nil {
+		blob, ack, aerr := h.analyzer.MaybeEnrich(ctx, userText)
+		if aerr != nil {
+			log.Warn().Err(aerr).Str("chat_id", chatID).Msg("advisor: market analyzer error")
+		}
+		marketBlob = blob
+		if ack != "" {
+			_ = h.transport.SendMessage(ctx, chatID, ack)
+		}
+	}
+
+	msgs := BuildMessagesWithMarket(history, userText, marketBlob)
 
 	chunks, errCh := h.llm.Stream(ctx, msgs)
 
@@ -169,7 +205,12 @@ func (h *ChatHandler) handleCommand(ctx context.Context, chatID, text string) bo
 		return true
 	case "/help":
 		_ = h.transport.SendMessage(ctx, chatID,
-			"Lệnh khả dụng:\n/start — lời chào\n/reset — xoá ngữ cảnh\n/help — xem lệnh\n\nCòn lại cứ nhắn tự nhiên, mình trả lời.")
+			"Lệnh khả dụng:\n"+
+				"/start — lời chào\n"+
+				"/reset — xoá ngữ cảnh\n"+
+				"/help — xem lệnh\n"+
+				"/analyze SYMBOL [TF] — phân tích kỹ thuật realtime (ví dụ: /analyze BTC H4, /analyze XAU)\n\n"+
+				"Còn lại cứ nhắn tự nhiên. Khi bạn hỏi buy/sell/vào lệnh kèm tên coin mình sẽ tự fetch dữ liệu và phân tích.")
 		return true
 	}
 	return false

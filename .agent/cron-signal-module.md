@@ -59,7 +59,7 @@ flowchart TD
   RUN --> FAN["fan-out over TradingSymbols<br/>(semaphore, MaxConcurrentFetches=5)"]
 
   subgraph perSymbol ["per symbol (goroutine)"]
-    FAN --> FETCH["fetchMarketData<br/>(Binance REST, multi-TF)"]
+    FAN --> FETCH["marketdata.BinanceFetcher<br/>(Binance REST, multi-TF)"]
     FETCH --> PRICE["extract currentPrice<br/>from entryTF last candle"]
     PRICE --> ANALYZE["ensemble.Analyze(input)"]
 
@@ -84,7 +84,8 @@ Key invariants per tier:
 ## 5. Tier → TF wiring
 
 Each tier configures the ensemble with specific timeframes (see
-`buildEnsemble` in `cron_job_manager.go`):
+`DefaultTierWirings` in `trading/ensembles/defaults.go`, shared with
+the advisor):
 
 | Tier (EntryTF) | TrendTF | StructureTF | HTFRegime (multi-TF confirm) | ExposureTTL |
 | -------------- | ------- | ----------- | ---------------------------- | ----------- |
@@ -182,7 +183,8 @@ tune a strategy, update this mirror too so the fingerprint flips.
 Adding a new strategy:
 
 1. Create `trading/strategies/<name>.go` implementing `engine.Strategy`.
-2. Register in `buildEnsemble`.
+2. Register in `trading/ensembles/defaults.go#NewEnsembleFromWiring`
+   (shared by cron + advisor).
 3. Add an entry to `defaultStrategyParams()` with its magic numbers.
 4. (optional) Add an entry to `EnsembleConfig.FullAgreement` threshold
    tuning — adding a 5th strategy may warrant raising `FullAgreement` to 4.
@@ -318,16 +320,27 @@ by watching logs on local runs. Good candidate for a future test using
 
 ## 17. Relationship to the advisor module
 
-- **Shared**: `trading/engine` (Ensemble / RiskManager / ExposureTracker /
-  Regime / versioning), `trading/strategies`, `trading/indicators`,
-  `brokers/binance`, `common`.
-- **Not shared**: the advisor has its own request-scoped ensemble without
-  dedup and without committing to the shared `ExposureTracker` (advisor is
-  read-only advice, cron is the "position taker" in paper mode).
-- **Planned refactor**: extract `buildEnsemble` from
-  `cron_job_manager.go` into `engine.DefaultEnsembleFor(tf)` so both modules
-  share a single strategy-set definition. Cron keeps its exposure/dedup;
-  advisor instantiates with `nil` tracker.
+- **Shared at the code level** (both modules import from the same
+  packages; changes propagate automatically):
+  - `trading/engine` — Ensemble, RiskManager, ExposureTracker, Regime,
+    strategy-version snapshotting.
+  - `trading/strategies` — the 4 strategy implementations.
+  - `trading/indicators` — EMA / RSI / ATR / ADX / BB / Donchian / swings.
+  - `trading/ensembles` — `DefaultEnsembleFor(tf)` factory +
+    `DefaultSymbols` universe + `CollectRequiredTFs`. **Single source of
+    truth** for how we compose strategies and which pairs we cover. Cron
+    and advisor both call `ensembles.DefaultEnsembleFor(entryTF)` — no
+    duplicated wiring.
+  - `trading/marketdata` — `CandleFetcher` interface + `BinanceFetcher`.
+    Cron uses it per tier tick; advisor uses it per user question.
+  - `brokers/binance`, `common`.
+- **Not shared**:
+  - Cron owns the `ExposureTracker` (portfolio caps, cooldowns, signal
+    dedup). It wires `WithExposureTracker(...)` after the shared factory.
+  - Advisor instantiates ensembles WITHOUT a tracker (read-only advice,
+    not position-taking) so two users asking about BTC don't interfere.
+  - Cron pushes via `notifier.SignalPusher`; advisor renders a
+    `[MARKET_DATA]` blob for the LLM via `modules/advisor/biz/market/digest.go`.
 
 ## 18. How to make common changes
 
