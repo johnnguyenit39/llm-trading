@@ -9,7 +9,7 @@ to modify the module without re-reading the whole codebase.
 | File                                         | Scope                                                                                                | When to include                                                                                                                                                 |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [cron-signal-module.md](cron-signal-module.md) | The existing cron-based signal broadcaster (H1/H4/D1 ensemble → Telegram channel + DB).              | Any task touching `cron_jobs/`, `trading/engine`, `trading/strategies`, `trading/indicators`, `notifier/`, `modules/strategy_version`, or `modules/order` fire-signal persistence. |
-| [advisor-module.md](advisor-module.md)       | The new on-demand advisor module (user chat → OpenClaw → backend → DeepSeek → structured advice).    | Any task touching `modules/advisor/`, `/api/v1/advisor/*` routes, DeepSeek prompt/response shape, or the `advisor_sessions` table.                                |
+| [advisor-module.md](advisor-module.md)       | The conversational Telegram chat bot (Phase 1: chat-only; Phase 2 adds market data). Backend long-polls Telegram, streams DeepSeek, edits bubbles progressively. | Any task touching `modules/advisor/`, `telegram/advisor_*`, DeepSeek client, or Redis session keys `advisor:*`.                                                    |
 
 ## Global conventions (apply to every doc here)
 
@@ -31,7 +31,7 @@ to modify the module without re-reading the whole codebase.
 flowchart TD
   Q["incoming task"] --> A{"touches cron /<br/>ensemble signals<br/>to Telegram channel?"}
   A -->|yes| CRON["read cron-signal-module.md"]
-  A -->|no| B{"touches user chat /<br/>/advisor/* API /<br/>DeepSeek?"}
+  A -->|no| B{"touches Telegram chat /<br/>advisor bot /<br/>DeepSeek?"}
   B -->|yes| ADV["read advisor-module.md"]
   B -->|no| BOTH{"touches trading/engine,<br/>indicators, or strategies?"}
   BOTH -->|yes| BOTH2["read BOTH (shared code)"]

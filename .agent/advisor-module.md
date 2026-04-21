@@ -5,307 +5,296 @@
 
 ## 1. Purpose (one paragraph)
 
-The **advisor** module is a new HTTP service (mounted inside the existing
-`j_ai_trade` Go binary) that answers ad-hoc trading questions from end users
-such as *"Should I buy or sell XAU/USD right now? What TP/SL?"*. Users chat
-with a Telegram/Zalo bot; OpenClaw relays the message to our backend; the
-backend fetches market data (candles, indicators, optional news), **cooks it
-into a compact prompt**, sends it to **DeepSeek**, parses DeepSeek's
-reasoning into a structured decision (direction, entry, SL, TP, confidence,
-recheck-after-minutes, retest plan), and returns it upstream. The existing
-cron-based signal broadcaster is untouched and keeps running in parallel.
+The **advisor** module is a conversational Telegram bot — a trader-buddy
+chat companion — that lives inside the existing `j_ai_trade` Go binary.
+Phase 1 scope is deliberately narrow: users DM a separate bot, the backend
+long-polls Telegram, streams replies from **DeepSeek**, and edits the
+Telegram bubble progressively so the UX feels like texting a person.
+Phase 1 has **no market-data pipe yet** — when a user asks for a concrete
+signal ("XAU buy hay sell?") the bot honestly says the feature is coming
+and keeps the conversation going. Phases 2/3 (listed in §12) add candle
+digests, ensemble-on-demand, proactive alerts, etc. The existing cron-based
+signal broadcaster is completely untouched and runs in parallel under a
+different bot token.
 
 ## 2. Who orchestrates what (IMPORTANT)
 
-- **Backend (this repo) = the brain orchestrator.** It holds the DeepSeek API
-  key, calls DeepSeek, cooks data, parses the LLM answer. DeepSeek receives
-  input **only after** data has been cooked at the backend.
-- **OpenClaw = dumb transport bridge** between Telegram and our backend.
-  It holds no secrets, does no reasoning. Think of it as a thin HTTP relay.
-- **DeepSeek = stateless reasoning engine.** It does NOT call back into our
-  backend (no function-calling/tool-use pattern). It just returns a JSON
-  answer to a cooked prompt.
+- **Backend (this repo) = the brain.** It holds the DeepSeek API key and
+  the Telegram bot token, long-polls Telegram, calls DeepSeek, and edits
+  Telegram messages to stream tokens. No external relay, no OpenClaw.
+- **DeepSeek = stateless reasoning engine.** It streams tokens back over
+  SSE; it does NOT call back into our backend.
+- **Telegram Bot API = transport only.** Long-polling (`getUpdates`) for
+  ingress, `sendMessage` / `editMessageText` / `sendChatAction` for egress.
 
-If a future decision is to flip this (let DeepSeek drive tool calls), update
-this doc first — the whole module layout depends on this direction.
+If a future decision is to flip any of this (function-calling DeepSeek,
+webhook mode instead of polling, a relay in front), update this doc first.
 
 ## 3. End-to-end data flow
 
 ```mermaid
 flowchart LR
-  U["User (Zalo/Telegram)"] --> TG["Telegram Bot"]
-  TG --> OC["OpenClaw<br/>(bridge only)"]
-  OC -->|"POST /advisor/ask<br/>{question, user_id}"| API["Advisor API (this repo)"]
+  U["User DM"] --> PLAT["Chat platform<br/>(Telegram today)"]
+  PLAT <-->|"platform-specific<br/>(long-poll / webhook / ...)"| TX["transport/*<br/>adapter"]
 
   subgraph repo ["j_ai_trade (Go binary)"]
-    API --> PARSE["IntentParser<br/>extract symbol + ask-type"]
-    PARSE --> NORM["SymbolNormalizer<br/>XAU USD -> XAUUSDT"]
-    NORM --> FETCH["MarketDataFetcher<br/>Binance multi-TF"]
-    FETCH --> DIGEST["DigestCandles<br/>EMA/RSI/ATR + S/R<br/>+ regime + structure"]
-    DIGEST --> COOK["PromptCooker<br/>compact JSON/text<br/>+ system prompt"]
-    ENS["EnsembleOnDemand<br/>(reuses trading/engine)"] --> COOK
-    NEWS["NewsProvider<br/>(STUB v1)"] --> COOK
-    COOK --> DS["DeepSeekClient<br/>POST /v1/chat/completions"]
-    DS --> PARSERESP["AnswerParser<br/>validate JSON schema"]
-    PARSERESP --> OUT["AdvisorAnswer DTO"]
-    PARSERESP -.->|"optional audit"| AUDIT[("advisor_sessions")]
+    TX -->|"biz.IncomingMessage"| CH["biz/chat_handler.go<br/>(depends only on interfaces)"]
+    CH --> F["biz/user_filter.go<br/>(DM + allowlist)"]
+    F --> G["biz/greeter.go<br/>(welcome once per chat)"]
+    G --> S["biz.SessionStore<br/>(storage/redis today)"]
+    S --> P["biz/prompt_builder.go<br/>system prompt + history"]
+    P --> LLM["biz.LLMProvider<br/>(provider/deepseek today)<br/>POST + SSE stream"]
+    LLM -->|"chunk string channel"| BUB["biz.MessageBubble<br/>(throttled edit-in-place)"]
+    BUB --> TX
+    CH -.->|"KeepTyping via transport"| TX
+    CH -.->|"Append Turn"| S
   end
-
-  OUT --> OC
-  OC --> TG
-  TG --> U
 ```
 
 Key invariants:
 
-- Everything between "POST /advisor/ask" and "AdvisorAnswer DTO" is
-  synchronous inside one HTTP request.
-- Raw OHLCV never reaches DeepSeek — always digested to indicator values +
-  last swings + S/R levels to keep prompt tokens low.
-- DeepSeek responses must conform to a strict JSON schema (see §6); on
-  parse failure we fall back to a safe "no trade, recheck later" answer.
+- One Telegram update -> one goroutine in `ChatHandler.handleMessage`. Slow
+  DeepSeek replies for user A never block user B.
+- `editMessageText` is throttled to one call per ~900ms per chat to stay
+  well under Telegram's per-chat edit rate limit (~1/s).
+- Session history is rolling — oldest turns are trimmed, TTL slides on
+  every append. Restart-safe because state lives in Redis, not RAM.
+- Non-fatal everywhere: missing `DEEP_SEEK_API_KEY`, missing bot token, or
+  a Redis outage only disables the bot; cron + HTTP API keep running.
 
-## 4. HTTP surface
+## 4. Module layout — hexagonal, three isolated seams
 
-All routes live under `/api/v1/advisor/*` and are protected by
-`APIKeyMiddleware` (header `X-Advisor-Key` checked against env
-`ADVISOR_API_KEY`). Only OpenClaw talks to these.
-
-| Method | Path                              | Purpose                                       |
-| ------ | --------------------------------- | --------------------------------------------- |
-| POST   | `/advisor/ask`                    | Main entrypoint. Accepts user question, returns structured decision. |
-| GET    | `/advisor/tools/pair-snapshot`    | Debug/internal: returns the cooked context blob without calling DeepSeek. |
-| GET    | `/advisor/tools/candles-digest`   | Debug: per-TF indicator digest only.          |
-| GET    | `/advisor/tools/ensemble-signal`  | Debug: run in-house ensemble on demand.       |
-| GET    | `/advisor/tools/market-clock`     | Next TF close + recommended recheck minutes.  |
-| GET    | `/advisor/tools/news-digest`      | STUB — empty list until phase 2.              |
-
-The debug `/tools/*` endpoints exist so we can unit/integration-test every
-stage without burning DeepSeek tokens, and so humans can eyeball the cooked
-prompt when tuning.
-
-### `POST /advisor/ask` request
-
-```json
-{
-  "question": "Hiện tại cặp XAU USD thì nên buy hay sell tp sl ra sao?",
-  "user_id": "tg:123456789",
-  "locale": "vi"
-}
-```
-
-### `POST /advisor/ask` response
-
-```json
-{
-  "symbol": "XAUUSDT",
-  "as_of": "2026-04-21T09:00:00Z",
-  "decision": {
-    "action": "BUY" | "SELL" | "WAIT",
-    "entry": 2345.1,
-    "stop_loss": 2328.0,
-    "take_profit": 2380.0,
-    "confidence": 0.72,
-    "net_rr": 1.8
-  },
-  "rationale": "H1 and H4 both trend_up; price retested EMA20 on H1 with bullish BOS; ATR room to resistance.",
-  "retest_plan": "If price rejects 2360 resistance and pulls back to 2340-2345, re-enter BUY with tighter SL at 2332.",
-  "recheck": { "after_minutes": 55, "reason": "next H1 close" },
-  "data_freshness_sec": 42,
-  "model": "deepseek-chat",
-  "prompt_tokens": 812,
-  "completion_tokens": 214
-}
-```
-
-When `decision.action == "WAIT"` the `entry/stop_loss/take_profit` fields
-are null and `retest_plan` explains the condition that would change the
-answer.
-
-## 5. Module layout
-
-Follows the clean-arch style of `modules/order` and `modules/user`.
+The advisor is structured as a pure domain core (`biz/`) surrounded by
+three interchangeable adapters. **Adding a new LLM vendor, chat platform,
+or session backend never touches `biz/`** — you drop a sibling package
+into `provider/`, `transport/`, or `storage/` that satisfies the matching
+interface, then change one line in `advisor_init.go`.
 
 ```
 modules/advisor/
+  advisor_init.go                 wires the three adapters into ChatHandler
+
+  biz/                            DOMAIN CORE — interfaces + pure logic only
+    llm_provider.go               interface LLMProvider (Stream, Name)
+    chat_transport.go             interface ChatTransport + MessageBubble +
+                                      IncomingMessage DTO
+    session_store.go              interface SessionStore
+    chat_handler.go               orchestrator: depends ONLY on the 3 above
+    user_filter.go                platform-neutral DM/allowlist rule
+    prompt_builder.go             SystemPrompt constant + BuildMessages()
+    greeter.go                    WelcomeMessage constant
+
   model/
-    dto/
-      ask.go                   // AskRequest, AskResponse
-      pair_snapshot.go         // internal cooked-context DTO
-      candles_digest.go
-      ensemble_signal.go
-      market_clock.go
-      news_digest.go
-      errors.go
-    advisor_session.go         // GORM model for audit table
-  biz/
-    symbol_normalizer.go       // alias map -> Binance universe
-    intent_parser.go           // extracts symbol + ask-type from free text
-    digest_candles.go          // indicators + S/R + swings + regime
-    market_clock.go            // next TF close + recheck_minutes
-    ensemble_factory.go        // SHARED with cron (extracted from cron_jobs)
-    ensemble_on_demand.go      // stateless Ensemble.Analyze wrapper
-    news_provider.go           // interface + NoopNewsProvider (STUB)
-    pair_snapshot.go           // assembles the cooked context blob
-    prompt_cooker.go           // context -> LLM messages (system + user)
-    deepseek_client.go         // thin HTTP client, holds API key
-    answer_parser.go           // LLM JSON -> AdvisorAnswer; strict schema
-    ask_flow.go                // orchestrator for POST /advisor/ask
-  storage/
-    postgres.go
-    insert_tool_call.go
-    insert_advisor_session.go
-  transport/gin/
-    middleware_api_key.go
-    ask_handler.go
-    get_pair_snapshot_handler.go
-    get_candles_digest_handler.go
-    get_ensemble_signal_handler.go
-    get_market_clock_handler.go
-    get_news_digest_handler.go
+    turn.go                       Turn{Role,Content,Time} — OpenAI-shape DTO
+
+  provider/                       LLM VENDOR ADAPTERS
+    deepseek/
+      client.go                   biz.LLMProvider impl (SSE streaming)
+    (openai/, anthropic/, ...)    future siblings; no changes elsewhere
+
+  storage/                        SESSION BACKEND ADAPTERS
+    redis/
+      session_store.go            biz.SessionStore impl (LIST + TTL)
+    (postgres/, memory/, ...)     future siblings
+
+  transport/                      CHAT PLATFORM ADAPTERS
+    telegram/
+      transport.go                biz.ChatTransport impl (wraps telegram/)
+    (zalo/, discord/, slack/, ...)  future siblings
+
+telegram/                         LOW-LEVEL TELEGRAM PRIMITIVES
+  telegram_service.go             EXISTING — cron broadcaster (untouched)
+  advisor_bot.go                  AdvisorBot: raw getUpdates / sendMessage /
+                                      editMessageText / sendChatAction
+  advisor_types.go                Update/Message/Chat/User DTOs
+  listener.go                     long-poll loop -> chan Update
+  typing.go                       KeepTyping helper (tick 4s)
+  stream_editor.go                ProgressiveMessage (throttled edit)
 ```
 
-Routes are mounted in `config/app/initializing_app.go` inside an
-`advisor := v1.Group("/advisor")` block guarded by `APIKeyMiddleware()`.
+Key dependency rules enforced by the layout:
 
-## 6. Prompt contract (backend <-> DeepSeek)
+- `biz/` imports only `model/` and stdlib/log. Grep proof:
+  `grep -r "j_ai_trade/" modules/advisor/biz` returns only `.../model`.
+- `telegram/` imports nothing from `modules/advisor/*`. It's a reusable
+  low-level package; the adapter in `transport/telegram/` is the only
+  bridge.
+- Adapter packages never import each other — they all depend inward on
+  `biz/` and `model/`.
 
-We pin DeepSeek to a strict JSON output so the backend can parse
-deterministically.
+No `transport/gin/` yet — Phase 1 has zero HTTP surface. The advisor is
+100% push-driven by the chat transport's Updates channel.
 
-**System prompt (stable, versioned):**
+## 5. Runtime control flow (per user message)
 
-> You are a disciplined swing/intraday trading assistant. Use ONLY the data
-> provided in the user message. Do not invent indicator values. Output a
-> single JSON object conforming exactly to the schema below. No prose, no
-> markdown, no extra keys. If data is insufficient or conflicting, return
-> action="WAIT" with a recheck plan.
+Every step below references ONLY interface types — concrete vendor/
+platform names are resolved at construction time in `advisor_init.go`.
 
-**Schema returned by DeepSeek (enforced via JSON-mode):**
-
-```json
-{
-  "action": "BUY | SELL | WAIT",
-  "entry": number|null,
-  "stop_loss": number|null,
-  "take_profit": number|null,
-  "confidence": number,           // 0..1
-  "rationale": string,            // <= 280 chars
-  "retest_plan": string,          // <= 280 chars, required even when action!=WAIT
-  "recheck_after_minutes": integer
-}
+```
+1. ChatTransport.Updates()  normalized biz.IncomingMessage on channel
+2. ChatHandler.Run          receives msg, fans out to handleMessage goroutine
+3. UserFilter.ShouldHandle  msg.IsDM && (allowlist empty || userID allowed)
+4. handleCommand            /start /reset /help short-circuit the LLM
+5. maybeGreet               !HasGreeted -> SendMessage(WelcomeMessage), MarkGreeted
+6. ChatTransport.KeepTyping spawn ticker sending "typing" every 4s
+7. SessionStore.Load        LRANGE advisor:session:<chat_id>
+8. BuildMessages            [system, ...history, {user, text}]
+9. LLMProvider.Stream       returns <-chan string, <-chan error
+10. ChatTransport.NewBubble  biz.MessageBubble backed by the platform
+11. bubble.Start("…") -> Append on each chunk -> Finish at end of stream
+12. SessionStore.Append     RPUSH user turn, RPUSH assistant turn, LTRIM, EXPIRE
 ```
 
-**User message (what the backend "cooks"):** single JSON blob — no raw
-OHLCV, only digested signals. Target <= ~1K tokens.
+Per-message budget: 90s (context.WithTimeout). Even if the LLM hangs the
+bubble won't stay stuck forever.
 
-```json
-{
-  "symbol": "XAUUSDT",
-  "as_of": "2026-04-21T09:00:00Z",
-  "price": 2345.12,
-  "regimes": { "H1": "trend_up", "H4": "trend_up", "D1": "choppy" },
-  "indicators": {
-    "H1": {"ema20":2338.2,"ema50":2325.1,"rsi14":62.4,"atr14":8.7,"atr_pct":0.37},
-    "H4": {"ema20":2312.0,"ema50":2290.0,"rsi14":58.0,"atr14":22.1}
-  },
-  "structure": { "H1": {"last_swings":["HL@2328","HH@2352","HL@2336"],"bos":"bullish"} },
-  "levels":    { "support":[2330,2315,2298], "resistance":[2360,2380] },
-  "in_house_signal": {
-    "direction":"BUY","entry":2345,"sl":2328,"tp":2380,
-    "confidence":72,"tier":"half","net_rr":1.8
-  },
-  "news": { "items": [], "summary": "" },
-  "clock": { "next_h1_close":"2026-04-21T10:00:00Z" },
-  "user_question": "XAU USD buy hay sell? TP SL?"
-}
+## 6. Prompt contract
+
+The system prompt is in `biz/prompt_builder.go` as `SystemPrompt`. Key
+rules pinned there (edit ONLY via that constant — single source of truth):
+
+- Respond in user's language (VI or EN auto-detected by DeepSeek itself).
+- Short replies (2–5 sentences) for chat vibe; no heavy markdown.
+- **Never fabricate market data.** When asked for a concrete signal the
+  bot must acknowledge Phase 1 has no data feed and ask for context.
+- Friendly trader-buddy tone; ≤1 emoji per reply.
+
+Each DeepSeek call receives: `[system, ...history_from_redis, user_message]`.
+No other metadata is injected in Phase 1 (no market blob, no news digest).
+
+## 7. Reuse of existing code
+
+- **`telegram/telegram_service.go`** — NOT used by advisor. That's the cron
+  bot (`J_AI_TRADE_BOT_V1`) pushing signals to a fixed channel.
+- **`telegram/advisor_*.go` + `telegram/stream_editor.go` + `telegram/typing.go`** —
+  low-level Telegram Bot API primitives. Re-usable outside the advisor if
+  any other module ever needs conversational Telegram I/O. The
+  advisor-specific wiring lives in `modules/advisor/transport/telegram/`.
+- **`config/redis/redis.go`** — reused. `RedisClient.GetClient()` is passed
+  into `advisor.Init`.
+- **`logger`** (zerolog) — standard `log.Info()/Warn()/Error()` used
+  throughout the module.
+
+Advisor does NOT (yet) touch: `trading/engine`, `brokers/binance`,
+`notifier`, `modules/order`. Phase 2 wires those in.
+
+## 7a. How to add a new adapter
+
+### New LLM vendor (e.g. OpenAI)
+
+1. `modules/advisor/provider/openai/client.go` — struct implementing
+   `biz.LLMProvider` (methods: `Stream(ctx, []model.Turn) (<-chan string, <-chan error)`
+   and `Name() string`).
+2. Add env vars (`OPENAI_API_KEY`, `OPENAI_MODEL`, ...).
+3. In `advisor_init.go` swap the one line:
+   `llm, err := openaiProvider.New()` (or gate on an env var to choose).
+4. No change in `biz/`, `transport/`, `storage/`.
+
+### New chat platform (e.g. Zalo, Discord)
+
+1. `modules/advisor/transport/zalo/transport.go` — struct implementing
+   `biz.ChatTransport` (methods: `Updates`, `SendMessage`, `NewBubble`,
+   `KeepTyping`, `Name`). Whatever streaming-edit primitives the platform
+   exposes (Discord allows message edits too; Zalo may need
+   "delete + resend" semantics) are hidden inside a private
+   `biz.MessageBubble` impl in the adapter package.
+2. Add the bot-token / credentials env var.
+3. In `advisor_init.go`:
+   `transport, err := zaloTransport.NewTransport(ctx)`.
+4. No change in `biz/`, `provider/`, `storage/`.
+
+### New session backend (e.g. Postgres for durable audit)
+
+1. `modules/advisor/storage/postgres/session_store.go` — implements
+   `biz.SessionStore` (5 methods).
+2. Migration: add `advisor_sessions` table via
+   `config/postgres/AutoMigrate`.
+3. In `advisor_init.go`:
+   `store := postgresStorage.NewSessionStore(db)`.
+
+The compile-time `var _ biz.LLMProvider = (*Client)(nil)` guard in every
+adapter file ensures mismatches surface at build time, not at runtime.
+
+## 8. Environment variables
+
+| Env var                       | Required | Purpose                                                      |
+| ----------------------------- | -------- | ------------------------------------------------------------ |
+| `J_AI_TRADE_ADVISOR`          | yes      | Telegram bot token for the advisor bot (separate from cron). |
+| `DEEP_SEEK_API_KEY`           | yes      | DeepSeek API key. Held ONLY by backend. Never logged.        |
+| `DEEP_SEEK_BASE_URL`          | no       | Default `https://api.deepseek.com`.                          |
+| `DEEP_SEEK_MODEL`             | no       | Default `deepseek-chat`. `deepseek-reasoner` also supported. |
+| `ADVISOR_ALLOWED_USER_IDS`    | no       | Comma-separated Telegram user IDs. Unset = public.           |
+| `REDIS_HOST`, `REDIS_PORT`    | yes      | Already used by the rest of the app.                         |
+
+JWT `AuthMiddleware` is not involved — advisor has no HTTP routes.
+
+## 9. Session persistence (Redis layout)
+
+```
+advisor:session:<chat_id>    LIST<json(Turn)>   trimmed to last 12, TTL 30m slide
+advisor:greeted:<chat_id>    STRING "1"         TTL 30 days
 ```
 
-`in_house_signal` comes from `EnsembleOnDemand` — it gives DeepSeek a
-"second opinion" from our rule-based engine. DeepSeek is free to overrule
-but must justify it in `rationale`.
+Why Redis over Postgres for Phase 1:
 
-## 7. Reuse of existing code (do NOT duplicate)
+- Built-in TTL keeps state bounded without a cron job.
+- Atomic RPUSH+LTRIM+EXPIRE via pipeline.
+- Sub-ms latency on every message.
+- Already configured in the repo.
 
-- **`trading/engine`** — `Ensemble`, `ClassifyRegime`, `RiskManager`, strategies.
-  Extract `buildEnsemble` from `cron_jobs/cron_job_manager.go` into a shared
-  `engine.DefaultEnsembleFor(tf)` so advisor and cron share one definition.
-- **`trading/indicators`** — EMA/RSI/ATR/SMA. All math lives here.
-- **`brokers/binance`** — `binance.NewBinanceService(repository.NewBinanceRepository())`.
-  Wrap behind a `MarketDataFetcher` interface in advisor/biz for testability.
-- **`common`** — `BaseApiResponse`, `BaseCandle`, error codes.
-- **`telegram/`** — NOT used by advisor in v1. Reply travels back via the HTTP
-  response to OpenClaw; OpenClaw sends the Telegram message.
-
-## 8. Auth & secrets
-
-| Env var             | Where used                      | Notes                                   |
-| ------------------- | ------------------------------- | --------------------------------------- |
-| `ADVISOR_API_KEY`   | `APIKeyMiddleware`              | Shared secret OpenClaw must present.    |
-| `DEEPSEEK_API_KEY`  | `biz/deepseek_client.go`        | Held ONLY by backend. Never logged.     |
-| `DEEPSEEK_BASE_URL` | `biz/deepseek_client.go`        | Default `https://api.deepseek.com`.     |
-| `DEEPSEEK_MODEL`    | `biz/deepseek_client.go`        | Default `deepseek-chat`.                |
-
-Inbound JWT `AuthMiddleware` is **not** applied to advisor routes — they are
-service-to-service (OpenClaw -> backend), not user-to-backend.
-
-## 9. Persistence (optional in v1)
-
-Table `advisor_sessions` (GORM automigrate from `config/postgres`):
-
-| Field              | Type          | Notes                                    |
-| ------------------ | ------------- | ---------------------------------------- |
-| id                 | uuid pk       |                                          |
-| created_at         | timestamptz   |                                          |
-| user_id            | text          | e.g. `tg:123456789`                      |
-| symbol             | text          | normalized                               |
-| question           | text          | raw user question                        |
-| cooked_context     | jsonb         | the cooked JSON sent to DeepSeek         |
-| answer             | jsonb         | parsed AdvisorAnswer                     |
-| deepseek_latency_ms| int           |                                          |
-| tokens_in / out    | int / int     |                                          |
-| status             | text          | `ok` / `llm_error` / `parse_error` / ... |
-
-Useful for prompt tuning, A/B experiments, and post-hoc accuracy eval.
+Phase 2 can add a durable `advisor_sessions` table in Postgres for audit
+logs without changing the `SessionStore` interface.
 
 ## 10. Failure modes & fallbacks
 
-| Failure                              | Behavior                                                            |
-| ------------------------------------ | ------------------------------------------------------------------- |
-| Symbol not recognized                | 400 with `supported` list.                                          |
-| Binance timeout / empty candles      | Return `WAIT` with rationale "data unavailable, retry in 5m".       |
-| DeepSeek non-2xx                     | Return `WAIT` + HTTP 502 upstream; log + audit row with `llm_error`. |
-| DeepSeek returns non-conforming JSON | Retry once with stricter system prompt; on 2nd failure return WAIT. |
-| Ensemble Analyze panic               | Recovered by `PanicRecoveryMiddleware`; WAIT fallback.              |
+| Failure                              | Behavior                                                        |
+| ------------------------------------ | --------------------------------------------------------------- |
+| `J_AI_TRADE_ADVISOR` missing         | Log warn, `advisor.Init` returns early. Cron + HTTP keep going. |
+| `DEEP_SEEK_API_KEY` missing          | Same — advisor disabled, rest of app fine.                      |
+| Redis unreachable at startup         | `advisor.Init` is skipped in `main.go`.                         |
+| Redis hiccup mid-session             | Load returns empty -> bot answers without history. Append logged. |
+| DeepSeek non-2xx / timeout           | Stream error drained; if no tokens arrived user sees a polite apology message; existing bubble stays if partial. |
+| Telegram 429 / edit-rate-limit       | `editMessageText` error is logged at debug; next flush retries. |
+| `getUpdates` transient error         | Linear backoff 1s -> 2s -> ... 30s, retries forever.            |
+| Handler panic                        | `defer recover()` in `handleMessage`; logs + returns.           |
 
-## 11. Testing plan
+## 11. Testing plan (not yet implemented)
 
-- `symbol_normalizer_test.go` — table-driven alias map.
-- `digest_candles_test.go` — fixture candles, assert indicator values and S/R.
-- `prompt_cooker_test.go` — golden-file test on the cooked JSON shape.
-- `answer_parser_test.go` — malformed LLM outputs + strict-schema rejection.
-- `deepseek_client_test.go` — httptest.Server stub for 2xx / 4xx / timeout.
-- `ask_flow_test.go` — end-to-end with fakes for Binance + DeepSeek; confirm
-  WAIT fallback under each failure mode.
-- `middleware_api_key_test.go` — 401 when header missing/wrong.
+Hexagonal layout makes test writing easy — `biz/` is tested with **fakes
+of the three interfaces**, no real vendor calls:
 
-## 12. Non-goals (v1)
+- `storage/redis/session_store_test.go` — miniredis; assert trim + TTL.
+- `provider/deepseek/client_test.go` — `httptest.Server` returning canned
+  SSE events; verify chunk channel, graceful `[DONE]`, error path.
+- `transport/telegram/transport_test.go` — intercept HTTP with
+  `httptest.Server`; verify `IncomingMessage` normalization + bubble edits.
+- `biz/prompt_builder_test.go` — system prompt is first message + history
+  order preserved.
+- `biz/user_filter_test.go` — table-driven: DM/group, allowlist on/off.
+- `biz/chat_handler_test.go` — fake `ChatTransport` + fake `LLMProvider`
+  (in-memory channel) + miniredis-backed store. End-to-end: greeting
+  only once, reset clears, bubble sees >=1 append.
 
-- Real news provider (only `NoopNewsProvider`).
-- Streaming/SSE responses.
-- Multi-turn conversations (each `/ask` is stateless).
-- Placing real orders. This service is **advice only**.
-- Per-user rate limiting / billing.
-- Forex-native price feed (we reuse Binance; `XAU/USD` is approximated via
-  `XAUUSDT`). Flag for product review in phase 2.
+## 12. Phase 2/3 roadmap (tracked here so we don't forget)
 
-## 13. Phase 2 TODOs (tracked here so we don't forget)
+### Phase 2 — market data + structured signals
 
-- [ ] Replace `NoopNewsProvider` with a real implementation (ForexFactory /
-      MarketAux / self-hosted scraper). Interface already fixed — swap only.
-- [ ] Add a forex data source for `XAU/USD`, `EUR/USD` etc. so we stop
-      approximating with Binance USDT pairs.
-- [ ] Streaming LLM responses back through OpenClaw for snappier UX.
-- [ ] Multi-turn context ("okay now check EUR/USD too") via `advisor_sessions`.
-- [ ] Automated accuracy eval: compare advisor's `WAIT/BUY/SELL` calls
-      against N-hours-later price outcome stored in `advisor_sessions`.
+- Extract `buildEnsemble` from `cron_jobs/` to `trading/engine.DefaultEnsembleFor(tf)`
+  so cron + advisor share one strategy set.
+- `biz/symbol_normalizer.go` — "XAU USD" / "GOLD" / "BTC" -> Binance symbol.
+- `biz/digest_candles.go` — EMA/RSI/ATR/S-R digest per TF.
+- `biz/market_clock.go` — next H1/H4/D1 close + recommended recheck minutes.
+- `biz/pair_snapshot.go` — fetch -> digest -> ensemble -> compact JSON blob
+  injected as an extra user message before the actual question.
+- Strict JSON output schema (BUY/SELL/WAIT + TP/SL/confidence/rationale).
+- Audit table `advisor_sessions` in Postgres.
+
+### Phase 3 — proactive + multi-modal
+
+- Bot DMs the user when the cron's ensemble fires a high-confidence signal
+  matching their watchlist ("Hey, XAU just printed a bullish BOS on H1...").
+- Switch DeepSeek model to `deepseek-reasoner` for signal-generation
+  requests (keep `deepseek-chat` for small talk to save tokens).
+- Per-user rate limiting / cost tracking.
+- Optional webhook mode (`setWebhook`) for lower first-token latency in
+  prod (polling is fine for local dev).

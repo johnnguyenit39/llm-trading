@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"j_ai_trade/appi18n"
 	appContext "j_ai_trade/components/app_context"
 	appConfig "j_ai_trade/config/app"
@@ -10,6 +11,7 @@ import (
 	cronjobsManager "j_ai_trade/cron_jobs"
 	_ "j_ai_trade/docs"
 	"j_ai_trade/logger"
+	"j_ai_trade/modules/advisor"
 	"os"
 
 	"github.com/rs/zerolog/log"
@@ -80,6 +82,16 @@ func main() {
 
 	// Initialize and start cron jobs
 	cronjobsManager.InitCronJobs(db)
+
+	// Initialize advisor chat bot (long-polls Telegram, streams DeepSeek).
+	// Non-fatal: if the bot or DeepSeek is misconfigured, chat is disabled
+	// but the HTTP API and cron jobs keep running.
+	if redisClient != nil {
+		advisor.Init(context.Background(), redisClient.GetClient())
+	} else {
+		log.Warn().Msg("advisor: skipped because Redis is unavailable")
+	}
+
 	// Start the application on port 80
 	if err := app.Run(":80"); err != nil {
 		log.Fatal().Err(err).Msg("failed to start the application")
