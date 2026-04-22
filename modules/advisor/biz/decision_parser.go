@@ -3,8 +3,23 @@ package biz
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
+)
+
+// Risk-sizing defaults. Override via env at process start:
+//   - ADVISOR_ACCOUNT_USDT: notional equity the user wants to risk-size
+//     against. Set to 0 to disable sizing entirely (falls back to the
+//     LLM's raw lot).
+//   - ADVISOR_RISK_PCT: % of account lost if SL is hit. 0.5 = 0.5%.
+//
+// Values are read lazily on each format call so tests and ops can flip
+// them without restarting. Cheap — two os.Getenv per trade card.
+const (
+	defaultAccountUSDT = 1000.0
+	defaultRiskPct     = 0.5
 )
 
 // DecisionPayload is the shape of the JSON block the LLM emits when it
@@ -73,15 +88,33 @@ func StripDecisionFence(reply string) string {
 
 // FormatAdvisorReplyForUser turns the raw LLM reply into what we show on
 // Telegram and persist in session history: prose without the ```json fence,
-// plus an explicit trade card (entry/SL/TP/lot and estimated USDT PnL at
-// TP vs SL for linear USDT-M style notionals).
+// plus an explicit trade card.
+//
+// Entry / SL / TP come entirely from DeepSeek's analysis of the live
+// market — we never second-guess or clamp them. The only thing the
+// backend owns is the LOT SIZE: we resize d.Lot so hitting SL costs
+// exactly RiskPct% of AccountUSDT (read from env, defaults 1000 /
+// 0.5%). R:R is purely observational — whatever comes out of the
+// entry/SL/TP picked by the model, we just compute and display it.
 func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload) string {
-	prose := strings.TrimSpace(StripLLMEmphasis(StripDecisionFence(rawReply)))
+	account := envFloat("ADVISOR_ACCOUNT_USDT", defaultAccountUSDT)
+	riskPct := envFloat("ADVISOR_RISK_PCT", defaultRiskPct)
+	riskSizingOn := account > 0 && riskPct > 0
+
+	if riskSizingOn {
+		if sized := sizeLotForRisk(d.Symbol, d.Entry, d.StopLoss, account, riskPct); sized > 0 {
+			d.Lot = sized
+		}
+	}
+
+	prose := strings.TrimSpace(StripLLMEmphasis(StripMarketDataDump(StripDecisionFence(rawReply))))
 	if prose == "" {
 		prose = "Tín hiệu vào lệnh."
 	}
+
 	tpPnL := estimatedPnLUSDT(d.Symbol, d.Action, d.Entry, d.TakeProfit, d.Lot)
 	slPnL := estimatedPnLUSDT(d.Symbol, d.Action, d.Entry, d.StopLoss, d.Lot)
+
 	var b strings.Builder
 	b.WriteString(prose)
 	b.WriteString("\n\n📋 Lệnh gợi ý\n")
@@ -91,10 +124,84 @@ func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload) string {
 	b.WriteString(fmt.Sprintf("• SL: %s\n", formatAdvisorPrice(d.StopLoss)))
 	b.WriteString(fmt.Sprintf("• TP: %s\n", formatAdvisorPrice(d.TakeProfit)))
 	b.WriteString(fmt.Sprintf("• Khối lượng (base): %s\n", formatAdvisorLot(d.Lot)))
-	b.WriteString("\n💰 Ước tính PnL (USDT, linear, theo khối lượng trên)\n")
-	b.WriteString(fmt.Sprintf("• Nếu chạm TP: %+.2f USDT\n", tpPnL))
-	b.WriteString(fmt.Sprintf("• Nếu chạm SL: %+.2f USDT\n", slPnL))
+
+	if riskSizingOn {
+		slPct := slPnL / account * 100.0
+		tpPct := tpPnL / account * 100.0
+		b.WriteString(fmt.Sprintf("\n💰 Vốn $%s\n", formatMoney(account)))
+		b.WriteString(fmt.Sprintf("• SL: %+.2f USDT (%+.2f%%)\n", slPnL, slPct))
+		b.WriteString(fmt.Sprintf("• TP: %+.2f USDT (%+.2f%%)\n", tpPnL, tpPct))
+		if rr := riskRewardRatio(tpPnL, slPnL); rr > 0 {
+			b.WriteString(fmt.Sprintf("• R:R %.2f (DeepSeek tự chọn theo cấu trúc thị trường)\n", rr))
+		}
+	} else {
+		b.WriteString("\n💰 Ước tính PnL (USDT, linear, theo khối lượng trên)\n")
+		b.WriteString(fmt.Sprintf("• Nếu chạm TP: %+.2f USDT\n", tpPnL))
+		b.WriteString(fmt.Sprintf("• Nếu chạm SL: %+.2f USDT\n", slPnL))
+	}
+
 	return strings.TrimSpace(b.String())
+}
+
+// sizeLotForRisk picks a base-asset quantity so hitting SL costs
+// exactly account * riskPct/100. Returns 0 on malformed inputs — the
+// caller keeps the LLM's raw lot in that case rather than zeroing it.
+func sizeLotForRisk(symbol string, entry, stopLoss, account, riskPct float64) float64 {
+	if entry <= 0 || stopLoss <= 0 || entry == stopLoss {
+		return 0
+	}
+	delta := entry - stopLoss
+	if delta < 0 {
+		delta = -delta
+	}
+	cs := contractSizePerLot(symbol)
+	if cs <= 0 {
+		return 0
+	}
+	riskUSDT := account * riskPct / 100.0
+	return riskUSDT / (delta * cs)
+}
+
+// riskRewardRatio is |tpPnL| / |slPnL|. Purely observational — we
+// never gate a trade on R:R; DeepSeek already picked the levels based
+// on structure (supports/resistances, ATR, etc.) and sometimes the
+// market geometry demands R:R < 1 for a valid scalp.
+func riskRewardRatio(tpPnL, slPnL float64) float64 {
+	r := slPnL
+	if r < 0 {
+		r = -r
+	}
+	w := tpPnL
+	if w < 0 {
+		w = -w
+	}
+	if r == 0 {
+		return 0
+	}
+	return w / r
+}
+
+// envFloat reads a float env var, falling back to `def` on unset or
+// unparseable input. No hard failure — a typo in prod shouldn't break
+// trade cards.
+func envFloat(key string, def float64) float64 {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return def
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return def
+	}
+	return v
+}
+
+// formatMoney renders a round account size without "$1000.00" noise.
+func formatMoney(x float64) string {
+	if x == float64(int64(x)) {
+		return fmt.Sprintf("%d", int64(x))
+	}
+	return fmt.Sprintf("%.2f", x)
 }
 
 func formatAdvisorPrice(p float64) string {
