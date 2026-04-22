@@ -41,7 +41,12 @@ DỮ LIỆU THỊ TRƯỜNG:
       - "nearestR X (+a ATR)" / "nearestS Y (-b ATR)": kháng cự / hỗ trợ gần nhất chọn từ BB/Donch/Swing, khoảng cách quy ra ATR. <0.5 ATR = sát, entry ở đây có R:R kém; 1-2 ATR = khoảng đẹp để SL/TP; >3 ATR = xa, cần confluence để tin.
       - Luật tay: muốn BUY thì ưu tiên close pctile thấp + cách nearestR >= 1.5 ATR; muốn SELL thì ngược lại. BBwidth squeeze (pctile thấp) + price ở giữa range = chờ breakout rõ hướng.
   · "Recent <TF> candles": bảng OHLCV của ~20 nến M15 gần nhất. Chỉ dùng khi muốn xem microstructure không có trong pattern block.
-  · "Last N <TF> bar patterns" (QUAN TRỌNG — đây là pattern detection chính xác 100%, đã tính sẵn, KHÔNG tự đoán lại từ OHLCV):
+  · "Last N <TF> bar patterns" — CÓ THỂ CÓ NHIỀU BLOCK: 1 block cho entry TF (M15, 3 bar) + 1 block cho H1 confirmation (2 bar). Mỗi block dùng LEVEL CONTEXT CỦA CHÍNH TF ĐÓ — nên "at_support" trên H1 nghĩa là chạm H1 support (structural), không phải M15 support. Quy tắc confluence:
+      - M15 pattern + H1 pattern đồng hướng ở cùng vùng (cả 2 bullish hoặc cả 2 bearish) = setup **A+**, nên fire.
+      - M15 pattern đẹp nhưng H1 pattern NGƯỢC hướng (ví dụ M15 hammer + H1 engulfing_bear) = **TRAP WARNING**, nên PASS hoặc chờ H1 invalidate.
+      - Chỉ có M15 pattern, H1 normal = setup B, cần confluence khác (trend, ATR, level) bù lại.
+      - Chỉ có H1 pattern, M15 normal = chưa có entry timing rõ, chờ M15 xác nhận.
+      (QUAN TRỌNG — đây là pattern detection chính xác 100%, đã tính sẵn, KHÔNG tự đoán lại từ OHLCV):
       - Format mỗi dòng: "[-k] DATE TIME  kind · r=X · flag1 · flag2 · ..."
       - kind (shape thuần, toán deterministic): doji | dragonfly_doji | gravestone_doji | hammer | shooting_star | marubozu_bull|bear | engulfing_bull|bear | piercing_line | dark_cloud_cover | tweezer_top|bottom | harami_bull|bear | morning_star | evening_star | three_white_soldiers | three_black_crows | inside_bar | normal.
       - r=X: độ "rõ" của shape. r>=0.6 = rõ ràng, tin cậy; r<0.4 = biên, yếu.

@@ -2,6 +2,7 @@ package market
 
 import (
 	"math"
+	"time"
 
 	baseCandle "j_ai_trade/common"
 )
@@ -20,8 +21,9 @@ import (
 // signal or noise. Code never judges "is this a real hammer"; it just
 // provides every fact the LLM needs to make that call.
 type BarPattern struct {
-	Kind  string  // see DetectPattern for the full vocabulary
-	Ratio float64 // shape "purity" — interpretation depends on Kind (body/range, wick/range, etc.)
+	Time  time.Time // bar open time (UTC) — for render timestamp without reaching into raw candles
+	Kind  string    // see DetectPattern for the full vocabulary
+	Ratio float64   // shape "purity" — interpretation depends on Kind (body/range, wick/range, etc.)
 
 	// Preceding context (deterministic, bar-local)
 	PriorTrend   string // "UP" | "DOWN" | "FLAT" (OLS slope over 5 prior closes, threshold = 0.1·ATR/bar)
@@ -272,6 +274,7 @@ func AnalyzeLastBars(closed []baseCandle.BaseCandle, n int, lvl LevelContext) []
 	for i := start; i < len(closed); i++ {
 		p := enrichContext(closed, i, lvl)
 		p.Kind, p.Ratio = DetectPattern(closed, i)
+		p.Time = closed[i].OpenTime.UTC()
 		out = append(out, p)
 	}
 	markInvalidations(out, closed, start)

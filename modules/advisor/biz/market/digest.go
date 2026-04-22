@@ -90,10 +90,10 @@ type PairSnapshot struct {
 	Symbol       string
 	EntryTF      models.Timeframe
 	GeneratedAt  time.Time
-	CurrentPrice float64      // live price on the entry TF (from the unclosed bar)
-	Summaries    []TFSummary  // ordered: entry TF first, then higher TFs
-	RawBars      []RawCandle  // last ~20 OHLCV rows of the entry TF (anti-repaint: closed only)
-	Patterns     []BarPattern // shape+context+trap flags for last ~PatternLookback closed bars on entry TF
+	CurrentPrice float64                              // live price on the entry TF (from the unclosed bar)
+	Summaries    []TFSummary                          // ordered: entry TF first, then higher TFs
+	RawBars      []RawCandle                          // last ~20 OHLCV rows of the entry TF (anti-repaint: closed only)
+	Patterns     map[models.Timeframe][]BarPattern    // per-TF recent bar patterns; each TF uses its OWN LevelContext
 }
 
 // PatternLookback is how many recent CLOSED bars on the entry TF get a
@@ -102,6 +102,12 @@ type PairSnapshot struct {
 // resolve at the newest bar; larger windows just add noise the LLM has
 // to filter out.
 const PatternLookback = 3
+
+// PatternLookbackH1 is a shorter window for the H1 confirmation TF.
+// H1 bars take 4× longer to form so newer isn't "newer enough" to
+// matter — 2 recent bars are plenty to confirm or contradict the M15
+// read, and keeping it short cuts prompt noise.
+const PatternLookbackH1 = 2
 
 // Build produces a PairSnapshot from fetched multi-TF candles. Returns
 // an error if the entry TF has no candles (nothing useful to say).
@@ -151,23 +157,58 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 		}
 	}
 
-	// Candle patterns on the entry TF. We pull the pre-computed entry
-	// TF summary's levels so shape + context + trap flags all reference
-	// the SAME numbers the LLM sees elsewhere in the prompt — no drift.
-	if len(snap.Summaries) > 0 && len(closedEntry) > 0 {
-		entry := snap.Summaries[0]
-		lvl := LevelContext{
-			ATR:       entry.ATR,
-			SwingHigh: entry.SwingHigh,
-			SwingLow:  entry.SwingLow,
-			BBUpper:   entry.BBUpper,
-			BBLower:   entry.BBLower,
-			NearestR:  entry.NearestResist,
-			NearestS:  entry.NearestSupport,
+	// Candle patterns per TF. Each TF uses its OWN level context so
+	// "at_support" on H1 means at the H1 swing / H1 BB / H1 nearestS —
+	// same structural scale at which the pattern formed. Mixing TFs'
+	// levels would create misleading labels (an M15 bar is rarely at
+	// H1 support even in the same minute).
+	snap.Patterns = map[models.Timeframe][]BarPattern{}
+	if entryPats := analyzeTFPatterns(market, entryTF, snap.Summaries, PatternLookback); len(entryPats) > 0 {
+		snap.Patterns[entryTF] = entryPats
+	}
+	// H1 adds confirmation / trap context for intraday decisions. Skip
+	// if entry TF IS H1 (no point duplicating) or if H1 data is missing.
+	if entryTF != models.TF_H1 {
+		if h1Pats := analyzeTFPatterns(market, models.TF_H1, snap.Summaries, PatternLookbackH1); len(h1Pats) > 0 {
+			snap.Patterns[models.TF_H1] = h1Pats
 		}
-		snap.Patterns = AnalyzeLastBars(closedEntry, PatternLookback, lvl)
 	}
 	return snap, nil
+}
+
+// analyzeTFPatterns runs pattern detection on a given TF using that
+// TF's own indicator levels (pulled from the pre-computed summary).
+// Returns nil when the TF has no candles or no summary — callers just
+// skip emitting a pattern block in that case.
+func analyzeTFPatterns(market models.MarketData, tf models.Timeframe, summaries []TFSummary, lookback int) []BarPattern {
+	candles := market.Get(tf)
+	if len(candles) == 0 {
+		return nil
+	}
+	var sum *TFSummary
+	for i := range summaries {
+		if summaries[i].Timeframe == tf {
+			sum = &summaries[i]
+			break
+		}
+	}
+	if sum == nil {
+		return nil
+	}
+	closed := indicators.ClosedCandles(candles)
+	if len(closed) == 0 {
+		return nil
+	}
+	lvl := LevelContext{
+		ATR:       sum.ATR,
+		SwingHigh: sum.SwingHigh,
+		SwingLow:  sum.SwingLow,
+		BBUpper:   sum.BBUpper,
+		BBLower:   sum.BBLower,
+		NearestR:  sum.NearestResist,
+		NearestS:  sum.NearestSupport,
+	}
+	return AnalyzeLastBars(closed, lookback, lvl)
 }
 
 // summaryOrder returns the canonical ordering for per-TF blocks given
@@ -395,8 +436,12 @@ func Render(snap *PairSnapshot) string {
 		writeRawBars(&b, snap.EntryTF, snap.RawBars)
 	}
 
-	if len(snap.Patterns) > 0 {
-		writePatterns(&b, snap.EntryTF, snap.Patterns, snap.RawBars)
+	// Emit pattern blocks in summary order (entry TF first, then higher
+	// TFs) so the LLM reads the execution-TF patterns before context-TF.
+	for _, sum := range snap.Summaries {
+		if pats, ok := snap.Patterns[sum.Timeframe]; ok && len(pats) > 0 {
+			writePatterns(&b, sum.Timeframe, pats)
+		}
 	}
 
 	if footer := buildFooter(snap); footer != "" {
@@ -491,14 +536,11 @@ func writeRawBars(b *strings.Builder, tf models.Timeframe, bars []RawCandle) {
 // context/trap flag that triggered. Flags that didn't trigger are
 // omitted to keep the block compact — absence means "not applicable",
 // not "false data".
-func writePatterns(b *strings.Builder, tf models.Timeframe, pats []BarPattern, rawBars []RawCandle) {
+func writePatterns(b *strings.Builder, tf models.Timeframe, pats []BarPattern) {
 	if len(pats) == 0 {
 		return
 	}
 	fmt.Fprintf(b, "Last %d %s bar patterns (oldest -> newest):\n", len(pats), tf)
-	// rawBars is ordered oldest->newest too and usually longer than pats.
-	// We align by suffix: the last len(pats) rawBars correspond 1:1 to pats.
-	rawStart := len(rawBars) - len(pats)
 	for i, p := range pats {
 		parts := []string{p.Kind}
 		if p.Ratio > 0 {
@@ -539,12 +581,8 @@ func writePatterns(b *strings.Builder, tf models.Timeframe, pats []BarPattern, r
 		}
 
 		offset := len(pats) - 1 - i // newest = 0, older = 1, 2, ...
-		var ts string
-		if rawStart >= 0 && rawStart+i < len(rawBars) {
-			ts = rawBars[rawStart+i].Time.Format("01-02 15:04")
-		}
-		if ts != "" {
-			fmt.Fprintf(b, "  [-%d] %s  %s\n", offset, ts, strings.Join(parts, " · "))
+		if !p.Time.IsZero() {
+			fmt.Fprintf(b, "  [-%d] %s  %s\n", offset, p.Time.Format("01-02 15:04"), strings.Join(parts, " · "))
 		} else {
 			fmt.Fprintf(b, "  [-%d]  %s\n", offset, strings.Join(parts, " · "))
 		}
