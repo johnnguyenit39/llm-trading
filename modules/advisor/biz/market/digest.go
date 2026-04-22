@@ -44,6 +44,19 @@ type TFSummary struct {
 	SwingHigh float64          `json:"swing_high,omitempty"`
 	SwingLow  float64          `json:"swing_low,omitempty"`
 	Candles   int              `json:"candles"` // how many closed candles were analysed
+
+	// Range-context extras (added Phase-3b). All compute only when the
+	// underlying window is long enough; we use HasPricePct as the
+	// explicit validity flag for PricePct100 because 0 is a legitimate
+	// percentile value (price at the window minimum).
+	BBWidthPct     float64 `json:"bb_width_pct,omitempty"`    // (upper-lower)/mid * 100
+	BBWidthPctile  float64 `json:"bb_width_pctile,omitempty"` // rank of current width in last 50 closed bars (0=tightest)
+	PricePct100    float64 `json:"price_pct100,omitempty"`    // rank of last close among last 100 closes (0=lowest, 100=highest)
+	HasPricePct    bool    `json:"-"`
+	NearestResist  float64 `json:"nearest_resist,omitempty"`   // closest level > last close (picked from BB/Donch/Swing)
+	NearestSupport float64 `json:"nearest_support,omitempty"`  // closest level < last close
+	DistResistATR  float64 `json:"dist_resist_atr,omitempty"`  // (resist - close) / ATR
+	DistSupportATR float64 `json:"dist_support_atr,omitempty"` // (close - support) / ATR
 }
 
 // RawCandle is a single OHLCV row rendered into the digest so the LLM
@@ -192,7 +205,103 @@ func summariseTF(candles []baseCandle.BaseCandle, tf models.Timeframe) TFSummary
 	}
 	sum.SwingHigh, sum.SwingLow = indicators.SwingHighLow(closed, 3)
 	sum.Regime = simpleRegime(sum.ADX14, sum.EMA20, sum.EMA50)
+
+	fillRangeContext(&sum, closes)
 	return sum
+}
+
+// fillRangeContext computes the Phase-3b "where are we in the range"
+// features so the LLM doesn't have to eyeball them from raw indicators:
+//
+//   - BBWidthPct: current Bollinger width as % of mid. Tells absolute
+//     volatility at a glance — "0.5%" means a narrow band.
+//   - BBWidthPctile: same width ranked against the last 50 closed bars'
+//     widths. Low percentile = squeeze (compression before breakout).
+//   - PricePct100: where the last close sits within the last 100 closes'
+//     high-low range. 50 = middle, <20 = bottom of range, >80 = top.
+//   - Nearest resist/support + dist-in-ATR: picked from the existing
+//     BB/Donch/Swing levels. Distance is normalised by ATR so the LLM
+//     can read "0.3 ATR to resist" (sitting on it) vs "3 ATR" (plenty
+//     of room) the same way across pairs/TFs.
+//
+// All outputs degrade gracefully when the input window is short: fields
+// stay at zero and Render() skips them.
+func fillRangeContext(sum *TFSummary, closes []float64) {
+	n := len(closes)
+	if n == 0 {
+		return
+	}
+	last := closes[n-1]
+
+	// BB width + its percentile over the last 50 bars. We recompute BB
+	// on closes[:i] for each step — O(50·20) = ~1k ops per TF, trivial.
+	if sum.BBMid > 0 {
+		sum.BBWidthPct = (sum.BBUpper - sum.BBLower) / sum.BBMid * 100
+		const bbHist = 50
+		if n >= bbHist+20 {
+			widths := make([]float64, 0, bbHist+1)
+			for i := n - bbHist; i <= n; i++ {
+				u, m, l := indicators.BollingerBands(closes[:i], 20, 2.0)
+				if m > 0 {
+					widths = append(widths, (u-l)/m*100)
+				}
+			}
+			if len(widths) > 1 {
+				curr := widths[len(widths)-1]
+				below := 0
+				for _, w := range widths[:len(widths)-1] {
+					if w < curr {
+						below++
+					}
+				}
+				sum.BBWidthPctile = float64(below) / float64(len(widths)-1) * 100
+			}
+		}
+	}
+
+	// Price percentile over last 100 closed bars. Use an explicit Has
+	// flag because 0% is a legitimate value (price at the window min)
+	// and we don't want the default-zero to look like "not computed".
+	const priceHist = 100
+	if n >= priceHist {
+		window := closes[n-priceHist:]
+		below := 0
+		for _, v := range window[:len(window)-1] { // exclude current
+			if v < last {
+				below++
+			}
+		}
+		sum.PricePct100 = float64(below) / float64(len(window)-1) * 100
+		sum.HasPricePct = true
+	}
+
+	// Nearest resistance / support picked from pre-computed levels. We
+	// deliberately exclude EMAs (they drift with price — bad anchors)
+	// and BBMid (it's a mean, not a level). Distance in ATR lets the
+	// LLM compare tightness across any symbol without unit math.
+	if sum.ATR > 0 {
+		levels := []float64{sum.BBUpper, sum.BBLower, sum.DonchHigh, sum.DonchLow, sum.SwingHigh, sum.SwingLow}
+		for _, lv := range levels {
+			if lv <= 0 {
+				continue
+			}
+			if lv > last {
+				if sum.NearestResist == 0 || lv < sum.NearestResist {
+					sum.NearestResist = lv
+				}
+			} else if lv < last {
+				if sum.NearestSupport == 0 || lv > sum.NearestSupport {
+					sum.NearestSupport = lv
+				}
+			}
+		}
+		if sum.NearestResist > 0 {
+			sum.DistResistATR = (sum.NearestResist - last) / sum.ATR
+		}
+		if sum.NearestSupport > 0 {
+			sum.DistSupportATR = (last - sum.NearestSupport) / sum.ATR
+		}
+	}
 }
 
 // simpleRegime is a lightweight ADX+EMA label used only for LLM
@@ -302,6 +411,31 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 		}
 		fmt.Fprintf(b, "  %s\n", strings.Join(parts, " · "))
 	}
+
+	// Range-context line: BB width + squeeze percentile, price percentile
+	// over 100 bars, nearest resistance/support in ATR. Emitted only when
+	// any subfield is valid so short windows stay clean.
+	var ctx []string
+	if s.BBWidthPct > 0 {
+		if s.BBWidthPctile > 0 {
+			ctx = append(ctx, fmt.Sprintf("BBwidth %s%% (p%s/50)", f2(s.BBWidthPct), f0(s.BBWidthPctile)))
+		} else {
+			ctx = append(ctx, fmt.Sprintf("BBwidth %s%%", f2(s.BBWidthPct)))
+		}
+	}
+	if s.HasPricePct {
+		ctx = append(ctx, fmt.Sprintf("close p%s/100", f0(s.PricePct100)))
+	}
+	if s.NearestResist > 0 && s.DistResistATR > 0 {
+		ctx = append(ctx, fmt.Sprintf("nearestR %s (+%s ATR)", f4(s.NearestResist), f2(s.DistResistATR)))
+	}
+	if s.NearestSupport > 0 && s.DistSupportATR > 0 {
+		ctx = append(ctx, fmt.Sprintf("nearestS %s (-%s ATR)", f4(s.NearestSupport), f2(s.DistSupportATR)))
+	}
+	if len(ctx) > 0 {
+		fmt.Fprintf(b, "  %s\n", strings.Join(ctx, " · "))
+	}
+
 	b.WriteString("\n")
 }
 

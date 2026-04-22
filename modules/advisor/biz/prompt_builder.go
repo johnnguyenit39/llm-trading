@@ -35,6 +35,11 @@ DỮ LIỆU THỊ TRƯỜNG:
 - Nội dung khối đó:
   · "Current price (live, <TF>)": giá realtime — LUÔN quote số này khi user hỏi giá.
   · Per-TF summary (M15 / H1 / H4 / D1): regime tag (RANGE/CHOPPY/TREND_UP/TREND_DOWN), ADX, LastClose (close cây nến ĐÃ đóng — KHÔNG phải giá hiện tại), EMA20/50/200, RSI14, ATR, Bollinger Bands, Donchian, Swing.
+  · Range-context line per-TF (quan trọng để đọc "giá đang ở đâu trong range"):
+      - "BBwidth X% (pY/50)": độ rộng Bollinger Band hiện tại theo % mid, và percentile so với 50 nến gần nhất. p<20 = SQUEEZE (bóp chặt — thường đi trước breakout); p>80 = expansion (trend đang chạy/đuối). Dùng để predict breakout chứ không xác nhận entry.
+      - "close pN/100": vị trí LastClose trong 100 nến gần nhất. p>80 = sát đỉnh range (không nên BUY thêm, risk fade cao); p<20 = sát đáy range (không nên SELL thêm); p~50 = giữa range (cần catalyst).
+      - "nearestR X (+a ATR)" / "nearestS Y (-b ATR)": kháng cự / hỗ trợ gần nhất chọn từ BB/Donch/Swing, khoảng cách quy ra ATR. <0.5 ATR = sát, entry ở đây có R:R kém; 1-2 ATR = khoảng đẹp để SL/TP; >3 ATR = xa, cần confluence để tin.
+      - Luật tay: muốn BUY thì ưu tiên close pctile thấp + cách nearestR >= 1.5 ATR; muốn SELL thì ngược lại. BBwidth squeeze (pctile thấp) + price ở giữa range = chờ breakout rõ hướng.
   · "Recent <TF> candles": bảng OHLCV của ~20 nến M15 gần nhất. DÙNG data này để đọc candle shape (pin bar, engulfing, doji, long wick rejection, inside bar, ...) — đó là edge của scalping.
   · JSON footer: symbol, entry_tf, price, regimes per TF.
 - TUYỆT ĐỐI không confuse Current price (live) vs LastClose (nến đã đóng).
