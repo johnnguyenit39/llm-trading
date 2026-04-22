@@ -70,9 +70,12 @@ func TestFormatAdvisorReplyForUser(t *testing.T) {
 	if !strings.Contains(out, "Ước tính PnL") {
 		t.Fatalf("missing PnL section: %s", out)
 	}
-	// SELL: TP below entry -> profit positive at 4740
-	if !strings.Contains(out, "+") {
-		t.Fatalf("expected signed PnL: %s", out)
+	// XAUUSDT: 1 lot = 100 oz, so 0.1 lot * 20 USD move = 200 USDT.
+	if !strings.Contains(out, "• Nếu chạm TP: +200.00 USDT") {
+		t.Fatalf("unexpected TP PnL: %s", out)
+	}
+	if !strings.Contains(out, "• Nếu chạm SL: -100.00 USDT") {
+		t.Fatalf("unexpected SL PnL: %s", out)
 	}
 }
 

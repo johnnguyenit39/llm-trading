@@ -80,8 +80,8 @@ func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload) string {
 	if prose == "" {
 		prose = "Tín hiệu vào lệnh."
 	}
-	tpPnL := estimatedPnLUSDT(d.Action, d.Entry, d.TakeProfit, d.Lot)
-	slPnL := estimatedPnLUSDT(d.Action, d.Entry, d.StopLoss, d.Lot)
+	tpPnL := estimatedPnLUSDT(d.Symbol, d.Action, d.Entry, d.TakeProfit, d.Lot)
+	slPnL := estimatedPnLUSDT(d.Symbol, d.Action, d.Entry, d.StopLoss, d.Lot)
 	var b strings.Builder
 	b.WriteString(prose)
 	b.WriteString("\n\n📋 Lệnh gợi ý\n")
@@ -125,17 +125,31 @@ func formatAdvisorLot(lot float64) string {
 	return s
 }
 
-func estimatedPnLUSDT(action string, entry, exit, lot float64) float64 {
+func estimatedPnLUSDT(symbol, action string, entry, exit, lot float64) float64 {
 	if lot <= 0 || entry <= 0 || exit <= 0 {
 		return 0
 	}
+	priceDiff := 0.0
 	switch strings.ToUpper(strings.TrimSpace(action)) {
 	case "BUY":
-		return (exit - entry) * lot
+		priceDiff = exit - entry
 	case "SELL":
-		return (entry - exit) * lot
+		priceDiff = entry - exit
 	default:
 		return 0
+	}
+	return priceDiff * lot * contractSizePerLot(symbol)
+}
+
+func contractSizePerLot(symbol string) float64 {
+	switch strings.ToUpper(strings.TrimSpace(symbol)) {
+	// Gold CFDs typically use 1 lot = 100 ounces.
+	case "XAUUSD", "XAUUSDT":
+		return 100
+	default:
+		// Fallback keeps existing behavior where lot is interpreted as
+		// base quantity directly.
+		return 1
 	}
 }
 

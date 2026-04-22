@@ -90,10 +90,18 @@ type PairSnapshot struct {
 	Symbol       string
 	EntryTF      models.Timeframe
 	GeneratedAt  time.Time
-	CurrentPrice float64     // live price on the entry TF (from the unclosed bar)
-	Summaries    []TFSummary // ordered: entry TF first, then higher TFs
-	RawBars      []RawCandle // last ~20 OHLCV rows of the entry TF (anti-repaint: closed only)
+	CurrentPrice float64      // live price on the entry TF (from the unclosed bar)
+	Summaries    []TFSummary  // ordered: entry TF first, then higher TFs
+	RawBars      []RawCandle  // last ~20 OHLCV rows of the entry TF (anti-repaint: closed only)
+	Patterns     []BarPattern // shape+context+trap flags for last ~PatternLookback closed bars on entry TF
 }
+
+// PatternLookback is how many recent CLOSED bars on the entry TF get a
+// full pattern/context/trap analysis emitted into the prompt. Three is
+// the minimum that still lets 3-bar patterns (morning_star, etc.)
+// resolve at the newest bar; larger windows just add noise the LLM has
+// to filter out.
+const PatternLookback = 3
 
 // Build produces a PairSnapshot from fetched multi-TF candles. Returns
 // an error if the entry TF has no candles (nothing useful to say).
@@ -141,6 +149,23 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 				Volume: c.Volume,
 			})
 		}
+	}
+
+	// Candle patterns on the entry TF. We pull the pre-computed entry
+	// TF summary's levels so shape + context + trap flags all reference
+	// the SAME numbers the LLM sees elsewhere in the prompt — no drift.
+	if len(snap.Summaries) > 0 && len(closedEntry) > 0 {
+		entry := snap.Summaries[0]
+		lvl := LevelContext{
+			ATR:       entry.ATR,
+			SwingHigh: entry.SwingHigh,
+			SwingLow:  entry.SwingLow,
+			BBUpper:   entry.BBUpper,
+			BBLower:   entry.BBLower,
+			NearestR:  entry.NearestResist,
+			NearestS:  entry.NearestSupport,
+		}
+		snap.Patterns = AnalyzeLastBars(closedEntry, PatternLookback, lvl)
 	}
 	return snap, nil
 }
@@ -370,6 +395,10 @@ func Render(snap *PairSnapshot) string {
 		writeRawBars(&b, snap.EntryTF, snap.RawBars)
 	}
 
+	if len(snap.Patterns) > 0 {
+		writePatterns(&b, snap.EntryTF, snap.Patterns, snap.RawBars)
+	}
+
 	if footer := buildFooter(snap); footer != "" {
 		fmt.Fprintf(&b, "\n%s\n", footer)
 	}
@@ -452,6 +481,73 @@ func writeRawBars(b *strings.Builder, tf models.Timeframe, bars []RawCandle) {
 			c.Time.Format("01-02 15:04"),
 			f4(c.Open), f4(c.High), f4(c.Low), f4(c.Close), f2(c.Volume),
 		)
+	}
+	b.WriteString("\n")
+}
+
+// writePatterns emits the last-N closed-bar pattern analysis. Each
+// line starts with a bar-age offset ([-2] = two bars ago) and a UTC
+// timestamp, then the shape label, shape purity ratio, and every
+// context/trap flag that triggered. Flags that didn't trigger are
+// omitted to keep the block compact — absence means "not applicable",
+// not "false data".
+func writePatterns(b *strings.Builder, tf models.Timeframe, pats []BarPattern, rawBars []RawCandle) {
+	if len(pats) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "Last %d %s bar patterns (oldest -> newest):\n", len(pats), tf)
+	// rawBars is ordered oldest->newest too and usually longer than pats.
+	// We align by suffix: the last len(pats) rawBars correspond 1:1 to pats.
+	rawStart := len(rawBars) - len(pats)
+	for i, p := range pats {
+		parts := []string{p.Kind}
+		if p.Ratio > 0 {
+			parts = append(parts, fmt.Sprintf("r=%.2f", p.Ratio))
+		}
+		if p.PriorTrend != "" && p.PriorTrend != "FLAT" {
+			parts = append(parts, "prior="+p.PriorTrend)
+		}
+		if p.IsWindowLow {
+			parts = append(parts, "window_low")
+		}
+		if p.IsWindowHigh {
+			parts = append(parts, "window_high")
+		}
+		if p.AtSupport {
+			parts = append(parts, "at_support")
+		}
+		if p.AtResistance {
+			parts = append(parts, "at_resistance")
+		}
+		if p.WickGrabHigh {
+			parts = append(parts, "wick_grab_high")
+		}
+		if p.WickGrabLow {
+			parts = append(parts, "wick_grab_low")
+		}
+		if p.BBFakeoutUp {
+			parts = append(parts, "bb_fakeout_up")
+		}
+		if p.BBFakeoutDown {
+			parts = append(parts, "bb_fakeout_down")
+		}
+		if p.Exhaustion {
+			parts = append(parts, "exhaustion")
+		}
+		if p.Invalidated {
+			parts = append(parts, "INVALIDATED")
+		}
+
+		offset := len(pats) - 1 - i // newest = 0, older = 1, 2, ...
+		var ts string
+		if rawStart >= 0 && rawStart+i < len(rawBars) {
+			ts = rawBars[rawStart+i].Time.Format("01-02 15:04")
+		}
+		if ts != "" {
+			fmt.Fprintf(b, "  [-%d] %s  %s\n", offset, ts, strings.Join(parts, " · "))
+		} else {
+			fmt.Fprintf(b, "  [-%d]  %s\n", offset, strings.Join(parts, " · "))
+		}
 	}
 	b.WriteString("\n")
 }
