@@ -190,7 +190,7 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	for chunk := range chunks {
 		stopTypingOnce()
 		full.WriteString(chunk)
-		bubble.Append(ctx, StripLLMEmphasis(full.String()))
+		bubble.Append(ctx, StripLLMEmphasis(StripMarketDataDump(full.String())))
 	}
 
 	// Drain errCh exactly once — providers always close it.
@@ -223,7 +223,7 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	// which is easy to miss or watch "disappear" after the final edit.
 	// Session history stores the same formatted text so follow-ups stay
 	// consistent with what the user saw.
-	historyReply := StripLLMEmphasis(reply)
+	historyReply := StripLLMEmphasis(StripMarketDataDump(reply))
 	if decision := ExtractDecision(reply); decision != nil {
 		h.recordDecision(ctx, chatID, decision)
 		historyReply = FormatAdvisorReplyForUser(reply, decision)
