@@ -11,14 +11,13 @@ import (
 	"j_ai_trade/trading/models"
 )
 
-// RawCandleTF is the timeframe whose last N candles get emitted as raw
-// OHLCV rows inside the digest. We pick the entry TF (M15 in the
-// scalping default) because that's where the LLM needs to read candle
-// shape — pin bar / engulfing / long wick — to decide on an entry.
-// Higher TFs stay summarised via indicators only; dumping their raw
-// candles would balloon the prompt without adding information the
-// indicators don't already capture.
-const RawCandleBars = 20
+// RawCandleBars is the number of entry-TF raw OHLCV rows emitted into
+// the digest. Reduced from 20 → 10 once pattern + pivot blocks landed:
+// those blocks already encode shape + structure with labels; the raw
+// table is now a fallback for microstructure the LLM wants to
+// double-check, not a primary source. Cutting to 10 saves ~10 lines of
+// prompt per request with no measurable loss of signal.
+const RawCandleBars = 10
 
 // TFSummary is the per-timeframe digest of what the market looks like
 // right now. Everything is pre-computed so the LLM reads numbers
@@ -57,6 +56,27 @@ type TFSummary struct {
 	NearestSupport float64 `json:"nearest_support,omitempty"`  // closest level < last close
 	DistResistATR  float64 `json:"dist_resist_atr,omitempty"`  // (resist - close) / ATR
 	DistSupportATR float64 `json:"dist_support_atr,omitempty"` // (close - support) / ATR
+
+	// Structural flags (Phase-3c) — pivot-derived patterns deterministic
+	// enough to emit as named structures. Subjective patterns (triangle,
+	// wedge, H&S) are left to the LLM reasoning about pivots directly.
+	DoubleTop    float64 `json:"double_top,omitempty"`
+	DoubleBottom float64 `json:"double_bottom,omitempty"`
+	RangeTop     float64 `json:"range_top,omitempty"`
+	RangeBottom  float64 `json:"range_bottom,omitempty"`
+	RangeWidth   float64 `json:"range_width_atr,omitempty"`
+	InRange      bool    `json:"in_range,omitempty"`
+
+	// Phase-3d enrichments — cheap scalars moved out of LLM mental-math.
+	EMAStack           string  `json:"ema_stack,omitempty"`            // bullish_full | bullish_partial | ... | choppy | ...
+	AtEMA20            bool    `json:"at_ema20,omitempty"`             // LastClose within ±0.3 ATR of EMA20
+	AtEMA50            bool    `json:"at_ema50,omitempty"`
+	AtEMA200           bool    `json:"at_ema200,omitempty"`
+	ATRPercentile      float64 `json:"atr_pctile,omitempty"`           // -1 when insufficient history
+	MomentumDelta5     float64 `json:"momentum_delta5_atr,omitempty"`  // (close - close[-5]) / ATR
+	RSIDivergence      string  `json:"rsi_divergence,omitempty"`       // "bearish" | "bullish" | ""
+	BBSqueezeReleasing bool    `json:"bb_squeeze_releasing,omitempty"`
+	EMACrossover       string  `json:"ema_crossover,omitempty"`        // "bull_3ago" / "bear_5ago" / ""
 }
 
 // RawCandle is a single OHLCV row rendered into the digest so the LLM
@@ -90,11 +110,30 @@ type PairSnapshot struct {
 	Symbol       string
 	EntryTF      models.Timeframe
 	GeneratedAt  time.Time
-	CurrentPrice float64                              // live price on the entry TF (from the unclosed bar)
-	Summaries    []TFSummary                          // ordered: entry TF first, then higher TFs
-	RawBars      []RawCandle                          // last ~20 OHLCV rows of the entry TF (anti-repaint: closed only)
-	Patterns     map[models.Timeframe][]BarPattern    // per-TF recent bar patterns; each TF uses its OWN LevelContext
+	CurrentPrice float64                           // live price on the entry TF (from the unclosed bar)
+	Summaries    []TFSummary                       // ordered: entry TF first, then higher TFs
+	RawBars      []RawCandle                       // last ~10 OHLCV rows of the entry TF (anti-repaint: closed only)
+	Patterns     map[models.Timeframe][]BarPattern // per-TF recent bar patterns; each TF uses its OWN LevelContext
+	Pivots       map[models.Timeframe][]Pivot      // per-TF pivot sequence (HH/HL/LH/LL) — structural primitive for LLM
+
+	// Phase-3d snapshot-level scalars. Describe the pair as a whole or
+	// the wall-clock session state at generation time.
+	TFAlignment  string  // "4/4 bullish" | "3/4 bearish (M15 choppy)" | "mixed"
+	IntrabarMove float64 // (CurrentPrice - entry-TF LastClose) / entry-TF ATR
+	PDH          float64 // previous day high (from D1 prior-closed candle)
+	PDL          float64 // previous day low
+	Session      string  // "ASIA" | "LONDON" | "LONDON_NY_OVERLAP" | "NY" | "LATE_NY"
 }
+
+// Pivot window sizes per TF. Entry TF gets 6 for richer structural
+// reading; H1 gets 4 because each H1 pivot already carries 4× the
+// "weight" of an M15 pivot. RangeScanWindow is how many recent closed
+// bars DetectRange examines — 30 bars ≈ 7.5h on M15, 30h on H1.
+const (
+	PivotLimitEntry = 6
+	PivotLimitH1    = 4
+	RangeScanWindow = 30
+)
 
 // PatternLookback is how many recent CLOSED bars on the entry TF get a
 // full pattern/context/trap analysis emitted into the prompt. Three is
@@ -126,6 +165,10 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 		EntryTF:      entryTF,
 		GeneratedAt:  now.UTC(),
 		CurrentPrice: currentPrice,
+		Session:      computeSession(now.UTC()),
+	}
+	if d1 := market.Get(models.TF_D1); len(d1) > 0 {
+		snap.PDH, snap.PDL = computePDHPDL(d1)
 	}
 
 	// Per-TF summaries, entry TF first for LLM anchoring.
@@ -135,6 +178,12 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 			continue
 		}
 		snap.Summaries = append(snap.Summaries, summariseTF(candles, tf))
+	}
+	// Snapshot-level confluence scalar + intrabar move. Entry TF is
+	// Summaries[0] by construction of summaryOrder.
+	snap.TFAlignment = computeTFAlignment(snap.Summaries)
+	if len(snap.Summaries) > 0 {
+		snap.IntrabarMove = computeIntrabarMove(currentPrice, snap.Summaries[0])
 	}
 
 	// Raw OHLCV window for the entry TF only. ClosedCandles drops the
@@ -154,6 +203,53 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 				Close:  c.Close,
 				Volume: c.Volume,
 			})
+		}
+	}
+
+	// Pivot sequences + structural flags per TF. Computed BEFORE pattern
+	// analysis. Only M15 + H1 emit pivots — H4/D1 structure is already
+	// captured by regime + EMA stacking and slower pivots rarely drive
+	// intraday decisions.
+	snap.Pivots = map[models.Timeframe][]Pivot{}
+	for i := range snap.Summaries {
+		sum := &snap.Summaries[i]
+		tf := sum.Timeframe
+		var limit int
+		switch tf {
+		case entryTF:
+			limit = PivotLimitEntry
+		case models.TF_H1:
+			if tf == entryTF {
+				continue
+			}
+			limit = PivotLimitH1
+		default:
+			continue
+		}
+		candles := market.Get(tf)
+		if len(candles) == 0 {
+			continue
+		}
+		closed := indicators.ClosedCandles(candles)
+		pivots := RecentPivots(closed, 3, limit)
+		if len(pivots) > 0 {
+			snap.Pivots[tf] = pivots
+		}
+		if sum.ATR > 0 {
+			if ds := DetectDoubleTopBottom(pivots, sum.ATR, 0.3); ds.Kind != "" {
+				switch ds.Kind {
+				case "double_top":
+					sum.DoubleTop = ds.Level
+				case "double_bottom":
+					sum.DoubleBottom = ds.Level
+				}
+			}
+			if rs := DetectRange(closed, sum.ATR, RangeScanWindow); rs.Top > 0 {
+				sum.RangeTop = rs.Top
+				sum.RangeBottom = rs.Bottom
+				sum.RangeWidth = rs.WidthATR
+				sum.InRange = rs.IsRange
+			}
 		}
 	}
 
@@ -273,6 +369,12 @@ func summariseTF(candles []baseCandle.BaseCandle, tf models.Timeframe) TFSummary
 	sum.Regime = simpleRegime(sum.ADX14, sum.EMA20, sum.EMA50)
 
 	fillRangeContext(&sum, closes)
+	fillEMAContext(&sum)
+	fillATRPercentile(&sum, closed)
+	fillMomentumDelta5(&sum, closed)
+	fillRSIDivergence(&sum, closed)
+	fillBBSqueezeReleasing(&sum, closes)
+	fillEMACrossover(&sum, closed)
 	return sum
 }
 
@@ -411,7 +513,24 @@ func Render(snap *PairSnapshot) string {
 		snap.Symbol, snap.GeneratedAt.Format("2006-01-02 15:04"), snap.EntryTF)
 
 	if snap.CurrentPrice > 0 {
-		fmt.Fprintf(&b, "Current price (live, %s): %s\n", snap.EntryTF, f4(snap.CurrentPrice))
+		fmt.Fprintf(&b, "Current price (live, %s): %s", snap.EntryTF, f4(snap.CurrentPrice))
+		if snap.IntrabarMove != 0 {
+			sign := "+"
+			if snap.IntrabarMove < 0 {
+				sign = ""
+			}
+			fmt.Fprintf(&b, " (intrabar %s%s ATR vs LastClose)", sign, f2(snap.IntrabarMove))
+		}
+		b.WriteString("\n")
+	}
+	if snap.TFAlignment != "" {
+		fmt.Fprintf(&b, "TF alignment: %s\n", snap.TFAlignment)
+	}
+	if snap.Session != "" {
+		fmt.Fprintf(&b, "Session: %s UTC\n", snap.Session)
+	}
+	if snap.PDH > 0 && snap.PDL > 0 {
+		fmt.Fprintf(&b, "Prev day: H=%s L=%s\n", f4(snap.PDH), f4(snap.PDL))
 	}
 
 	// Next-close clocks — only for TFs we actually summarised; avoids
@@ -444,6 +563,15 @@ func Render(snap *PairSnapshot) string {
 		}
 	}
 
+	// Pivot sequences — entry TF first, then H1. Gives the LLM raw
+	// structural data to reason about subjective patterns (triangles,
+	// wedges, H&S) without code hard-coding them.
+	for _, sum := range snap.Summaries {
+		if pivs, ok := snap.Pivots[sum.Timeframe]; ok && len(pivs) > 0 {
+			writePivots(&b, sum.Timeframe, pivs)
+		}
+	}
+
 	if footer := buildFooter(snap); footer != "" {
 		fmt.Fprintf(&b, "\n%s\n", footer)
 	}
@@ -452,21 +580,45 @@ func Render(snap *PairSnapshot) string {
 }
 
 func writeTFBlock(b *strings.Builder, s TFSummary) {
-	fmt.Fprintf(b, "%s (regime: %s, ADX %s)\n", s.Timeframe, s.Regime, f0(s.ADX14))
+	// Header: regime + ADX + EMA stack label. Stack tells the LLM the
+	// EMA story in one token instead of three number comparisons.
+	fmt.Fprintf(b, "%s (regime: %s, ADX %s", s.Timeframe, s.Regime, f0(s.ADX14))
+	if s.EMAStack != "" {
+		fmt.Fprintf(b, ", stack: %s", s.EMAStack)
+	}
+	b.WriteString(")\n")
+
+	// EMA line with per-EMA proximity flags. [at] marks price-to-EMA
+	// pullback within 0.3 ATR — classic scalp entry zone.
 	fmt.Fprintf(b, "  LastClose %s", f4(s.Close))
 	if s.EMA20 > 0 {
 		fmt.Fprintf(b, "  EMA20 %s", f4(s.EMA20))
+		if s.AtEMA20 {
+			b.WriteString(" [at]")
+		}
 	}
 	if s.EMA50 > 0 {
 		fmt.Fprintf(b, "  EMA50 %s", f4(s.EMA50))
+		if s.AtEMA50 {
+			b.WriteString(" [at]")
+		}
 	}
 	if s.EMA200 > 0 {
 		fmt.Fprintf(b, "  EMA200 %s", f4(s.EMA200))
+		if s.AtEMA200 {
+			b.WriteString(" [at]")
+		}
 	}
 	b.WriteString("\n")
+
+	// RSI + ATR (with percentile) + BB line.
 	fmt.Fprintf(b, "  RSI14 %s", f1(s.RSI14))
 	if s.ATR > 0 {
-		fmt.Fprintf(b, "  ATR %s (%s%%)", f4(s.ATR), f2(s.ATRPct))
+		if s.ATRPercentile >= 0 {
+			fmt.Fprintf(b, "  ATR %s (%s%%, p%s/50)", f4(s.ATR), f2(s.ATRPct), f0(s.ATRPercentile))
+		} else {
+			fmt.Fprintf(b, "  ATR %s (%s%%)", f4(s.ATR), f2(s.ATRPct))
+		}
 	}
 	if s.BBMid > 0 {
 		fmt.Fprintf(b, "  BB %s..%s..%s", f4(s.BBLower), f4(s.BBMid), f4(s.BBUpper))
@@ -487,8 +639,7 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 	}
 
 	// Range-context line: BB width + squeeze percentile, price percentile
-	// over 100 bars, nearest resistance/support in ATR. Emitted only when
-	// any subfield is valid so short windows stay clean.
+	// over 100 bars, nearest resistance/support in ATR.
 	var ctx []string
 	if s.BBWidthPct > 0 {
 		if s.BBWidthPctile > 0 {
@@ -508,6 +659,46 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 	}
 	if len(ctx) > 0 {
 		fmt.Fprintf(b, "  %s\n", strings.Join(ctx, " · "))
+	}
+
+	// Structural flags (rectangle / double top / double bottom) — emit
+	// only when something triggered so blocks stay compact.
+	var structBits []string
+	if s.InRange {
+		structBits = append(structBits, fmt.Sprintf("in_range %s..%s (w=%s ATR)", f4(s.RangeBottom), f4(s.RangeTop), f2(s.RangeWidth)))
+	}
+	if s.DoubleTop > 0 {
+		structBits = append(structBits, fmt.Sprintf("double_top @ %s", f4(s.DoubleTop)))
+	}
+	if s.DoubleBottom > 0 {
+		structBits = append(structBits, fmt.Sprintf("double_bottom @ %s", f4(s.DoubleBottom)))
+	}
+	if len(structBits) > 0 {
+		fmt.Fprintf(b, "  structure: %s\n", strings.Join(structBits, " · "))
+	}
+
+	// Dynamic line: momentum / divergence / squeeze / crossover flags.
+	// Each is a one-token signal; together they describe "direction +
+	// acceleration" for this TF.
+	var dyn []string
+	if s.MomentumDelta5 != 0 {
+		sign := "+"
+		if s.MomentumDelta5 < 0 {
+			sign = ""
+		}
+		dyn = append(dyn, fmt.Sprintf("mom5 %s%s ATR", sign, f2(s.MomentumDelta5)))
+	}
+	if s.RSIDivergence != "" {
+		dyn = append(dyn, "rsi_div="+s.RSIDivergence)
+	}
+	if s.BBSqueezeReleasing {
+		dyn = append(dyn, "bb_squeeze_releasing")
+	}
+	if s.EMACrossover != "" {
+		dyn = append(dyn, "ema_cross_"+s.EMACrossover)
+	}
+	if len(dyn) > 0 {
+		fmt.Fprintf(b, "  %s\n", strings.Join(dyn, " · "))
 	}
 
 	b.WriteString("\n")
@@ -543,7 +734,9 @@ func writePatterns(b *strings.Builder, tf models.Timeframe, pats []BarPattern) {
 	fmt.Fprintf(b, "Last %d %s bar patterns (oldest -> newest):\n", len(pats), tf)
 	for i, p := range pats {
 		parts := []string{p.Kind}
-		if p.Ratio > 0 {
+		// Skip ratio for "normal" bars — body/range there has no
+		// actionable meaning and would be pure prompt noise.
+		if p.Ratio > 0 && p.Kind != "normal" {
 			parts = append(parts, fmt.Sprintf("r=%.2f", p.Ratio))
 		}
 		if p.PriorTrend != "" && p.PriorTrend != "FLAT" {
@@ -576,6 +769,10 @@ func writePatterns(b *strings.Builder, tf models.Timeframe, pats []BarPattern) {
 		if p.Exhaustion {
 			parts = append(parts, "exhaustion")
 		}
+		// Volume multiplier — only meaningful on non-normal bars.
+		if p.VolMult > 0 && p.Kind != "normal" {
+			parts = append(parts, fmt.Sprintf("vol=%sx", f2(p.VolMult)))
+		}
 		if p.Invalidated {
 			parts = append(parts, "INVALIDATED")
 		}
@@ -586,6 +783,28 @@ func writePatterns(b *strings.Builder, tf models.Timeframe, pats []BarPattern) {
 		} else {
 			fmt.Fprintf(b, "  [-%d]  %s\n", offset, strings.Join(parts, " · "))
 		}
+	}
+	b.WriteString("\n")
+}
+
+// writePivots emits the recent pivot sequence for a TF: one line per
+// pivot with type (SH/SL), price, timestamp, and HH/HL/LH/LL label.
+// This is the structural primitive the LLM uses to reason about
+// triangles, wedges, H&S, trend breaks, etc. — code deliberately does
+// NOT name these patterns (they're subjective); the LLM infers them
+// from the label sequence.
+func writePivots(b *strings.Builder, tf models.Timeframe, pivs []Pivot) {
+	if len(pivs) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "Recent %s pivots (oldest -> newest):\n", tf)
+	for _, p := range pivs {
+		label := p.Label
+		if label == "" {
+			label = "-"
+		}
+		fmt.Fprintf(b, "  %s %s  %s  %s\n",
+			p.Type, f4(p.Price), p.Time.Format("01-02 15:04"), label)
 	}
 	b.WriteString("\n")
 }

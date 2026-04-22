@@ -43,6 +43,13 @@ type BarPattern struct {
 	// a later bar disproves the pattern here. LLM should treat the
 	// pattern as if it never triggered when this is true.
 	Invalidated bool
+
+	// Volume context (Phase-3d). VolMult = bar volume / SMA20 of prior
+	// closed volumes (exclusive of this bar). Patterns with volume
+	// confirmation (>=2×) are materially stronger than the same shape
+	// on thin volume — this is how the LLM distinguishes.
+	VolMult  float64 // 1.0 = average; 0 = not computable
+	VolSpike bool    // VolMult >= 2.0
 }
 
 // LevelContext bundles the current-TF levels we need to classify where
@@ -275,6 +282,7 @@ func AnalyzeLastBars(closed []baseCandle.BaseCandle, n int, lvl LevelContext) []
 		p := enrichContext(closed, i, lvl)
 		p.Kind, p.Ratio = DetectPattern(closed, i)
 		p.Time = closed[i].OpenTime.UTC()
+		p.VolMult, p.VolSpike = fillVolumeContext(closed, i)
 		out = append(out, p)
 	}
 	markInvalidations(out, closed, start)
