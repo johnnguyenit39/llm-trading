@@ -5,13 +5,12 @@
 //	Telegram  ──►  advisor.ChatHandler  ──►  DeepSeek (streaming)
 //	                      │
 //	                      ├──►  Binance REST          (market data)
-//	                      ├──►  biz.SessionStore       (Redis today)
-//	                      └──►  biz.DecisionStore      (Postgres today)
+//	                      ├──►  biz.SessionStore       (in-memory)
+//	                      └──►  biz.DecisionStore      (Firestore, with in-memory fallback)
 //
 // main.go is the composition root and the ONLY place that names
-// specific infrastructure (Redis, Postgres, etc.). Everything below
-// modules/advisor/ talks only to biz.* interfaces — swap a backend by
-// writing a sibling adapter + flipping the wiring here.
+// concrete infrastructure. Everything below modules/advisor/ talks
+// only to biz.* interfaces.
 package main
 
 import (
@@ -23,13 +22,13 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 
-	storage "j_ai_trade/config/postgres"
-	"j_ai_trade/config/redis"
+	firecfg "j_ai_trade/config/firebase"
 	"j_ai_trade/logger"
 	"j_ai_trade/modules/advisor"
-	"j_ai_trade/modules/advisor/biz"
-	sessionRedis "j_ai_trade/modules/advisor/storage/redis"
-	decisionPostgres "j_ai_trade/modules/agent_decision/storage/postgres"
+	abiz "j_ai_trade/modules/advisor/biz"
+	sessionMemory "j_ai_trade/modules/advisor/storage/memory"
+	decisionFirestore "j_ai_trade/modules/agent_decision/storage/firestore"
+	decisionMemory "j_ai_trade/modules/agent_decision/storage/memory"
 )
 
 func main() {
@@ -44,13 +43,17 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// Build the advisor's infrastructure using biz interfaces. Each
-	// block picks ONE concrete adapter; to switch backend (Postgres
-	// sessions, in-memory decisions, ...) replace the constructor
-	// here — modules/advisor/ and biz/ are untouched.
+	var err error
+	firecfg.App, err = firecfg.NewAppFromEnv(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msg("firebase: invalid SERVICE_ACCOUNT_FIREBASE_BASE_64")
+	} else if firecfg.App != nil {
+		log.Info().Msg("firebase: admin SDK initialized (use firecfg.MessagingClient for FCM)")
+	}
+
 	advisor.Init(ctx, advisor.Deps{
-		Sessions:  buildSessionStore(),
-		Decisions: buildDecisionStore(),
+		Sessions:  sessionMemory.NewSessionStore(),
+		Decisions: buildDecisionStore(ctx),
 	})
 
 	log.Info().Msg("j_ai_trade: Telegram advisor bot online — waiting for signals")
@@ -58,36 +61,19 @@ func main() {
 	log.Info().Msg("j_ai_trade: shutdown signal received, exiting")
 }
 
-// buildSessionStore wires the Redis-backed biz.SessionStore. Redis is
-// mandatory: the chat bot needs session memory to feel coherent
-// across turns, so a failure here is fatal.
-//
-// To move sessions onto a different backend (Postgres table with a
-// TTL cron, in-memory for tests, DynamoDB for horizontal scale,
-// etcd, ...): write a new type implementing biz.SessionStore,
-// construct it here, return it. The rest of the codebase is
-// untouched.
-func buildSessionStore() biz.SessionStore {
-	rc, err := redis.NewRedisClient()
-	if err != nil {
-		log.Fatal().Err(err).Msg("redis connection failed — advisor cannot start without a session store")
+// buildDecisionStore returns a Firestore-backed DecisionStore when the
+// Firebase app is available; otherwise it falls back to an in-memory
+// store so local dev (no SERVICE_ACCOUNT_FIREBASE_BASE_64) still boots.
+func buildDecisionStore(ctx context.Context) abiz.DecisionStore {
+	if firecfg.App == nil {
+		log.Warn().Msg("firestore: Firebase app not initialized — decisions persist in memory only")
+		return decisionMemory.NewStore()
 	}
-	return sessionRedis.NewSessionStore(rc.GetClient())
-}
-
-// buildDecisionStore wires the Postgres-backed biz.DecisionStore. It
-// is OPTIONAL: on any DB failure we return nil, and advisor.Init
-// downgrades to "parse + log but don't persist". That keeps the chat
-// bot usable in dev where Postgres isn't running.
-//
-// Same pattern as sessions: to swap storage, change this function
-// only.
-func buildDecisionStore() biz.DecisionStore {
-	db, err := storage.NewConnection()
-	if err != nil {
-		log.Warn().Err(err).Msg("postgres connection failed — trade decisions will not be persisted")
-		return nil
+	client, err := firecfg.FirestoreClient(ctx, firecfg.App)
+	if err != nil || client == nil {
+		log.Warn().Err(err).Msg("firestore: client init failed — decisions persist in memory only")
+		return decisionMemory.NewStore()
 	}
-	storage.AutoMigrate(db)
-	return decisionPostgres.NewStore(db)
+	log.Info().Msg("firestore: decision store online (collection=agent_decisions)")
+	return decisionFirestore.NewStore(client)
 }

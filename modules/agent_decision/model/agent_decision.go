@@ -1,53 +1,25 @@
-// Package model holds the GORM-mapped domain types for the
-// agent_decision module. One type, one table: every row represents a
-// single buy/sell call the LLM made. Wait/hold replies are NOT
-// persisted — only rows with an actual trade end up here.
+// Package model holds domain types for agent trade decisions.
 package model
 
-import (
-	"log"
+import "j_ai_trade/common"
 
-	"j_ai_trade/common"
-
-	"gorm.io/gorm"
-)
-
-// Action enumerates the trade directions we accept. Kept as string
-// constants (not an int enum) so the DB column stays human-readable
-// when you poke around with psql.
+// Action enumerates the trade directions we accept.
 const (
 	ActionBuy  = "BUY"
 	ActionSell = "SELL"
 )
 
-// EntityName is used by the generic logger/audit helpers in common/.
+// EntityName is used by generic logger/audit helpers in common/.
 const EntityName = "AgentDecision"
 
-// AgentDecision is one trade the LLM decided to open. The schema is
-// deliberately minimal — id, symbol, direction, the three prices the
-// trade needs, and timestamps. No status machine, no P&L tracking, no
-// user id: this is a pure decision log. If we ever want execution /
-// close tracking later we add columns; GORM's AutoMigrate will handle
-// the additive change without touching existing rows.
+// AgentDecision is one trade the LLM decided to open.
 type AgentDecision struct {
 	common.BaseModel
 
-	Symbol     string  `json:"symbol" gorm:"column:symbol;type:text;not null;index"`
-	Action     string  `json:"action" gorm:"column:action;type:text;not null"` // BUY | SELL
-	Entry      float64 `json:"entry" gorm:"column:entry;type:numeric;not null"`
-	StopLoss   float64 `json:"stop_loss" gorm:"column:stop_loss;type:numeric;not null"`
-	TakeProfit float64 `json:"take_profit" gorm:"column:take_profit;type:numeric;not null"`
-	Lot        float64 `json:"lot" gorm:"column:lot;type:numeric;not null;default:0"`
-}
-
-func (*AgentDecision) TableName() string { return "agent_decisions" }
-
-// Migrate is called from config/postgres.AutoMigrate and is safe to
-// run repeatedly — GORM adds missing columns and indices idempotently.
-func Migrate(db *gorm.DB) error {
-	if err := db.AutoMigrate(&AgentDecision{}); err != nil {
-		log.Println(err.Error())
-		return err
-	}
-	return nil
+	Symbol     string  `json:"symbol" firestore:"symbol"`
+	Action     string  `json:"action" firestore:"action"` // BUY | SELL
+	Entry      float64 `json:"entry" firestore:"entry"`
+	StopLoss   float64 `json:"stop_loss" firestore:"stop_loss"`
+	TakeProfit float64 `json:"take_profit" firestore:"take_profit"`
+	Lot        float64 `json:"lot" firestore:"lot"`
 }

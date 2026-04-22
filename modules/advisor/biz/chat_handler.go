@@ -31,7 +31,7 @@ type ChatHandler struct {
 	llm       LLMProvider
 	filter    *UserFilter
 	analyzer  MarketAnalyzer // may be nil — chat-only fallback
-	decisions DecisionStore  // may be nil — decision logging off when Postgres unavailable
+	decisions DecisionStore  // may be nil — no persistence of trade JSON
 }
 
 func NewChatHandler(
@@ -59,9 +59,7 @@ func (h *ChatHandler) WithMarketAnalyzer(a MarketAnalyzer) *ChatHandler {
 
 // WithDecisionStore attaches the persister for LLM trade decisions.
 // Nil store is legal — in that mode decisions are parsed and logged
-// but never written, which is exactly what we want if Postgres is
-// misconfigured: the chat bot keeps working, the ops team notices
-// the missing rows, nothing crashes.
+// but not written.
 func (h *ChatHandler) WithDecisionStore(s DecisionStore) *ChatHandler {
 	h.decisions = s
 	return h
@@ -192,7 +190,7 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	for chunk := range chunks {
 		stopTypingOnce()
 		full.WriteString(chunk)
-		bubble.Append(ctx, full.String())
+		bubble.Append(ctx, StripLLMEmphasis(full.String()))
 	}
 
 	// Drain errCh exactly once — providers always close it.
@@ -225,7 +223,7 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	// which is easy to miss or watch "disappear" after the final edit.
 	// Session history stores the same formatted text so follow-ups stay
 	// consistent with what the user saw.
-	historyReply := reply
+	historyReply := StripLLMEmphasis(reply)
 	if decision := ExtractDecision(reply); decision != nil {
 		h.recordDecision(ctx, chatID, decision)
 		historyReply = FormatAdvisorReplyForUser(reply, decision)

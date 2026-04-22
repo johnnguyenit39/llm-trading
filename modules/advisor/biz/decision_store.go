@@ -13,14 +13,11 @@ import (
 //  1. The advisor package doesn't drag the agent_decision biz package
 //     into its own public API surface.
 //  2. Test doubles stay trivial (one method to mock).
-//  3. Swapping the backend — Postgres today, a JSON audit log
-//     tomorrow, a Kafka topic the day after — is an additive
-//     change: write a new type implementing this interface, pass
-//     it to advisor.Init via Deps.
+//  3. Swapping the backend is an additive change: new type implementing
+//     this interface, pass it to advisor.Init via Deps.
 //
-// Nil DecisionStore is a legal runtime state: the ChatHandler logs the
-// parsed decision and skips persistence. That keeps the bot usable in
-// dev without a DB.
+// Nil DecisionStore: ChatHandler logs the parsed decision and skips
+// persistence.
 type DecisionStore interface {
 	Save(ctx context.Context, d *adModel.AgentDecision) error
 }

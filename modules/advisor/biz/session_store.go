@@ -11,9 +11,8 @@ import (
 // agnostic to Telegram user IDs / Zalo sender IDs / Discord channel IDs /
 // etc.
 //
-// Phase 1 ships a Redis-backed implementation with a rolling window + TTL;
-// an in-memory/Postgres variant can be swapped in later without touching
-// the ChatHandler.
+// The default main.go wires in-memory storage; any implementation can be
+// swapped in without touching the ChatHandler.
 type SessionStore interface {
 	// Load returns the N most recent turns for the chat, oldest first.
 	// Returns an empty slice (not an error) when no session exists.

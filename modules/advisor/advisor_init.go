@@ -16,28 +16,22 @@ import (
 
 // Deps is the infrastructure the advisor needs to run. Every field is
 // an INTERFACE from biz/: this package deliberately has zero
-// compile-time knowledge of Redis, Postgres, Binance, DeepSeek, or
-// Telegram. Replacing any backend means changing only main.go (the
-// composition root) plus writing a new adapter under storage/ or
-// provider/ — this file, biz/, and everything downstream are
-// untouched.
+// compile-time knowledge of Binance, DeepSeek, or Telegram. Replacing
+// any backend means changing only main.go (the composition root) plus
+// a new adapter under storage/ or provider/ — this file, biz/, and
+// everything downstream are untouched.
 //
-// Pattern rationale ("don't write Redis-specific functions"):
-//   - biz.SessionStore is how the handler talks to session memory.
-//     Redis today, Postgres/DynamoDB/in-memory/etcd tomorrow — the
-//     handler never knows.
-//   - biz.DecisionStore is how trade decisions get persisted.
-//     Postgres today, could become a JSON audit log or a Kafka
-//     topic later.
+// Pattern:
+//   - biz.SessionStore — session memory (in-memory in main today).
+//   - biz.DecisionStore — trade decision log (in-memory in main today;
+//     optional nil still supported for tests / no-persist mode).
 //   - biz.LLMProvider / biz.ChatTransport / biz.MarketAnalyzer are
 //     already dependency-inverted the same way.
 //
 // Nil semantics:
-//   - SessionStore is REQUIRED. A nil store has no sensible meaning
-//     (every chat would feel amnesiac); main.go fails fast when it
-//     can't build one.
+//   - SessionStore is REQUIRED. A nil store disables the chat path.
 //   - DecisionStore is OPTIONAL. Nil = "log parsed decisions, don't
-//     persist". Useful in dev without Postgres.
+//     persist".
 type Deps struct {
 	Sessions  biz.SessionStore
 	Decisions biz.DecisionStore
@@ -48,8 +42,8 @@ type Deps struct {
 //	ChatHandler
 //	  ├── biz.ChatTransport   <── transport/telegram   (Telegram today)
 //	  ├── biz.LLMProvider     <── provider/deepseek    (DeepSeek today)
-//	  ├── biz.SessionStore    <── (injected via Deps)  (Redis today)
-//	  ├── biz.DecisionStore   <── (injected via Deps)  (Postgres today, optional)
+//	  ├── biz.SessionStore    <── (injected via Deps)
+//	  ├── biz.DecisionStore   <── (injected via Deps, optional)
 //	  └── biz.MarketAnalyzer  <── biz/market           (Binance-backed, optional)
 //
 // Non-fatal on failure at every layer:

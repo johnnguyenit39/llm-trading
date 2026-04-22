@@ -1,8 +1,7 @@
 // Package biz defines the domain-level contract for persisting agent
-// decisions. Concrete backends (Postgres today, could be a file log or
-// a message queue tomorrow) implement Store; the ChatHandler depends
-// only on this interface so tests can substitute a fake without
-// pulling in GORM.
+// decisions. Concrete backends (in-memory, file, DB, queue, …)
+// implement Store; the ChatHandler depends on this interface so tests
+// can substitute a fake.
 package biz
 
 import (
@@ -17,8 +16,7 @@ import (
 // the system.
 type Store interface {
 	// Save writes the decision row. The caller is expected to
-	// populate Symbol/Action/Entry/StopLoss/TakeProfit; the store is
-	// responsible for stamping ID/CreatedAt/UpdatedAt (GORM does this
-	// via BaseModel hooks).
+	// populate Symbol/Action/Entry/StopLoss/TakeProfit; the store
+	// stamps ID and timestamps.
 	Save(ctx context.Context, d *model.AgentDecision) error
 }

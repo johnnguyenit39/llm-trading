@@ -8,7 +8,7 @@ import (
 )
 
 // DecisionPayload is the shape of the JSON block the LLM emits when it
-// decides to open a trade. Fields match the Postgres schema 1:1 so the
+// decides to open a trade. Fields match the AgentDecision model so the
 // handler can map straight from JSON into the ORM model without a
 // second DTO layer.
 //
@@ -76,7 +76,7 @@ func StripDecisionFence(reply string) string {
 // plus an explicit trade card (entry/SL/TP/lot and estimated USDT PnL at
 // TP vs SL for linear USDT-M style notionals).
 func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload) string {
-	prose := strings.TrimSpace(StripDecisionFence(rawReply))
+	prose := strings.TrimSpace(StripLLMEmphasis(StripDecisionFence(rawReply)))
 	if prose == "" {
 		prose = "Tín hiệu vào lệnh."
 	}
