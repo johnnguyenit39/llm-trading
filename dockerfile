@@ -1,5 +1,5 @@
 # Stage 1: Build the Go application
-FROM golang:1.23.4-alpine AS builder
+FROM golang:1.25.0-alpine AS builder
 
 # Set GOARCH to amd64 and GOOS to linux
 ENV GOARCH=amd64
