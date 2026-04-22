@@ -37,6 +37,7 @@ type AgentDecision struct {
 	Entry      float64 `json:"entry" gorm:"column:entry;type:numeric;not null"`
 	StopLoss   float64 `json:"stop_loss" gorm:"column:stop_loss;type:numeric;not null"`
 	TakeProfit float64 `json:"take_profit" gorm:"column:take_profit;type:numeric;not null"`
+	Lot        float64 `json:"lot" gorm:"column:lot;type:numeric;not null;default:0"`
 }
 
 func (*AgentDecision) TableName() string { return "agent_decisions" }

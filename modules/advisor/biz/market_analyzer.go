@@ -27,7 +27,7 @@ type EnrichmentResult struct {
 	Digest string
 
 	// Ack is an optional short pre-reply surfaced to the user before
-	// the LLM stream starts ("Đang kiểm tra BTCUSDT M15..."). Empty
+	// the LLM stream starts (e.g. "Đang kiểm tra BTCUSDT..."). Empty
 	// string means "no ack".
 	Ack string
 

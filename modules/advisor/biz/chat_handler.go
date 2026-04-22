@@ -219,23 +219,17 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	}
 
 	// Extract any fenced trade-decision JSON the LLM emitted. When
-	// present, persist it as an agent_decision row; regardless of
-	// persistence outcome we strip the fence before saving the turn
-	// into session history so (a) the user's bubble isn't polluted
-	// with the raw JSON on the next follow-up and (b) the LLM doesn't
-	// see its own trade JSON on the next turn and conclude "I already
-	// traded this".
+	// present, persist it as an agent_decision row; replace the Telegram
+	// bubble with a user-readable trade card (symbol, action, entry,
+	// SL/TP, lot, estimated USDT at TP vs SL) instead of raw ```json,
+	// which is easy to miss or watch "disappear" after the final edit.
+	// Session history stores the same formatted text so follow-ups stay
+	// consistent with what the user saw.
 	historyReply := reply
 	if decision := ExtractDecision(reply); decision != nil {
 		h.recordDecision(ctx, chatID, decision)
-		historyReply = StripDecisionFence(reply)
-		if historyReply == "" {
-			// Paranoia: an LLM that sent ONLY the JSON block and
-			// nothing else would otherwise lose the whole turn from
-			// history. Keep a short audit trail so later turns know
-			// a trade happened.
-			historyReply = "(đã đặt lệnh)"
-		}
+		historyReply = FormatAdvisorReplyForUser(reply, decision)
+		bubble.ReplaceWith(ctx, historyReply)
 	}
 	h.persistTurns(ctx, chatID, userText, historyReply)
 }
@@ -254,6 +248,7 @@ func (h *ChatHandler) recordDecision(ctx context.Context, chatID string, d *Deci
 			Float64("entry", d.Entry).
 			Float64("sl", d.StopLoss).
 			Float64("tp", d.TakeProfit).
+			Float64("lot", d.Lot).
 			Msg("advisor: decision parsed but no store wired — skipping persistence")
 		return
 	}
@@ -263,6 +258,7 @@ func (h *ChatHandler) recordDecision(ctx context.Context, chatID string, d *Deci
 		Entry:      d.Entry,
 		StopLoss:   d.StopLoss,
 		TakeProfit: d.TakeProfit,
+		Lot:        d.Lot,
 	}
 	if err := h.decisions.Save(ctx, row); err != nil {
 		log.Error().Err(err).
@@ -279,6 +275,7 @@ func (h *ChatHandler) recordDecision(ctx context.Context, chatID string, d *Deci
 		Float64("entry", row.Entry).
 		Float64("sl", row.StopLoss).
 		Float64("tp", row.TakeProfit).
+		Float64("lot", row.Lot).
 		Msg("advisor: persisted agent_decision")
 }
 

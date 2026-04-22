@@ -2,6 +2,7 @@ package biz
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -20,6 +21,9 @@ type DecisionPayload struct {
 	Entry      float64 `json:"entry"`
 	StopLoss   float64 `json:"stop_loss"`
 	TakeProfit float64 `json:"take_profit"`
+	// Lot is position size in base-asset units (Binance USDT-M linear: qty
+	// in the symbol's base) so we can show estimated PnL in USDT.
+	Lot float64 `json:"lot"`
 }
 
 // decisionFenceRe matches a ```json ... ``` fenced block with any
@@ -67,6 +71,74 @@ func StripDecisionFence(reply string) string {
 	return strings.TrimSpace(cleaned)
 }
 
+// FormatAdvisorReplyForUser turns the raw LLM reply into what we show on
+// Telegram and persist in session history: prose without the ```json fence,
+// plus an explicit trade card (entry/SL/TP/lot and estimated USDT PnL at
+// TP vs SL for linear USDT-M style notionals).
+func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload) string {
+	prose := strings.TrimSpace(StripDecisionFence(rawReply))
+	if prose == "" {
+		prose = "Tín hiệu vào lệnh."
+	}
+	tpPnL := estimatedPnLUSDT(d.Action, d.Entry, d.TakeProfit, d.Lot)
+	slPnL := estimatedPnLUSDT(d.Action, d.Entry, d.StopLoss, d.Lot)
+	var b strings.Builder
+	b.WriteString(prose)
+	b.WriteString("\n\n📋 Lệnh gợi ý\n")
+	b.WriteString(fmt.Sprintf("• Symbol: %s\n", d.Symbol))
+	b.WriteString(fmt.Sprintf("• Lệnh: %s\n", d.Action))
+	b.WriteString(fmt.Sprintf("• Entry: %s\n", formatAdvisorPrice(d.Entry)))
+	b.WriteString(fmt.Sprintf("• SL: %s\n", formatAdvisorPrice(d.StopLoss)))
+	b.WriteString(fmt.Sprintf("• TP: %s\n", formatAdvisorPrice(d.TakeProfit)))
+	b.WriteString(fmt.Sprintf("• Khối lượng (base): %s\n", formatAdvisorLot(d.Lot)))
+	b.WriteString("\n💰 Ước tính PnL (USDT, linear, theo khối lượng trên)\n")
+	b.WriteString(fmt.Sprintf("• Nếu chạm TP: %+.2f USDT\n", tpPnL))
+	b.WriteString(fmt.Sprintf("• Nếu chạm SL: %+.2f USDT\n", slPnL))
+	return strings.TrimSpace(b.String())
+}
+
+func formatAdvisorPrice(p float64) string {
+	ap := p
+	if ap < 0 {
+		ap = -ap
+	}
+	switch {
+	case ap >= 1000:
+		return fmt.Sprintf("%.2f", p)
+	case ap >= 1:
+		return fmt.Sprintf("%.4f", p)
+	default:
+		return fmt.Sprintf("%.6f", p)
+	}
+}
+
+func formatAdvisorLot(lot float64) string {
+	if lot <= 0 {
+		return "(chưa có)"
+	}
+	// Trim trailing zeros for readability.
+	s := fmt.Sprintf("%.8f", lot)
+	s = strings.TrimRight(strings.TrimRight(s, "0"), ".")
+	if s == "" {
+		return "0"
+	}
+	return s
+}
+
+func estimatedPnLUSDT(action string, entry, exit, lot float64) float64 {
+	if lot <= 0 || entry <= 0 || exit <= 0 {
+		return 0
+	}
+	switch strings.ToUpper(strings.TrimSpace(action)) {
+	case "BUY":
+		return (exit - entry) * lot
+	case "SELL":
+		return (entry - exit) * lot
+	default:
+		return 0
+	}
+}
+
 // valid enforces the prompt contract: non-empty symbol, a recognised
 // action, and three positive prices. We don't check price ORDERING
 // (SL<Entry for BUY vs SL>Entry for SELL) here — that's a business
@@ -80,7 +152,7 @@ func (p DecisionPayload) valid() bool {
 	if act != "BUY" && act != "SELL" {
 		return false
 	}
-	if p.Entry <= 0 || p.StopLoss <= 0 || p.TakeProfit <= 0 {
+	if p.Entry <= 0 || p.StopLoss <= 0 || p.TakeProfit <= 0 || p.Lot <= 0 {
 		return false
 	}
 	return true

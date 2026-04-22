@@ -115,7 +115,9 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 
 	return biz.EnrichmentResult{
 		Digest: Render(snap),
-		Ack:    fmt.Sprintf("Đang kiểm tra %s %s...", intent.Symbol, intent.Timeframe),
+		// Keep ack user-friendly: we always fetch multi-TF context internally;
+		// surfacing M15/H1/etc. here is noise and can confuse the bias story.
+		Ack:    fmt.Sprintf("Đang kiểm tra %s...", intent.Symbol),
 		Symbol: intent.Symbol,
 	}, nil
 }
