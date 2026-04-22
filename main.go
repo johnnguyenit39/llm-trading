@@ -5,13 +5,13 @@
 //	Telegram  ──►  advisor.ChatHandler  ──►  DeepSeek (streaming)
 //	                      │
 //	                      ├──►  Binance REST          (market data)
-//	                      ├──►  Redis                  (chat sessions + LastSymbol)
-//	                      └──►  Postgres               (agent_decisions)
+//	                      ├──►  biz.SessionStore       (Redis today)
+//	                      └──►  biz.DecisionStore      (Postgres today)
 //
-// There is no HTTP server, no cron, no user/auth layer — the whole
-// program is a single long-running process that long-polls Telegram,
-// pipes each message through the advisor module, and persists any
-// trade decision the LLM makes.
+// main.go is the composition root and the ONLY place that names
+// specific infrastructure (Redis, Postgres, etc.). Everything below
+// modules/advisor/ talks only to biz.* interfaces — swap a backend by
+// writing a sibling adapter + flipping the wiring here.
 package main
 
 import (
@@ -27,6 +27,9 @@ import (
 	"j_ai_trade/config/redis"
 	"j_ai_trade/logger"
 	"j_ai_trade/modules/advisor"
+	"j_ai_trade/modules/advisor/biz"
+	sessionRedis "j_ai_trade/modules/advisor/storage/redis"
+	decisionPostgres "j_ai_trade/modules/agent_decision/storage/postgres"
 )
 
 func main() {
@@ -41,27 +44,50 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// Postgres: stores agent_decisions. Non-fatal on failure — the
-	// bot still works as a pure chat interface; parsed trade JSON
-	// just won't be persisted.
-	db, err := storage.NewConnection()
-	if err != nil {
-		log.Warn().Err(err).Msg("postgres connection failed — trade decisions will not be persisted")
-	} else {
-		storage.AutoMigrate(db)
-	}
-
-	// Redis: carries chat sessions + the LastSymbol pin for follow-up
-	// questions. Nil Redis disables the chat bot entirely — without
-	// session storage follow-ups would feel amnesiac.
-	redisClient, err := redis.NewRedisClient()
-	if err != nil {
-		log.Fatal().Err(err).Msg("redis connection failed — advisor cannot start without a session store")
-	}
-
-	advisor.Init(ctx, db, redisClient.GetClient())
+	// Build the advisor's infrastructure using biz interfaces. Each
+	// block picks ONE concrete adapter; to switch backend (Postgres
+	// sessions, in-memory decisions, ...) replace the constructor
+	// here — modules/advisor/ and biz/ are untouched.
+	advisor.Init(ctx, advisor.Deps{
+		Sessions:  buildSessionStore(),
+		Decisions: buildDecisionStore(),
+	})
 
 	log.Info().Msg("j_ai_trade: Telegram advisor bot online — waiting for signals")
 	<-ctx.Done()
 	log.Info().Msg("j_ai_trade: shutdown signal received, exiting")
+}
+
+// buildSessionStore wires the Redis-backed biz.SessionStore. Redis is
+// mandatory: the chat bot needs session memory to feel coherent
+// across turns, so a failure here is fatal.
+//
+// To move sessions onto a different backend (Postgres table with a
+// TTL cron, in-memory for tests, DynamoDB for horizontal scale,
+// etcd, ...): write a new type implementing biz.SessionStore,
+// construct it here, return it. The rest of the codebase is
+// untouched.
+func buildSessionStore() biz.SessionStore {
+	rc, err := redis.NewRedisClient()
+	if err != nil {
+		log.Fatal().Err(err).Msg("redis connection failed — advisor cannot start without a session store")
+	}
+	return sessionRedis.NewSessionStore(rc.GetClient())
+}
+
+// buildDecisionStore wires the Postgres-backed biz.DecisionStore. It
+// is OPTIONAL: on any DB failure we return nil, and advisor.Init
+// downgrades to "parse + log but don't persist". That keeps the chat
+// bot usable in dev where Postgres isn't running.
+//
+// Same pattern as sessions: to swap storage, change this function
+// only.
+func buildDecisionStore() biz.DecisionStore {
+	db, err := storage.NewConnection()
+	if err != nil {
+		log.Warn().Err(err).Msg("postgres connection failed — trade decisions will not be persisted")
+		return nil
+	}
+	storage.AutoMigrate(db)
+	return decisionPostgres.NewStore(db)
 }

@@ -3,47 +3,65 @@ package advisor
 import (
 	"context"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
-	"gorm.io/gorm"
 
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
 	"j_ai_trade/modules/advisor/biz"
 	"j_ai_trade/modules/advisor/biz/market"
 	deepseekProvider "j_ai_trade/modules/advisor/provider/deepseek"
-	redisStorage "j_ai_trade/modules/advisor/storage/redis"
 	telegramTransport "j_ai_trade/modules/advisor/transport/telegram"
-	decisionPostgres "j_ai_trade/modules/agent_decision/storage/postgres"
 	"j_ai_trade/trading/marketdata"
 )
 
-// Init wires up the advisor module from its hexagonal adapters into
-// the domain core (biz.ChatHandler):
+// Deps is the infrastructure the advisor needs to run. Every field is
+// an INTERFACE from biz/: this package deliberately has zero
+// compile-time knowledge of Redis, Postgres, Binance, DeepSeek, or
+// Telegram. Replacing any backend means changing only main.go (the
+// composition root) plus writing a new adapter under storage/ or
+// provider/ — this file, biz/, and everything downstream are
+// untouched.
+//
+// Pattern rationale ("don't write Redis-specific functions"):
+//   - biz.SessionStore is how the handler talks to session memory.
+//     Redis today, Postgres/DynamoDB/in-memory/etcd tomorrow — the
+//     handler never knows.
+//   - biz.DecisionStore is how trade decisions get persisted.
+//     Postgres today, could become a JSON audit log or a Kafka
+//     topic later.
+//   - biz.LLMProvider / biz.ChatTransport / biz.MarketAnalyzer are
+//     already dependency-inverted the same way.
+//
+// Nil semantics:
+//   - SessionStore is REQUIRED. A nil store has no sensible meaning
+//     (every chat would feel amnesiac); main.go fails fast when it
+//     can't build one.
+//   - DecisionStore is OPTIONAL. Nil = "log parsed decisions, don't
+//     persist". Useful in dev without Postgres.
+type Deps struct {
+	Sessions  biz.SessionStore
+	Decisions biz.DecisionStore
+}
+
+// Init wires up the advisor module:
 //
 //	ChatHandler
-//	  ├── biz.ChatTransport   <── transport/telegram             (Telegram today)
-//	  ├── biz.LLMProvider     <── provider/deepseek              (DeepSeek today)
-//	  ├── biz.SessionStore    <── storage/redis                  (Redis today)
-//	  ├── biz.MarketAnalyzer  <── biz/market                     (Phase-2, optional)
-//	  └── biz.DecisionStore   <── agent_decision/storage/postgres(Phase-3, optional)
-//
-// Swapping any adapter requires only a new package + one line change
-// here — biz/ never imports a concrete vendor.
+//	  ├── biz.ChatTransport   <── transport/telegram   (Telegram today)
+//	  ├── biz.LLMProvider     <── provider/deepseek    (DeepSeek today)
+//	  ├── biz.SessionStore    <── (injected via Deps)  (Redis today)
+//	  ├── biz.DecisionStore   <── (injected via Deps)  (Postgres today, optional)
+//	  └── biz.MarketAnalyzer  <── biz/market           (Binance-backed, optional)
 //
 // Non-fatal on failure at every layer:
-//   - If Telegram/LLM fail to init we log and skip — the rest of the
-//     app keeps running (this function is the only consumer).
+//   - If Telegram/LLM fail to init we log and skip — the caller (main)
+//     is the only consumer and will wait on ctx.Done().
 //   - If Binance REST can't be built the advisor downgrades to
-//     chat-only (Phase-1 behaviour); users asking for analysis get a
-//     polite fallback, the bot itself stays up.
-//   - If Postgres is nil (or the decision store can't be built) the
-//     bot still runs; LLM trade JSON blocks are parsed and logged
-//     but not persisted. This keeps the chat bot usable in dev
-//     without a DB.
-func Init(ctx context.Context, db *gorm.DB, rdb *redis.Client) {
-	if rdb == nil {
-		log.Warn().Msg("advisor: Redis client is nil — chat disabled")
+//     chat-only; users asking for analysis get a polite fallback.
+//   - If deps.Decisions is nil, trade JSON is parsed and logged but
+//     not persisted. Chat keeps working.
+func Init(ctx context.Context, deps Deps) {
+	if deps.Sessions == nil {
+		log.Warn().Msg("advisor: Sessions store is nil — chat disabled")
 		return
 	}
 
@@ -59,29 +77,19 @@ func Init(ctx context.Context, db *gorm.DB, rdb *redis.Client) {
 		return
 	}
 
-	store := redisStorage.NewSessionStore(rdb)
 	filter := biz.NewUserFilter()
+	handler := biz.NewChatHandler(transport, deps.Sessions, llm, filter)
 
-	handler := biz.NewChatHandler(transport, store, llm, filter)
-
-	// Phase-2 market analyzer wiring. Kept OPTIONAL: if anything in the
-	// Binance stack can't be constructed we log a warning and continue
-	// with chat-only behaviour. Users get a polite "no data" response
-	// when they ask for analysis — better than crashing the whole bot.
 	if analyzer := buildMarketAnalyzer(); analyzer != nil {
 		handler = handler.WithMarketAnalyzer(analyzer)
-		log.Info().Msg("advisor: market analyzer attached (Phase 2 enabled)")
+		log.Info().Msg("advisor: market analyzer attached")
 	} else {
 		log.Warn().Msg("advisor: market analyzer disabled — chat-only mode")
 	}
 
-	// Phase-3 decision persistence. OPTIONAL: nil DB means the bot
-	// still works as a pure chat interface; the LLM's trade JSON
-	// blocks will be parsed and logged but not saved. In production
-	// the DB is always wired, so this only matters in dev.
-	if db != nil {
-		handler = handler.WithDecisionStore(decisionPostgres.NewStore(db))
-		log.Info().Msg("advisor: decision store attached (Phase 3 enabled)")
+	if deps.Decisions != nil {
+		handler = handler.WithDecisionStore(deps.Decisions)
+		log.Info().Msg("advisor: decision store attached")
 	} else {
 		log.Warn().Msg("advisor: decision store disabled — trade JSON will be logged only")
 	}
@@ -94,12 +102,16 @@ func Init(ctx context.Context, db *gorm.DB, rdb *redis.Client) {
 		Msg("advisor: chat bot online")
 }
 
-// buildMarketAnalyzer instantiates the Phase-2 pipeline (symbol
+// buildMarketAnalyzer instantiates the market pipeline (symbol
 // resolver, intent detector, Binance-backed candle fetcher, analyzer).
 // Returns nil if any dependency can't be built so the caller can
-// downgrade to chat-only mode. Currently only Binance REST is
-// required; it has no API key and thus rarely fails at construction
-// time — but we keep the guard for future exchanges that might.
+// downgrade to chat-only mode. Binance REST has no API key so it
+// rarely fails at construction — but we keep the guard for future
+// exchanges that might.
+//
+// This lives inside advisor_init because the Binance adapter is the
+// only CandleFetcher we support today. If we add OKX/Bybit later,
+// lift `marketdata.CandleFetcher` into Deps just like the stores.
 func buildMarketAnalyzer() biz.MarketAnalyzer {
 	repo := repository.NewBinanceRepository()
 	bs := binance.NewBinanceService(repo)

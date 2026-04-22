@@ -11,19 +11,6 @@ import (
 	adModel "j_ai_trade/modules/agent_decision/model"
 )
 
-// DecisionStore is the dependency-inverted view of the
-// agent_decision.biz.Store that the advisor needs — wire just `Save`
-// so the ChatHandler's test doubles can stay trivial and so the
-// advisor package doesn't pull the agent_decision biz package into
-// its public API.
-//
-// advisor_init.go passes the concrete Postgres-backed store as this
-// interface; any other persister (e.g. a JSON log for dry-runs)
-// slots in without changes here.
-type DecisionStore interface {
-	Save(ctx context.Context, d *adModel.AgentDecision) error
-}
-
 // ChatHandler wires every per-message decision together: filter, greet,
 // optionally enrich with market data (Phase 2), build prompt, stream
 // the LLM, edit the reply bubble, persist the turn pair. It depends
