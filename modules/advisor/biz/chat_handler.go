@@ -8,7 +8,21 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"j_ai_trade/modules/advisor/model"
+	adModel "j_ai_trade/modules/agent_decision/model"
 )
+
+// DecisionStore is the dependency-inverted view of the
+// agent_decision.biz.Store that the advisor needs — wire just `Save`
+// so the ChatHandler's test doubles can stay trivial and so the
+// advisor package doesn't pull the agent_decision biz package into
+// its public API.
+//
+// advisor_init.go passes the concrete Postgres-backed store as this
+// interface; any other persister (e.g. a JSON log for dry-runs)
+// slots in without changes here.
+type DecisionStore interface {
+	Save(ctx context.Context, d *adModel.AgentDecision) error
+}
 
 // ChatHandler wires every per-message decision together: filter, greet,
 // optionally enrich with market data (Phase 2), build prompt, stream
@@ -30,6 +44,7 @@ type ChatHandler struct {
 	llm       LLMProvider
 	filter    *UserFilter
 	analyzer  MarketAnalyzer // may be nil — chat-only fallback
+	decisions DecisionStore  // may be nil — decision logging off when Postgres unavailable
 }
 
 func NewChatHandler(
@@ -52,6 +67,16 @@ func NewChatHandler(
 // the handler (e.g. lazy Binance dial) can be attached at any time.
 func (h *ChatHandler) WithMarketAnalyzer(a MarketAnalyzer) *ChatHandler {
 	h.analyzer = a
+	return h
+}
+
+// WithDecisionStore attaches the persister for LLM trade decisions.
+// Nil store is legal — in that mode decisions are parsed and logged
+// but never written, which is exactly what we want if Postgres is
+// misconfigured: the chat bot keeps working, the ops team notices
+// the missing rows, nothing crashes.
+func (h *ChatHandler) WithDecisionStore(s DecisionStore) *ChatHandler {
+	h.decisions = s
 	return h
 }
 
@@ -205,7 +230,69 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	if reply == "" {
 		return
 	}
-	h.persistTurns(ctx, chatID, userText, reply)
+
+	// Extract any fenced trade-decision JSON the LLM emitted. When
+	// present, persist it as an agent_decision row; regardless of
+	// persistence outcome we strip the fence before saving the turn
+	// into session history so (a) the user's bubble isn't polluted
+	// with the raw JSON on the next follow-up and (b) the LLM doesn't
+	// see its own trade JSON on the next turn and conclude "I already
+	// traded this".
+	historyReply := reply
+	if decision := ExtractDecision(reply); decision != nil {
+		h.recordDecision(ctx, chatID, decision)
+		historyReply = StripDecisionFence(reply)
+		if historyReply == "" {
+			// Paranoia: an LLM that sent ONLY the JSON block and
+			// nothing else would otherwise lose the whole turn from
+			// history. Keep a short audit trail so later turns know
+			// a trade happened.
+			historyReply = "(đã đặt lệnh)"
+		}
+	}
+	h.persistTurns(ctx, chatID, userText, historyReply)
+}
+
+// recordDecision writes the LLM's trade decision into the agent
+// decisions store. Failure is non-fatal — the user still sees the
+// reply bubble; we just log loudly so ops notice. We keep the call
+// out-of-band (no context timeout tightening) because it runs AFTER
+// the user-facing bubble is finished.
+func (h *ChatHandler) recordDecision(ctx context.Context, chatID string, d *DecisionPayload) {
+	if h.decisions == nil {
+		log.Info().
+			Str("chat_id", chatID).
+			Str("symbol", d.Symbol).
+			Str("action", d.Action).
+			Float64("entry", d.Entry).
+			Float64("sl", d.StopLoss).
+			Float64("tp", d.TakeProfit).
+			Msg("advisor: decision parsed but no store wired — skipping persistence")
+		return
+	}
+	row := &adModel.AgentDecision{
+		Symbol:     d.Symbol,
+		Action:     d.Action,
+		Entry:      d.Entry,
+		StopLoss:   d.StopLoss,
+		TakeProfit: d.TakeProfit,
+	}
+	if err := h.decisions.Save(ctx, row); err != nil {
+		log.Error().Err(err).
+			Str("chat_id", chatID).
+			Str("symbol", d.Symbol).
+			Str("action", d.Action).
+			Msg("advisor: failed to persist agent_decision")
+		return
+	}
+	log.Info().
+		Str("chat_id", chatID).
+		Str("symbol", row.Symbol).
+		Str("action", row.Action).
+		Float64("entry", row.Entry).
+		Float64("sl", row.StopLoss).
+		Float64("tp", row.TakeProfit).
+		Msg("advisor: persisted agent_decision")
 }
 
 // handleCommand processes the small set of built-in slash commands.

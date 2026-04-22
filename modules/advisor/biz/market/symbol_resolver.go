@@ -11,15 +11,29 @@ import (
 	"strings"
 	"unicode"
 
-	"j_ai_trade/trading/ensembles"
 	"j_ai_trade/trading/models"
 )
 
+// SupportedSymbols is the advisor's trading universe — every symbol the
+// bot is willing to fetch candles for. Adding a pair here is the ONLY
+// place needed: the resolver, the ack messages, and anything downstream
+// just read from this list.
+//
+// Kept as a package-level var (not a const slice, Go can't) so tests
+// can swap it temporarily if needed.
+var SupportedSymbols = []string{
+	"BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT",
+	"XRPUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT",
+	"DOTUSDT", "ATOMUSDT", "NEARUSDT", "SUIUSDT",
+	"DOGEUSDT", "TRXUSDT", "BCHUSDT", "LTCUSDT",
+	"XAUUSDT",
+}
+
 // SymbolResolver maps arbitrary user text ("XAU", "vàng", "btc") onto a
 // canonical Binance symbol ("XAUUSDT", "BTCUSDT"). It is scoped to the
-// universe defined by cron_jobs.TradingSymbols so the advisor can only
-// analyse pairs the rest of the system already monitors — keeping cron
-// and advisor consistent is more important than supporting obscure pairs.
+// `SupportedSymbols` universe so the advisor can only analyse pairs it
+// has been configured for — an unknown pair produces an honest "not in
+// watchlist" response rather than a 400 from Binance.
 //
 // Design choices:
 //   - Static alias map; no network calls. A user typing an unknown pair
@@ -34,13 +48,13 @@ type SymbolResolver struct {
 	aliases map[string]string // normalised token -> canonical symbol
 }
 
-// NewSymbolResolver builds the resolver from the shared trading universe.
-// It expands each canonical symbol with a handful of common aliases and
+// NewSymbolResolver builds the resolver from `SupportedSymbols`. It
+// expands each canonical symbol with a handful of common aliases and
 // rejects tokens outside the universe so user mistakes surface early.
 func NewSymbolResolver() *SymbolResolver {
 	aliases := map[string]string{}
 	// 1. Every canonical symbol maps to itself.
-	for _, s := range ensembles.DefaultSymbols {
+	for _, s := range SupportedSymbols {
 		aliases[strings.ToLower(s)] = s
 	}
 	// 2. Hand-curated short names / Vietnamese aliases. Keep this small.
@@ -80,8 +94,9 @@ func NewSymbolResolver() *SymbolResolver {
 		"vàng":     "XAUUSDT",
 	}
 	for alias, canonical := range extra {
-		// Skip if the canonical symbol isn't in the universe (e.g. we
-		// dropped XAU from cron but the extra map still references it).
+		// Skip aliases whose canonical symbol isn't in SupportedSymbols
+		// — prevents the map from silently accepting tokens we can't
+		// actually fetch.
 		if _, ok := aliases[strings.ToLower(canonical)]; !ok {
 			continue
 		}

@@ -1,17 +1,19 @@
+// Package storage owns the Postgres connection used by the agent
+// decision log. There's only one migration target right now
+// (agent_decisions); AutoMigrate stays additive so future decision-
+// related tables can be registered here without downtime.
 package storage
 
 import (
 	"fmt"
-	orderModel "j_ai_trade/modules/order/model"
-	otpModel "j_ai_trade/modules/otp/model"
-	svModel "j_ai_trade/modules/strategy_version/model"
-	userModel "j_ai_trade/modules/user/model"
 	"log"
 	"os"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	adModel "j_ai_trade/modules/agent_decision/model"
 )
 
 type Config struct {
@@ -42,15 +44,17 @@ func NewConnection() (*gorm.DB, error) {
 	})
 	if err != nil {
 		log.Println("Could not create a new database connection")
+		return nil, err
 	}
 	return db, nil
 }
 
+// AutoMigrate is intentionally narrow: the only table this app owns is
+// agent_decisions. We still call AutoMigrate (rather than raw SQL) so
+// additive column changes in the model keep working after deploys
+// without an ops step. Existing rows are untouched.
 func AutoMigrate(db *gorm.DB) {
-	db.AutoMigrate(
-		&userModel.User{},
-		&otpModel.Otp{},
-		&svModel.StrategyVersion{},
-		&orderModel.Order{},
-	)
+	if err := db.AutoMigrate(&adModel.AgentDecision{}); err != nil {
+		log.Printf("postgres: AutoMigrate failed: %v", err)
+	}
 }

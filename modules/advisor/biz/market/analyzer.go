@@ -9,27 +9,32 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"j_ai_trade/modules/advisor/biz"
-	"j_ai_trade/trading/ensembles"
 	"j_ai_trade/trading/marketdata"
 	"j_ai_trade/trading/models"
 )
 
-// Analyzer is the Phase-2 implementation of biz.MarketAnalyzer: it
-// detects a user's analysis intent, fetches candles, runs the canonical
-// ensemble + indicators, and renders a prompt-ready digest. It owns no
-// mutable state — thread-safe by construction — so one instance serves
-// every concurrent ChatHandler goroutine.
+// CandleBudget is the number of candles fetched per timeframe. 120 bars
+// is enough warm-up for every indicator we compute (ADX14 wants ~28,
+// EMA200 wants 200 but degrades gracefully — we just skip EMA200 when
+// short). Larger values cost Binance weight and LLM tokens without
+// adding actionable information; smaller values fail ADX reliably.
+const CandleBudget = 200
+
+// Analyzer is the market-data pipeline for the advisor chat bot: it
+// detects the user's analysis intent, fetches multi-TF candles, and
+// renders a prompt-ready digest. It owns no mutable state (thread-safe
+// by construction) so one instance serves every ChatHandler goroutine.
 //
 // Dependency surface is intentionally narrow:
 //
 //	Analyzer
-//	  ├── IntentDetector  (symbol + keyword heuristic, /analyze parser)
+//	  ├── IntentDetector  (symbol + keyword heuristic + /analyze parser)
 //	  ├── SymbolResolver  (owned by IntentDetector)
 //	  └── CandleFetcher   (interface; real impl is Binance REST)
 //
-// Everything else (ensemble factory, indicators, digest renderer) is
-// pulled in statically from the trading packages — no interfaces
-// needed because those are pure functions over candles.
+// The decision-making used to live here via an ensemble; Phase-3 lifts
+// that out entirely — the bot (LLM) is now the trader, the backend
+// just hands it clean data.
 type Analyzer struct {
 	intent  *IntentDetector
 	fetcher marketdata.CandleFetcher
@@ -41,7 +46,7 @@ type Analyzer struct {
 
 // NewAnalyzer wires the dependencies. Callers in advisor_init.go build
 // a SymbolResolver, an IntentDetector, and a Binance-backed fetcher
-// then pass them here.
+// then pass them in here.
 func NewAnalyzer(intent *IntentDetector, fetcher marketdata.CandleFetcher) *Analyzer {
 	return &Analyzer{
 		intent:       intent,
@@ -54,8 +59,8 @@ func NewAnalyzer(intent *IntentDetector, fetcher marketdata.CandleFetcher) *Anal
 // the market pipeline for the given user text + hints; when yes, it
 // returns a populated EnrichmentResult (digest + ack + symbol).
 //
-// Errors are strictly for programmer bugs — ANY runtime failure
-// (intent miss, unsupported symbol/TF, Binance timeout, empty candles)
+// Errors are reserved for programmer bugs — ANY runtime failure
+// (intent miss, Binance timeout, empty candles, unsupported TF)
 // returns a zero EnrichmentResult with nil error so the handler falls
 // back gracefully to the chat-only flow.
 func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.EnrichmentHints) (biz.EnrichmentResult, error) {
@@ -69,33 +74,22 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 				Ack: fmt.Sprintf(
 					"Mình không nhận ra pair nào trong '%s'. Thử: /analyze BTC, /analyze XAU H4, /analyze ETH D1. Hiện đang support: %s.",
 					strings.TrimSpace(text),
-					strings.Join(ensembles.DefaultSymbols, ", "),
+					strings.Join(SupportedSymbols, ", "),
 				),
 			}, nil
 		}
 		return biz.EnrichmentResult{}, nil
 	}
 
-	ens := ensembles.DefaultEnsembleFor(intent.Timeframe)
-	if ens == nil {
-		// Unsupported entry TF — again, leave an ack so the bot can
-		// explain rather than silently dropping the market context.
-		return biz.EnrichmentResult{
-			Ack: fmt.Sprintf("Timeframe %s chưa support (hiện có M15/H1/H4/D1).", intent.Timeframe),
-		}, nil
-	}
-	required := ensembles.CollectRequiredTFs(ens)
-
-	// Advisor-specific: always fetch H1/H4/D1 on top of whatever the
-	// ensemble strictly needs, so the digest can include higher-TF
-	// "trend context" even for a scalping M15 setup. The bot uses this
-	// to answer questions like "M15 cho buy nhưng D1 đang trend gì?".
-	// 120 bars is enough for EMA50/RSI14/ADX14 on every TF and cheap
-	// on the Binance weight budget (cap 2400 / min).
-	for _, tf := range []models.Timeframe{models.TF_H1, models.TF_H4, models.TF_D1} {
-		if n, ok := required[tf]; !ok || n < 120 {
-			required[tf] = 120
-		}
+	// Fetch the standard "scalping + macro context" bundle on every
+	// analysis request: M15 (entry timing), H1/H4/D1 (trend context).
+	// CandleBudget is uniform so downstream indicators always have
+	// enough warm-up regardless of which TF the user asked for.
+	required := map[models.Timeframe]int{
+		models.TF_M15: CandleBudget,
+		models.TF_H1:  CandleBudget,
+		models.TF_H4:  CandleBudget,
+		models.TF_D1:  CandleBudget,
 	}
 
 	fetchCtx, cancel := context.WithTimeout(ctx, a.fetchTimeout)
@@ -107,13 +101,10 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 			Str("symbol", intent.Symbol).
 			Str("tf", string(intent.Timeframe)).
 			Msg("advisor: market fetch failed; falling back to chat-only")
-		// Non-fatal: bot still replies without market context. The
-		// system prompt instructs it to say "tạm thời không lấy được
-		// dữ liệu" in that case.
 		return biz.EnrichmentResult{}, nil
 	}
 
-	snap, err := Build(fetchCtx, market, intent.Timeframe, time.Now())
+	snap, err := Build(market, intent.Timeframe, time.Now())
 	if err != nil {
 		log.Warn().Err(err).
 			Str("symbol", intent.Symbol).

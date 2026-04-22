@@ -5,6 +5,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
@@ -13,6 +14,7 @@ import (
 	deepseekProvider "j_ai_trade/modules/advisor/provider/deepseek"
 	redisStorage "j_ai_trade/modules/advisor/storage/redis"
 	telegramTransport "j_ai_trade/modules/advisor/transport/telegram"
+	decisionPostgres "j_ai_trade/modules/agent_decision/storage/postgres"
 	"j_ai_trade/trading/marketdata"
 )
 
@@ -20,20 +22,26 @@ import (
 // the domain core (biz.ChatHandler):
 //
 //	ChatHandler
-//	  ├── biz.ChatTransport   <── transport/telegram  (Telegram today)
-//	  ├── biz.LLMProvider     <── provider/deepseek   (DeepSeek today)
-//	  ├── biz.SessionStore    <── storage/redis       (Redis today)
-//	  └── biz.MarketAnalyzer  <── biz/market          (Phase 2 — optional)
+//	  ├── biz.ChatTransport   <── transport/telegram             (Telegram today)
+//	  ├── biz.LLMProvider     <── provider/deepseek              (DeepSeek today)
+//	  ├── biz.SessionStore    <── storage/redis                  (Redis today)
+//	  ├── biz.MarketAnalyzer  <── biz/market                     (Phase-2, optional)
+//	  └── biz.DecisionStore   <── agent_decision/storage/postgres(Phase-3, optional)
 //
 // Swapping any adapter requires only a new package + one line change
 // here — biz/ never imports a concrete vendor.
 //
-// Non-fatal on failure: if the bot or LLM is misconfigured we log and
-// skip; the rest of the app (cron jobs, HTTP API) keeps running.
-// Within advisor itself, the market analyzer is ALSO optional — a
-// Binance outage at boot downgrades the advisor to Phase-1 chat-only
-// rather than disabling it entirely.
-func Init(ctx context.Context, rdb *redis.Client) {
+// Non-fatal on failure at every layer:
+//   - If Telegram/LLM fail to init we log and skip — the rest of the
+//     app keeps running (this function is the only consumer).
+//   - If Binance REST can't be built the advisor downgrades to
+//     chat-only (Phase-1 behaviour); users asking for analysis get a
+//     polite fallback, the bot itself stays up.
+//   - If Postgres is nil (or the decision store can't be built) the
+//     bot still runs; LLM trade JSON blocks are parsed and logged
+//     but not persisted. This keeps the chat bot usable in dev
+//     without a DB.
+func Init(ctx context.Context, db *gorm.DB, rdb *redis.Client) {
 	if rdb == nil {
 		log.Warn().Msg("advisor: Redis client is nil — chat disabled")
 		return
@@ -65,6 +73,17 @@ func Init(ctx context.Context, rdb *redis.Client) {
 		log.Info().Msg("advisor: market analyzer attached (Phase 2 enabled)")
 	} else {
 		log.Warn().Msg("advisor: market analyzer disabled — chat-only mode")
+	}
+
+	// Phase-3 decision persistence. OPTIONAL: nil DB means the bot
+	// still works as a pure chat interface; the LLM's trade JSON
+	// blocks will be parsed and logged but not saved. In production
+	// the DB is always wired, so this only matters in dev.
+	if db != nil {
+		handler = handler.WithDecisionStore(decisionPostgres.NewStore(db))
+		log.Info().Msg("advisor: decision store attached (Phase 3 enabled)")
+	} else {
+		log.Warn().Msg("advisor: decision store disabled — trade JSON will be logged only")
 	}
 
 	go handler.Run(ctx)

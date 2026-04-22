@@ -1,36 +1,35 @@
 package market
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
 	baseCandle "j_ai_trade/common"
-	"j_ai_trade/trading/engine"
-	"j_ai_trade/trading/ensembles"
 	"j_ai_trade/trading/indicators"
 	"j_ai_trade/trading/models"
 )
 
-// PaperEquity is the virtual account size passed to the ensemble so it
-// can compute position sizing for the digest. The advisor is read-only,
-// so the number only matters for the "if you took this trade, risk ~$X"
-// framing the LLM may choose to echo. $1000 matches the cron's paper
-// equity for consistency.
-const PaperEquity = 1000.0
+// RawCandleTF is the timeframe whose last N candles get emitted as raw
+// OHLCV rows inside the digest. We pick the entry TF (M15 in the
+// scalping default) because that's where the LLM needs to read candle
+// shape — pin bar / engulfing / long wick — to decide on an entry.
+// Higher TFs stay summarised via indicators only; dumping their raw
+// candles would balloon the prompt without adding information the
+// indicators don't already capture.
+const RawCandleBars = 20
 
 // TFSummary is the per-timeframe digest of what the market looks like
-// right now. Everything is pre-computed so the LLM can read numbers
-// directly and doesn't need to do any math. Keep field names short —
-// they appear in the JSON footer and every extra character costs tokens.
+// right now. Everything is pre-computed so the LLM reads numbers
+// directly and doesn't do any math. Field names are short because they
+// also appear in the JSON footer, and every extra character costs
+// tokens on every call.
 type TFSummary struct {
 	Timeframe models.Timeframe `json:"tf"`
-	Regime    models.Regime    `json:"regime"`
+	Regime    string           `json:"regime"` // RANGE | CHOPPY | TREND_UP | TREND_DOWN
 	ADX14     float64          `json:"adx"`
-	Close     float64          `json:"close"`
+	Close     float64          `json:"close"` // last CLOSED bar close
 	EMA20     float64          `json:"ema20"`
 	EMA50     float64          `json:"ema50"`
 	EMA200    float64          `json:"ema200,omitempty"`
@@ -47,102 +46,98 @@ type TFSummary struct {
 	Candles   int              `json:"candles"` // how many closed candles were analysed
 }
 
-// EnsembleDigest mirrors the important fields of the ensemble's
-// TradeDecision in a compact, LLM-friendly shape. We include both the
-// decision itself AND the full vote breakdown so the bot can explain
-// WHY the rule engine leaned one way.
-type EnsembleDigest struct {
-	Direction   string                `json:"direction"` // BUY | SELL | NONE
-	Tier        string                `json:"tier,omitempty"`
-	Confidence  float64               `json:"conf,omitempty"`
-	NetRR       float64               `json:"netrr,omitempty"`
-	Entry       float64               `json:"entry,omitempty"`
-	StopLoss    float64               `json:"sl,omitempty"`
-	TakeProfit  float64               `json:"tp,omitempty"`
-	SizeFactor  float64               `json:"size_factor,omitempty"`
-	Notional    float64               `json:"notional,omitempty"`
-	Leverage    float64               `json:"lev,omitempty"`
-	RiskUSD     float64               `json:"risk_usd,omitempty"`
-	Agreement   int                   `json:"agreement,omitempty"`
-	Eligible    int                   `json:"eligible,omitempty"`
-	AgreeRatio  float64               `json:"ratio,omitempty"`
-	Reason      string                `json:"reason"`
-	Votes       []models.StrategyVote `json:"-"` // rendered as prose, not JSON, to save tokens
-	VetoReasons []string              `json:"vetoes,omitempty"`
+// RawCandle is a single OHLCV row rendered into the digest so the LLM
+// can read candle shape directly. We emit open/high/low/close/volume —
+// enough for any pattern recognition (pin bar, engulfing, doji, etc.)
+// without blowing up the prompt with microstructure we don't need.
+type RawCandle struct {
+	Time   time.Time `json:"t"` // bar open time (UTC)
+	Open   float64   `json:"o"`
+	High   float64   `json:"h"`
+	Low    float64   `json:"l"`
+	Close  float64   `json:"c"`
+	Volume float64   `json:"v"`
 }
 
-// PairSnapshot is the complete cooked view of a symbol the LLM sees.
-// It carries everything the prompt needs — raw indicators per TF, the
-// rule engine's decision, timing context. Render(snapshot) turns this
-// into the actual prompt string.
+// PairSnapshot is the complete cooked view of a symbol that the LLM
+// sees. It carries everything the prompt needs:
+//   - live price (distinct from any per-TF closed-bar close),
+//   - per-TF indicator summaries (ordered entry TF first, then higher
+//     TFs for macro context),
+//   - a short window of raw OHLCV for the entry TF so the LLM can
+//     inspect candle shape / patterns that indicators flatten out.
 //
-// CurrentPrice is the LIVE last-trade price from the entry TF's most
-// recent (possibly unclosed) candle. All per-TF TFSummary.Close values
-// are last CLOSED-bar closes so indicators stay anti-repaint — those
-// are distinct numbers mid-candle and confusing them was the Phase-2
-// bug users flagged.
+// Render(snapshot) turns this into the actual [MARKET_DATA]...[/MARKET_DATA]
+// prompt blob.
+//
+// What's intentionally NOT here: rule-engine verdicts, strategy votes,
+// risk sizing, veto lists. The bot itself is the decision maker now —
+// the backend just hands it clean data.
 type PairSnapshot struct {
 	Symbol       string
 	EntryTF      models.Timeframe
 	GeneratedAt  time.Time
 	CurrentPrice float64     // live price on the entry TF (from the unclosed bar)
-	Summaries    []TFSummary // ordered entry TF first, then higher TFs for context
-	Ensemble     EnsembleDigest
+	Summaries    []TFSummary // ordered: entry TF first, then higher TFs
+	RawBars      []RawCandle // last ~20 OHLCV rows of the entry TF (anti-repaint: closed only)
 }
 
-// Build produces a PairSnapshot by running the canonical ensemble plus
-// standalone indicator summaries for each required TF. Returns an error
-// if the ensemble factory doesn't know this entry TF or the entry TF's
-// candles are empty (nothing useful to say).
-func Build(ctx context.Context, market models.MarketData, entryTF models.Timeframe, now time.Time) (*PairSnapshot, error) {
-	ens := ensembles.DefaultEnsembleFor(entryTF)
-	if ens == nil {
-		return nil, fmt.Errorf("no default ensemble for entry timeframe %q", entryTF)
-	}
+// Build produces a PairSnapshot from fetched multi-TF candles. Returns
+// an error if the entry TF has no candles (nothing useful to say).
+func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*PairSnapshot, error) {
 	entryCandles := market.Get(entryTF)
 	if len(entryCandles) == 0 {
 		return nil, fmt.Errorf("no candles for entry timeframe %q", entryTF)
 	}
+	// Live price = the LAST bar's close, which on Binance REST is the
+	// most-recent-trade price of the currently-forming candle. This is
+	// what users mean by "giá hiện tại".
 	currentPrice := entryCandles[len(entryCandles)-1].Close
-
-	decision := ens.Analyze(ctx, engine.StrategyInput{
-		Market:       market,
-		Fundamental:  nil,
-		Equity:       PaperEquity,
-		CurrentPrice: currentPrice,
-		EntryTF:      entryTF,
-	})
 
 	snap := &PairSnapshot{
 		Symbol:       market.Symbol,
 		EntryTF:      entryTF,
 		GeneratedAt:  now.UTC(),
 		CurrentPrice: currentPrice,
-		Ensemble:     ensembleDigestFrom(decision),
 	}
 
-	// Entry TF first (what the user cares about executing on), then
-	// higher TFs for trend context. Unfetched TFs are skipped silently.
-	tfOrder := summaryOrder(entryTF)
-	for _, tf := range tfOrder {
+	// Per-TF summaries, entry TF first for LLM anchoring.
+	for _, tf := range summaryOrder(entryTF) {
 		candles := market.Get(tf)
 		if len(candles) == 0 {
 			continue
 		}
 		snap.Summaries = append(snap.Summaries, summariseTF(candles, tf))
 	}
+
+	// Raw OHLCV window for the entry TF only. ClosedCandles drops the
+	// forming bar so the LLM never sees a repainting close price.
+	closedEntry := indicators.ClosedCandles(entryCandles)
+	if n := len(closedEntry); n > 0 {
+		start := n - RawCandleBars
+		if start < 0 {
+			start = 0
+		}
+		for _, c := range closedEntry[start:] {
+			snap.RawBars = append(snap.RawBars, RawCandle{
+				Time:   c.OpenTime.UTC(),
+				Open:   c.Open,
+				High:   c.High,
+				Low:    c.Low,
+				Close:  c.Close,
+				Volume: c.Volume,
+			})
+		}
+	}
 	return snap, nil
 }
 
 // summaryOrder returns the canonical ordering for per-TF blocks given
-// an entry TF: entry TF first (the one the LLM should focus on for
+// an entry TF: entry TF first (what the LLM should focus on for
 // execution), then strictly higher TFs for macro context. Listing the
-// entry TF up front matters because the LLM naturally anchors on the
-// first block it reads.
+// entry TF up front matters because LLMs anchor on the first block.
 func summaryOrder(entryTF models.Timeframe) []models.Timeframe {
 	all := []models.Timeframe{models.TF_M15, models.TF_H1, models.TF_H4, models.TF_D1}
-	// Find entry TF index. If the entry TF is unknown (shouldn't
-	// happen — Build already validated), fall back to chronological.
 	startIdx := -1
 	for i, tf := range all {
 		if tf == entryTF {
@@ -166,21 +161,20 @@ func summaryOrder(entryTF models.Timeframe) []models.Timeframe {
 
 // summariseTF computes every indicator the digest reports. We anti-
 // repaint by analysing ClosedCandles — the LIVE bar is excluded from
-// every calculation, matching how strategies behave.
+// every calculation so numbers don't jump mid-candle.
 func summariseTF(candles []baseCandle.BaseCandle, tf models.Timeframe) TFSummary {
 	closed := indicators.ClosedCandles(candles)
 	if len(closed) == 0 {
 		return TFSummary{Timeframe: tf}
 	}
 	closes := indicators.Closes(closed)
-	close := closed[len(closed)-1].Close
+	last := closed[len(closed)-1].Close
 
 	sum := TFSummary{
 		Timeframe: tf,
-		Close:     close,
+		Close:     last,
 		Candles:   len(closed),
 	}
-	sum.Regime = engine.DetectRegime(candles, engine.DefaultRegimeThresholds())
 	sum.ADX14 = indicators.ADX(closed, 14)
 	sum.RSI14 = indicators.RSI(closes, 14)
 	sum.EMA20 = indicators.EMA(closes, 20)
@@ -189,55 +183,50 @@ func summariseTF(candles []baseCandle.BaseCandle, tf models.Timeframe) TFSummary
 		sum.EMA200 = indicators.EMA(closes, 200)
 	}
 	sum.ATR = indicators.ATR(closed, 14)
-	if close > 0 && sum.ATR > 0 {
-		sum.ATRPct = (sum.ATR / close) * 100
+	if last > 0 && sum.ATR > 0 {
+		sum.ATRPct = (sum.ATR / last) * 100
 	}
 	if len(closes) >= 20 {
 		sum.BBUpper, sum.BBMid, sum.BBLower = indicators.BollingerBands(closes, 20, 2.0)
 		sum.DonchHigh, sum.DonchLow = indicators.DonchianChannel(closed, 20)
 	}
 	sum.SwingHigh, sum.SwingLow = indicators.SwingHighLow(closed, 3)
+	sum.Regime = simpleRegime(sum.ADX14, sum.EMA20, sum.EMA50)
 	return sum
 }
 
-// ensembleDigestFrom flattens a TradeDecision into the compact shape the
-// prompt uses. We copy field-by-field rather than embed the decision so
-// future changes to TradeDecision don't leak into the prompt contract.
-func ensembleDigestFrom(d *models.TradeDecision) EnsembleDigest {
-	dg := EnsembleDigest{
-		Direction:   d.Direction,
-		Tier:        d.Tier,
-		Confidence:  round2(d.Confidence),
-		NetRR:       round2(d.NetRR),
-		Entry:       d.Entry,
-		StopLoss:    d.StopLoss,
-		TakeProfit:  d.TakeProfit,
-		SizeFactor:  d.SizeFactor,
-		Notional:    round2(d.Notional),
-		Leverage:    round2(d.Leverage),
-		RiskUSD:     round2(d.RiskUSD),
-		Agreement:   d.Agreement,
-		Eligible:    d.EligibleCount,
-		AgreeRatio:  round2(d.AgreeRatio),
-		Reason:      d.Reason,
-		Votes:       d.Votes,
-		VetoReasons: d.VetoReasons,
+// simpleRegime is a lightweight ADX+EMA label used only for LLM
+// context. It's deliberately crude — the LLM is the real decision
+// maker, not this label. The thresholds (20/25) match the standard
+// Wilder dead-zone convention.
+func simpleRegime(adx, ema20, ema50 float64) string {
+	switch {
+	case adx < 20:
+		return "RANGE"
+	case adx < 25:
+		return "CHOPPY"
+	case ema20 > ema50:
+		return "TREND_UP"
+	case ema20 < ema50:
+		return "TREND_DOWN"
+	default:
+		return "TREND"
 	}
-	return dg
 }
 
 // Render formats the snapshot as the final blob the ChatHandler injects
-// into the LLM prompt. The format is deliberately hybrid:
+// into the LLM prompt. Format is hybrid:
 //
-//   - Human prose per TF — LLMs excel at narrative, and prose compresses
-//     better than repeated JSON keys.
-//   - One JSON footer carrying the exact numbers the bot may need to
-//     echo (entry/SL/TP). This protects against decimal-drift when the
-//     LLM paraphrases.
+//   - Human prose per TF — LLMs do well with narrative and prose
+//     compresses better than repeated JSON keys.
+//   - A compact raw-OHLCV table of the entry TF so the LLM can read
+//     candle shape / pin bars / engulfings directly.
+//   - One JSON footer with the exact price numbers — protects against
+//     decimal drift when the LLM paraphrases.
 //
-// The whole thing is wrapped in `[MARKET_DATA] ... [/MARKET_DATA]` so
-// the system prompt can reference a precise boundary: "only use numbers
-// inside [MARKET_DATA]".
+// The whole thing is wrapped in `[MARKET_DATA]...[/MARKET_DATA]` so the
+// system prompt can reference a precise boundary ("only use numbers
+// inside [MARKET_DATA]").
 func Render(snap *PairSnapshot) string {
 	if snap == nil {
 		return ""
@@ -246,16 +235,12 @@ func Render(snap *PairSnapshot) string {
 	fmt.Fprintf(&b, "[MARKET_DATA] %s · generated %s UTC · entry_tf=%s\n",
 		snap.Symbol, snap.GeneratedAt.Format("2006-01-02 15:04"), snap.EntryTF)
 
-	// LIVE price — the single number the LLM should quote whenever the
-	// user asks "giá hiện tại?". Distinguished from per-TF closed-bar
-	// closes so the bot can't accidentally serve a stale number.
 	if snap.CurrentPrice > 0 {
 		fmt.Fprintf(&b, "Current price (live, %s): %s\n", snap.EntryTF, f4(snap.CurrentPrice))
 	}
 
-	// Next-close clocks help the LLM frame confirmation timing. Only
-	// emit lines for TFs we actually fetched — otherwise the LLM sees
-	// "H1=16:00" in a digest that has no H1 block and gets confused.
+	// Next-close clocks — only for TFs we actually summarised; avoids
+	// confusing the LLM with phantom timeframes.
 	var clocks []string
 	for _, s := range snap.Summaries {
 		if line := FormatNextClose(s.Timeframe, snap.GeneratedAt); line != "" {
@@ -268,18 +253,15 @@ func Render(snap *PairSnapshot) string {
 		b.WriteString("\n")
 	}
 
-	// Per-TF prose blocks.
 	for _, s := range snap.Summaries {
 		writeTFBlock(&b, s)
 	}
 
-	// Rule-engine verdict — always present, even when NONE.
-	writeEnsembleBlock(&b, snap)
+	if len(snap.RawBars) > 0 {
+		writeRawBars(&b, snap.EntryTF, snap.RawBars)
+	}
 
-	// JSON footer for exact numbers. Only non-zero fields are emitted
-	// (see omitempty on the struct) so token cost stays minimal.
-	footer := buildFooter(snap)
-	if footer != "" {
+	if footer := buildFooter(snap); footer != "" {
 		fmt.Fprintf(&b, "\n%s\n", footer)
 	}
 	b.WriteString("[/MARKET_DATA]")
@@ -323,70 +305,37 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 	b.WriteString("\n")
 }
 
-func writeEnsembleBlock(b *strings.Builder, snap *PairSnapshot) {
-	e := snap.Ensemble
-	switch e.Direction {
-	case models.DirectionBuy, models.DirectionSell:
-		fmt.Fprintf(b, "Rule engine: %s tier=%s conf=%s netRR=%s\n",
-			e.Direction, e.Tier, f1(e.Confidence), f2(e.NetRR))
-		fmt.Fprintf(b, "  Entry %s  SL %s  TP %s\n", f4(e.Entry), f4(e.StopLoss), f4(e.TakeProfit))
-		fmt.Fprintf(b, "  Agreement %d/%d eligible (ratio %s, avgConf %s)\n",
-			e.Agreement, e.Eligible, f2(e.AgreeRatio), f1(e.Confidence))
-		if e.Notional > 0 {
-			fmt.Fprintf(b, "  Sizing: notional $%s  leverage %sx  risk $%s  (size_factor %s)\n",
-				f2(e.Notional), f1(e.Leverage), f2(e.RiskUSD), f2(e.SizeFactor))
-		}
-		fmt.Fprintf(b, "  Reason: %s\n", e.Reason)
-	default:
-		fmt.Fprintf(b, "Rule engine: NONE (no trade)\n")
-		fmt.Fprintf(b, "  Reason: %s\n", e.Reason)
+// writeRawBars emits a compact fixed-column table of the last N entry-TF
+// candles. Format is one line per bar: `HH:MM  O=... H=... L=... C=...
+// V=...`. This is deliberately tabular rather than JSON because LLMs
+// parse tabular numeric data more reliably and it's cheaper on tokens
+// than a repeated-key JSON array.
+func writeRawBars(b *strings.Builder, tf models.Timeframe, bars []RawCandle) {
+	fmt.Fprintf(b, "Recent %s candles (oldest -> newest, UTC):\n", tf)
+	for _, c := range bars {
+		fmt.Fprintf(b,
+			"  %s  O=%s H=%s L=%s C=%s V=%s\n",
+			c.Time.Format("01-02 15:04"),
+			f4(c.Open), f4(c.High), f4(c.Low), f4(c.Close), f2(c.Volume),
+		)
 	}
-	if len(e.Votes) > 0 {
-		fmt.Fprintf(b, "  Votes: %s\n", formatVotes(e.Votes))
-	}
-	if len(e.VetoReasons) > 0 {
-		fmt.Fprintf(b, "  Vetoes: %s\n", strings.Join(e.VetoReasons, "; "))
-	}
+	b.WriteString("\n")
 }
 
-func formatVotes(votes []models.StrategyVote) string {
-	// Sort by name for stable output (helps diff when debugging).
-	sorted := append([]models.StrategyVote(nil), votes...)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
-	parts := make([]string, 0, len(sorted))
-	for _, v := range sorted {
-		parts = append(parts, fmt.Sprintf("%s=%s@%s", v.Name, v.Direction, f0(v.Confidence)))
-	}
-	return strings.Join(parts, " · ")
-}
-
-// buildFooter emits the machine-readable JSON line the bot uses to echo
-// exact numbers. We trim EnsembleDigest fields when Direction==NONE so
-// we don't dump a bag of zeros into the prompt.
+// buildFooter emits a minimal machine-readable JSON blob the bot uses
+// to echo exact numbers. We keep it small on purpose — the LLM is the
+// decision maker, so there are no pre-computed entries/SLs to copy.
 func buildFooter(snap *PairSnapshot) string {
+	regimes := map[string]string{}
+	for _, s := range snap.Summaries {
+		regimes[string(s.Timeframe)] = s.Regime
+	}
 	payload := map[string]any{
 		"symbol":   snap.Symbol,
 		"entry_tf": string(snap.EntryTF),
 		"price":    snap.CurrentPrice,
-		"ensemble": snap.Ensemble.Direction,
-		"reason":   snap.Ensemble.Reason,
+		"regimes":  regimes,
 	}
-	// Numeric ensemble fields only when we have a real setup.
-	if snap.Ensemble.Direction == models.DirectionBuy || snap.Ensemble.Direction == models.DirectionSell {
-		payload["tier"] = snap.Ensemble.Tier
-		payload["conf"] = snap.Ensemble.Confidence
-		payload["netrr"] = snap.Ensemble.NetRR
-		payload["entry"] = snap.Ensemble.Entry
-		payload["sl"] = snap.Ensemble.StopLoss
-		payload["tp"] = snap.Ensemble.TakeProfit
-	}
-	// Regime per TF — small and handy for the bot to quote.
-	regimes := map[string]string{}
-	for _, s := range snap.Summaries {
-		regimes[string(s.Timeframe)] = string(s.Regime)
-	}
-	payload["regimes"] = regimes
-
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return ""
@@ -396,28 +345,15 @@ func buildFooter(snap *PairSnapshot) string {
 
 // ----- number formatting helpers -----
 // LLMs handle numbers better when decimals are stable and don't carry
-// floating-point noise ("2384.1200000001"). Single-source the
-// formatting here so the prose and the JSON stay in sync visually.
+// floating-point noise ("2384.1200000001"). Single-sourcing the
+// formatting here keeps prose and JSON visually in sync.
 
-func round2(v float64) float64 {
-	const scale = 100
-	return float64(int64(v*scale+sign(v)*0.5)) / scale
-}
-func sign(v float64) float64 {
-	if v < 0 {
-		return -1
-	}
-	return 1
-}
 func f0(v float64) string { return fmt.Sprintf("%.0f", v) }
 func f1(v float64) string { return fmt.Sprintf("%.1f", v) }
 func f2(v float64) string { return fmt.Sprintf("%.2f", v) }
 func f4(v float64) string {
-	// Use 4 decimals for prices — enough for gold/forex, truncates
-	// trailing zeros for integer-ish prices via %g-then-pad fallback.
 	if v == 0 {
 		return "0"
 	}
 	return fmt.Sprintf("%.4f", v)
 }
-

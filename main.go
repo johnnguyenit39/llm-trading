@@ -1,99 +1,67 @@
+// j_ai_trade is a Telegram-only trading advisor.
+//
+// Pipeline:
+//
+//	Telegram  ──►  advisor.ChatHandler  ──►  DeepSeek (streaming)
+//	                      │
+//	                      ├──►  Binance REST          (market data)
+//	                      ├──►  Redis                  (chat sessions + LastSymbol)
+//	                      └──►  Postgres               (agent_decisions)
+//
+// There is no HTTP server, no cron, no user/auth layer — the whole
+// program is a single long-running process that long-polls Telegram,
+// pipes each message through the advisor module, and persists any
+// trade decision the LLM makes.
 package main
 
 import (
 	"context"
-	"j_ai_trade/appi18n"
-	appContext "j_ai_trade/components/app_context"
-	appConfig "j_ai_trade/config/app"
-	storage "j_ai_trade/config/postgres"
-	"j_ai_trade/config/pubsub"
-	"j_ai_trade/config/redis"
-	cronjobsManager "j_ai_trade/cron_jobs"
-	_ "j_ai_trade/docs"
-	"j_ai_trade/logger"
-	"j_ai_trade/modules/advisor"
 	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
+	storage "j_ai_trade/config/postgres"
+	"j_ai_trade/config/redis"
+	"j_ai_trade/logger"
+	"j_ai_trade/modules/advisor"
 )
 
-// @title J-AI-Trade API
-// @version 1.0
-// @description J-AI-Trade API for cryptocurrency trading and management
-
-// @contact.name API Support
-// @contact.url http://www.swagger.io/support
-// @contact.email support@swagger.io
-
-// @license.name Apache 2.0
-// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
-
-// @host localhost:80
-// @BasePath /api
-
-// @securityDefinitions.apikey Bearer
-// @in header
-// @name Authorization
-// @description Type "Bearer" followed by a space and JWT token.
 func main() {
-	appi18n.Init()
-
 	logger.InitializeLogger()
 
-	// Load .env file only in local development
 	if os.Getenv("ENV") != "PROD" {
-		// Only load .env if not in production (i.e., in development)
-		err := godotenv.Load()
-		if err != nil {
-			log.Fatal().Err(err).Msg("error loading .env file")
+		if err := godotenv.Load(); err != nil {
+			log.Warn().Err(err).Msg("no .env file found — relying on process env")
 		}
 	}
 
-	//Pub sub
-	pubSub := pubsub.NewPubSub()
-	redisClient, err := redis.NewRedisClient()
-	if err != nil {
-		log.Warn().Err(err).Msg("Redis connection failed - continuing without Redis functionality")
-	} else {
-		pubsub.ListenEvent(redisClient.GetClient(), pubSub)
-	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
-	// Initialize  service
-	log.Info().Msg("J AI Trade service initialized successfully")
-
+	// Postgres: stores agent_decisions. Non-fatal on failure — the
+	// bot still works as a pure chat interface; parsed trade JSON
+	// just won't be persisted.
 	db, err := storage.NewConnection()
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to load the database")
-	}
-
-	storage.AutoMigrate(db)
-
-	// Initialize Gin router
-	app := gin.Default()
-
-	// Initialize AppContext with DB and app
-	appContext := appContext.NewAppContext(db, nil, pubSub, app)
-
-	// Initialize application config
-	appConfig.InitializeApp(appContext)
-
-	// Initialize and start cron jobs
-	cronjobsManager.InitCronJobs(db)
-
-	// Initialize advisor chat bot (long-polls Telegram, streams DeepSeek).
-	// Non-fatal: if the bot or DeepSeek is misconfigured, chat is disabled
-	// but the HTTP API and cron jobs keep running.
-	if redisClient != nil {
-		advisor.Init(context.Background(), redisClient.GetClient())
+		log.Warn().Err(err).Msg("postgres connection failed — trade decisions will not be persisted")
 	} else {
-		log.Warn().Msg("advisor: skipped because Redis is unavailable")
+		storage.AutoMigrate(db)
 	}
 
-	// Start the application on port 80
-	if err := app.Run(":80"); err != nil {
-		log.Fatal().Err(err).Msg("failed to start the application")
+	// Redis: carries chat sessions + the LastSymbol pin for follow-up
+	// questions. Nil Redis disables the chat bot entirely — without
+	// session storage follow-ups would feel amnesiac.
+	redisClient, err := redis.NewRedisClient()
+	if err != nil {
+		log.Fatal().Err(err).Msg("redis connection failed — advisor cannot start without a session store")
 	}
+
+	advisor.Init(ctx, db, redisClient.GetClient())
+
+	log.Info().Msg("j_ai_trade: Telegram advisor bot online — waiting for signals")
+	<-ctx.Done()
+	log.Info().Msg("j_ai_trade: shutdown signal received, exiting")
 }
