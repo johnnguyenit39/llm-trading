@@ -15,10 +15,14 @@ package main
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 
@@ -56,9 +60,59 @@ func main() {
 		Decisions: buildDecisionStore(ctx),
 	})
 
+	healthSrv := startHealthServer(ctx)
+
 	log.Info().Msg("j_ai_trade: Telegram advisor bot online — waiting for signals")
 	<-ctx.Done()
 	log.Info().Msg("j_ai_trade: shutdown signal received, exiting")
+
+	// Graceful shutdown of the health server so platforms that wait for
+	// 502s before killing the container see a clean close. 5s budget —
+	// plenty for a listener with no real traffic.
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelShutdown()
+	if err := healthSrv.Shutdown(shutdownCtx); err != nil {
+		log.Warn().Err(err).Msg("health: shutdown error")
+	}
+}
+
+// startHealthServer boots a Gin HTTP listener on $PORT (default 80)
+// that returns 200 on "/" and "/healthz". Cloud Run / Railway / Fly /
+// most PaaSes use a TCP-or-HTTP readiness probe — without this the
+// platform kills the container even though the Telegram long-poll
+// goroutines are alive and well.
+//
+// Returns the *http.Server so main can Shutdown it gracefully. Listen
+// errors after startup are logged but not fatal: the bot's primary
+// job is Telegram, not HTTP, and we'd rather keep polling than exit.
+func startHealthServer(ctx context.Context) *http.Server {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "80"
+	}
+
+	if os.Getenv("ENV") == "PROD" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	r := gin.New()
+	r.Use(gin.Recovery())
+
+	healthz := func(c *gin.Context) { c.String(http.StatusOK, "ok") }
+	r.GET("/", healthz)
+	r.GET("/healthz", healthz)
+
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	go func() {
+		log.Info().Str("port", port).Msg("health: Gin readiness server listening")
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Warn().Err(err).Msg("health: server exited unexpectedly")
+		}
+	}()
+	return srv
 }
 
 // buildDecisionStore returns a Firestore-backed DecisionStore when the

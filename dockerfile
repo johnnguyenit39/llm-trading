@@ -28,6 +28,9 @@ WORKDIR /app
 # Install certificates for HTTPS communication if needed
 RUN apk add --no-cache ca-certificates
 
+# Expose port 80
+EXPOSE 80
+
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/main .
 
