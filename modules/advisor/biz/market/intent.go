@@ -33,18 +33,14 @@ type Intent struct {
 // has a default so it is never blocking.
 func (i Intent) WantsAnalysis() bool { return i.Symbol != "" }
 
-// IntentDetector combines a SymbolResolver with a keyword heuristic to
-// decide whether a chat message is asking for a market analysis. Two
-// entry points:
+// IntentDetector combines a SymbolResolver with follow-up keyword
+// matching for the LastSymbol fallback. Two entry points:
 //
-//   - Detect(text): keyword-based, lenient — drives auto-enrichment for
-//     free-form chat.
-//   - ParseCommand(text): explicit /analyze parser, strict — triggers
-//     analysis regardless of keywords.
+//   - Detect(text): any supported symbol in the message → live fetch.
+//   - ParseCommand(text): explicit /analyze parser.
 //
-// Separating the two lets the handler distinguish "user typed
-// /analyze BTC" (always fetch) from "user casually mentioned BTC"
-// (fetch only if an intent keyword is nearby).
+// ParseCommand is checked first in Analyzer.resolveIntent so /analyze
+// still works with usage-help when the symbol is missing.
 type IntentDetector struct {
 	resolver *SymbolResolver
 }
@@ -53,50 +49,16 @@ func NewIntentDetector(resolver *SymbolResolver) *IntentDetector {
 	return &IntentDetector{resolver: resolver}
 }
 
-// intentKeywords are the words/phrases that — when co-occurring with a
-// known symbol — make us confident the user wants a live analysis. The
-// list is deliberately compact: adding noise words here causes
-// false-positives that cost Binance + DeepSeek tokens.
-//
-// A live price query ("BTC giá bao nhiêu", "ETH price now") also
-// qualifies — we need to fetch candles anyway to answer it, and the
-// extra indicators cost ~nothing once the fetch is done.
-var intentKeywords = []string{
-	// Vietnamese — trade intent
-	"mua", "bán", "ban",
-	"vào lệnh", "vao lenh", "vào", "vao",
-	"long", "short",
-	"phân tích", "phan tich",
-	"tín hiệu", "tin hieu", "signal", "setup",
-	"entry", "sl", "tp", "stop", "stoploss", "takeprofit",
-	"nên", "nen",
-	"sao rồi", "sao roi", "thế nào", "the nao", "giờ sao", "gio sao",
-	"view", "outlook", "trend",
-	"dự đoán", "du doan", "prediction",
-	"scalp", "scalping",
-	// Vietnamese — price / state query
-	"giá", "gia",
-	"bao nhiêu", "bao nhieu",
-	"hiện tại", "hien tai",
-	// English
-	"buy", "sell",
-	"analyze", "analysis",
-	"should i", "worth",
-	"breakout", "reversal", "bullish", "bearish",
-	"price", "quote", "how much", "current",
-}
-
 // followUpKeywords are phrases strong enough to imply "the user is
 // continuing the current analysis thread" even without re-naming the
 // symbol. Paired with a remembered LastSymbol, they let queries like
 // "bây giờ bao nhiêu", "giờ thì sao", "còn giờ thế nào" fire a fresh
 // fetch instead of letting the LLM recycle its stale previous reply.
 //
-// This list is a STRICT SUBSET of the continuation-y entries in
-// intentKeywords — we deliberately avoid generic tokens like "mua"
+// The list is deliberately strict — we avoid generic tokens like "mua"
 // or "long" so a user asking "có nên mua nhà không" doesn't
 // accidentally pull up BTCUSDT just because they asked about BTC
-// earlier in the same 30-min session.
+// earlier in the same session.
 var followUpKeywords = []string{
 	// Vietnamese — "what's it doing now?"
 	"bao nhiêu", "bao nhieu",
@@ -116,17 +78,17 @@ var followUpKeywords = []string{
 	"price", "how much", "current", "now", "still", "again", "recheck",
 }
 
-// Detect runs the keyword+symbol heuristic on free-form text. Returns
-// an Intent with WantsAnalysis()==true ONLY if both a symbol and at
-// least one intent keyword are present. This conservative bias errs on
-// the side of "just chat" — better to miss an implicit request than
-// to spam Binance for every passing mention of BTC.
+// Detect runs the symbol+optional-timeframe heuristic on free-form
+// text. Returns an Intent with WantsAnalysis()==true whenever the user
+// mentions a supported symbol — that alone is enough to run a live
+// fetch. Requiring an extra "intent keyword" on top caused frequent
+// misses (e.g. "XAUUSDT", "XAU", "vàng" alone): no [MARKET_DATA] was
+// injected, and the LLM answered from chat history with stale prices.
+// Trading-advisor use case: mentioning a watchlist pair implies market
+// context; generic chit‑chat almost never name-checks "BTCUSDT" etc.
 func (d *IntentDetector) Detect(text string) Intent {
 	sym := d.resolver.Resolve(text)
 	if sym == "" {
-		return Intent{}
-	}
-	if !hasAnyKeyword(text, intentKeywords) {
 		return Intent{}
 	}
 	tf, ok := ResolveTimeframe(text)

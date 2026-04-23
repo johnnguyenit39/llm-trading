@@ -28,6 +28,8 @@ func TestDetectWithFallback(t *testing.T) {
 		{"noise without keyword misses even with pin", "cảm ơn bạn", "BTCUSDT", "", ""},
 		{"switch to ETH when user names it explicitly", "ETH thế nào", "BTCUSDT", "ETHUSDT", models.TF_M15},
 		{"follow-up + explicit TF keeps the TF", "bây giờ bao nhiêu H4", "BTCUSDT", "BTCUSDT", models.TF_H4},
+		{"symbol alone fetches (no extra keywords)", "XAUUSDT", "", "XAUUSDT", models.TF_M15},
+		{"Vietnamese gold alias alone fetches", "vàng", "", "XAUUSDT", models.TF_M15},
 	}
 
 	for _, tc := range cases {
