@@ -1,3 +1,5 @@
+#Version 1.0.0
+
 # README for CRUD API Author Implementation in Clean Architecture (Go)
 
 ## Overview
