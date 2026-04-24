@@ -6,39 +6,76 @@ import (
 	"j_ai_trade/trading/models"
 )
 
-// TestDetectWithFallback pins down the "follow-up carries the last
-// symbol" behaviour that prevents the bot from echoing stale prices
-// when the user asks "bây giờ bao nhiêu" without re-mentioning BTC.
-func TestDetectWithFallback(t *testing.T) {
+// TestDetectGoldOnly pins down the gold-only behaviour: every
+// non-empty message resolves to XAUUSDT — either via an explicit
+// alias ("vàng", "XAU", "gold", "XAUUSDT") or via DefaultSymbol when
+// the user didn't name anything. The optional timeframe is honoured
+// when present; otherwise we default to M1 (scalping entry TF).
+func TestDetectGoldOnly(t *testing.T) {
 	res := NewSymbolResolver()
 	det := NewIntentDetector(res)
 
 	cases := []struct {
-		name       string
-		text       string
-		lastSymbol string
-		wantSym    string
-		wantTF     models.Timeframe
+		name    string
+		text    string
+		wantSym string
+		wantTF  models.Timeframe
 	}{
-		{"explicit symbol wins over pin", "BTC giá bao nhiêu", "ETHUSDT", "BTCUSDT", models.TF_M15},
-		{"bare follow-up uses pin", "bây giờ bao nhiêu", "BTCUSDT", "BTCUSDT", models.TF_M15},
-		{"bare follow-up short form uses pin", "giờ thì sao", "XAUUSDT", "XAUUSDT", models.TF_M15},
-		{"english follow-up uses pin", "price now?", "ETHUSDT", "ETHUSDT", models.TF_M15},
-		{"follow-up without pin misses", "bây giờ bao nhiêu", "", "", ""},
-		{"noise without keyword misses even with pin", "cảm ơn bạn", "BTCUSDT", "", ""},
-		{"switch to ETH when user names it explicitly", "ETH thế nào", "BTCUSDT", "ETHUSDT", models.TF_M15},
-		{"follow-up + explicit TF keeps the TF", "bây giờ bao nhiêu H4", "BTCUSDT", "BTCUSDT", models.TF_H4},
-		{"symbol alone fetches (no extra keywords)", "XAUUSDT", "", "XAUUSDT", models.TF_M15},
-		{"Vietnamese gold alias alone fetches", "vàng", "", "XAUUSDT", models.TF_M15},
+		{"explicit symbol", "XAUUSDT giá bao nhiêu", "XAUUSDT", models.TF_M1},
+		{"vietnamese alias", "vàng đang sao rồi", "XAUUSDT", models.TF_M1},
+		{"ascii-folded alias", "vang thế nào", "XAUUSDT", models.TF_M1},
+		{"short XAU", "xau", "XAUUSDT", models.TF_M1},
+		{"english alias", "gold price now?", "XAUUSDT", models.TF_M1},
+		{"bare follow-up falls back to XAUUSDT", "bây giờ bao nhiêu", "XAUUSDT", models.TF_M1},
+		{"small talk still routes to XAUUSDT", "cảm ơn bạn", "XAUUSDT", models.TF_M1},
+		{"explicit TF M5 honoured", "vàng thế nào M5", "XAUUSDT", models.TF_M5},
+		{"explicit TF H1 honoured", "bây giờ bao nhiêu H1", "XAUUSDT", models.TF_H1},
+		{"explicit TF H4 honoured", "XAU H4", "XAUUSDT", models.TF_H4},
+		{"scalp keyword maps to M1", "XAU scalp", "XAUUSDT", models.TF_M1},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := det.DetectWithFallback(tc.text, tc.lastSymbol)
+			got := det.DetectWithFallback(tc.text, "")
 			if got.Symbol != tc.wantSym {
 				t.Fatalf("symbol: want %q, got %q", tc.wantSym, got.Symbol)
 			}
-			if tc.wantSym != "" && got.Timeframe != tc.wantTF {
+			if got.Timeframe != tc.wantTF {
+				t.Fatalf("tf: want %q, got %q", tc.wantTF, got.Timeframe)
+			}
+		})
+	}
+}
+
+// TestParseCommand_GoldOnly confirms /analyze [TF] defaults to
+// XAUUSDT on M1, and that an explicit TF is preserved.
+func TestParseCommand_GoldOnly(t *testing.T) {
+	res := NewSymbolResolver()
+	det := NewIntentDetector(res)
+
+	cases := []struct {
+		name    string
+		text    string
+		wantSym string
+		wantTF  models.Timeframe
+	}{
+		{"bare /analyze", "/analyze", "XAUUSDT", models.TF_M1},
+		{"/analyze M5", "/analyze M5", "XAUUSDT", models.TF_M5},
+		{"/analyze H4", "/analyze H4", "XAUUSDT", models.TF_H4},
+		{"/analyze XAU H1", "/analyze XAU H1", "XAUUSDT", models.TF_H1},
+		{"/signal alias", "/signal", "XAUUSDT", models.TF_M1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := det.ParseCommand(tc.text)
+			if !got.Explicit {
+				t.Fatalf("expected Explicit=true for command input")
+			}
+			if got.Symbol != tc.wantSym {
+				t.Fatalf("symbol: want %q, got %q", tc.wantSym, got.Symbol)
+			}
+			if got.Timeframe != tc.wantTF {
 				t.Fatalf("tf: want %q, got %q", tc.wantTF, got.Timeframe)
 			}
 		})

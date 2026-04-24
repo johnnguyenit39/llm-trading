@@ -311,8 +311,12 @@ func analyzeTFPatterns(market models.MarketData, tf models.Timeframe, summaries 
 // an entry TF: entry TF first (what the LLM should focus on for
 // execution), then strictly higher TFs for macro context. Listing the
 // entry TF up front matters because LLMs anchor on the first block.
+// M15/D1 are kept in the ordering even though the current fetch plan
+// doesn't request them — summariseTF is skipped when the TF has no
+// candles, so extras here are harmless and let callers inject wider
+// contexts without touching this function.
 func summaryOrder(entryTF models.Timeframe) []models.Timeframe {
-	all := []models.Timeframe{models.TF_M15, models.TF_H1, models.TF_H4, models.TF_D1}
+	all := []models.Timeframe{models.TF_M1, models.TF_M5, models.TF_M15, models.TF_H1, models.TF_H4, models.TF_D1}
 	startIdx := -1
 	for i, tf := range all {
 		if tf == entryTF {

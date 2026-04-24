@@ -14,84 +14,44 @@ import (
 	"j_ai_trade/trading/models"
 )
 
-// SupportedSymbols is the advisor's trading universe — every symbol the
-// bot is willing to fetch candles for. Adding a pair here is the ONLY
-// place needed: the resolver, the ack messages, and anything downstream
-// just read from this list.
-//
-// Kept as a package-level var (not a const slice, Go can't) so tests
-// can swap it temporarily if needed.
-var SupportedSymbols = []string{
-	"BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT",
-	"XRPUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT",
-	"DOTUSDT", "ATOMUSDT", "NEARUSDT", "SUIUSDT",
-	"DOGEUSDT", "TRXUSDT", "BCHUSDT", "LTCUSDT",
-	"XAUUSDT",
-}
+// DefaultSymbol is the pair the bot falls back to when the user doesn't
+// name anything. Gold-only bot: every message routes here.
+const DefaultSymbol = "XAUUSDT"
 
-// SymbolResolver maps arbitrary user text ("XAU", "vàng", "btc") onto a
-// canonical Binance symbol ("XAUUSDT", "BTCUSDT"). It is scoped to the
+// SupportedSymbols is the advisor's trading universe. The bot is
+// currently gold-only, so this slice is a single entry — everything
+// downstream (resolver aliases, ack messages, fetch plan) reads from
+// here so adding more pairs later is one-line.
+var SupportedSymbols = []string{DefaultSymbol}
+
+// SymbolResolver maps arbitrary user text ("XAU", "vàng", "gold") onto
+// a canonical Binance symbol ("XAUUSDT"). It is scoped to the
 // `SupportedSymbols` universe so the advisor can only analyse pairs it
-// has been configured for — an unknown pair produces an honest "not in
-// watchlist" response rather than a 400 from Binance.
+// has been configured for.
 //
 // Design choices:
-//   - Static alias map; no network calls. A user typing an unknown pair
-//     gets a honest "not in watchlist" response rather than a 400 from
-//     Binance.
+//   - Static alias map; no network calls.
 //   - Aliases are lowercased on both sides. We tokenise the user's text,
 //     strip punctuation, and check each token against the map.
-//   - The map intentionally covers VI names ("vàng" for gold) and common
-//     short forms ("btc", "eth"). Add new ones as real users start
-//     asking for them — premature aliases are just lint.
+//   - Covers VI aliases ("vàng") and common short forms. Add new ones
+//     as real users start asking for them.
 type SymbolResolver struct {
 	aliases map[string]string // normalised token -> canonical symbol
 }
 
-// NewSymbolResolver builds the resolver from `SupportedSymbols`. It
-// expands each canonical symbol with a handful of common aliases and
-// rejects tokens outside the universe so user mistakes surface early.
+// NewSymbolResolver builds the resolver from `SupportedSymbols`.
 func NewSymbolResolver() *SymbolResolver {
 	aliases := map[string]string{}
 	// 1. Every canonical symbol maps to itself.
 	for _, s := range SupportedSymbols {
 		aliases[strings.ToLower(s)] = s
 	}
-	// 2. Hand-curated short names / Vietnamese aliases. Keep this small.
+	// 2. Hand-curated aliases — gold only while the bot is gold-only.
 	extra := map[string]string{
-		"btc":      "BTCUSDT",
-		"bitcoin":  "BTCUSDT",
-		"eth":      "ETHUSDT",
-		"ether":    "ETHUSDT",
-		"ethereum": "ETHUSDT",
-		"bnb":      "BNBUSDT",
-		"binance":  "BNBUSDT",
-		"sol":      "SOLUSDT",
-		"solana":   "SOLUSDT",
-		"xrp":      "XRPUSDT",
-		"ripple":   "XRPUSDT",
-		"ada":      "ADAUSDT",
-		"cardano":  "ADAUSDT",
-		"avax":     "AVAXUSDT",
-		"link":     "LINKUSDT",
-		"chainlink":"LINKUSDT",
-		"dot":      "DOTUSDT",
-		"polkadot": "DOTUSDT",
-		"atom":     "ATOMUSDT",
-		"cosmos":   "ATOMUSDT",
-		"near":     "NEARUSDT",
-		"sui":      "SUIUSDT",
-		"doge":     "DOGEUSDT",
-		"dogecoin": "DOGEUSDT",
-		"trx":      "TRXUSDT",
-		"tron":     "TRXUSDT",
-		"bch":      "BCHUSDT",
-		"ltc":      "LTCUSDT",
-		"litecoin": "LTCUSDT",
-		"xau":      "XAUUSDT",
-		"gold":     "XAUUSDT",
-		"vang":     "XAUUSDT", // ASCII-folded "vàng"
-		"vàng":     "XAUUSDT",
+		"xau":  "XAUUSDT",
+		"gold": "XAUUSDT",
+		"vang": "XAUUSDT", // ASCII-folded "vàng"
+		"vàng": "XAUUSDT",
 	}
 	for alias, canonical := range extra {
 		// Skip aliases whose canonical symbol isn't in SupportedSymbols
@@ -107,8 +67,8 @@ func NewSymbolResolver() *SymbolResolver {
 
 // Resolve scans the user's text for any known alias and returns the
 // FIRST matching canonical symbol. Returns "" when no known symbol is
-// mentioned. We tokenise on Unicode word boundaries so "BTC?" and "btc,"
-// and "vàng" all match cleanly.
+// mentioned. We tokenise on Unicode word boundaries so "XAU?" and
+// "xau," and "vàng" all match cleanly.
 func (r *SymbolResolver) Resolve(text string) string {
 	for _, tok := range tokenize(text) {
 		if sym, ok := r.aliases[tok]; ok {
@@ -119,7 +79,7 @@ func (r *SymbolResolver) Resolve(text string) string {
 }
 
 // ResolveAll returns every canonical symbol mentioned in order, with
-// duplicates removed. Useful for future "compare BTC vs ETH" queries.
+// duplicates removed. Useful once the watchlist grows beyond one pair.
 func (r *SymbolResolver) ResolveAll(text string) []string {
 	seen := map[string]struct{}{}
 	var out []string
@@ -160,8 +120,12 @@ func tokenize(text string) []string {
 }
 
 // tfAliases recognises common ways users reference timeframes in chat.
+// Scalping defaults: "scalp"/"scalping" map to M1 now that the bot
+// operates on M1/M5 entry timing instead of M15.
 var tfAliases = map[string]models.Timeframe{
-	"m15": models.TF_M15, "15m": models.TF_M15, "15": models.TF_M15, "scalp": models.TF_M15, "scalping": models.TF_M15,
+	"m1": models.TF_M1, "1m": models.TF_M1, "scalp": models.TF_M1, "scalping": models.TF_M1,
+	"m5": models.TF_M5, "5m": models.TF_M5,
+	"m15": models.TF_M15, "15m": models.TF_M15, "15": models.TF_M15,
 	"h1": models.TF_H1, "1h": models.TF_H1, "hourly": models.TF_H1,
 	"h4": models.TF_H4, "4h": models.TF_H4,
 	"d1": models.TF_D1, "1d": models.TF_D1, "daily": models.TF_D1, "day": models.TF_D1,
@@ -169,7 +133,7 @@ var tfAliases = map[string]models.Timeframe{
 
 // ResolveTimeframe extracts the first explicit timeframe mention from
 // the user's text. Returns ("", false) when none is found — callers
-// typically default to TF_H4 for swing-style chat questions.
+// default to TF_M1 (the scalping entry TF).
 func ResolveTimeframe(text string) (models.Timeframe, bool) {
 	for _, tok := range tokenize(text) {
 		if tf, ok := tfAliases[tok]; ok {

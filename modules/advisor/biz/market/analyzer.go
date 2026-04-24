@@ -3,7 +3,6 @@ package market
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -66,30 +65,21 @@ func NewAnalyzer(intent *IntentDetector, fetcher marketdata.CandleFetcher) *Anal
 func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.EnrichmentHints) (biz.EnrichmentResult, error) {
 	intent := a.resolveIntent(text, hints.LastSymbol)
 	if !intent.WantsAnalysis() {
-		// Explicit /analyze with no symbol gets a dedicated ack so the
-		// LLM can tell the user what went wrong; the digest stays empty
-		// so the LLM answers using just the ack + system prompt.
-		if intent.Explicit {
-			return biz.EnrichmentResult{
-				Ack: fmt.Sprintf(
-					"Mình không nhận ra pair nào trong '%s'. Thử: /analyze BTC, /analyze XAU H4, /analyze ETH D1. Hiện đang support: %s.",
-					strings.TrimSpace(text),
-					strings.Join(SupportedSymbols, ", "),
-				),
-			}, nil
-		}
+		// With gold-only + DefaultSymbol, Detect/ParseCommand always
+		// fill Symbol, so this branch is unreachable in practice. Kept
+		// as a safety net if a future refactor introduces an empty
+		// Intent path.
 		return biz.EnrichmentResult{}, nil
 	}
 
-	// Fetch the standard "scalping + macro context" bundle on every
-	// analysis request: M15 (entry timing), H1/H4/D1 (trend context).
-	// CandleBudget is uniform so downstream indicators always have
-	// enough warm-up regardless of which TF the user asked for.
+	// Scalping + trend-context bundle: M1 (entry timing), M5
+	// (confirmation), H1/H4 (macro trend strength). Uniform
+	// CandleBudget so every TF has enough warm-up for ADX/EMA.
 	required := map[models.Timeframe]int{
-		models.TF_M15: CandleBudget,
-		models.TF_H1:  CandleBudget,
-		models.TF_H4:  CandleBudget,
-		models.TF_D1:  CandleBudget,
+		models.TF_M1: CandleBudget,
+		models.TF_M5: CandleBudget,
+		models.TF_H1: CandleBudget,
+		models.TF_H4: CandleBudget,
 	}
 
 	fetchCtx, cancel := context.WithTimeout(ctx, a.fetchTimeout)
@@ -113,11 +103,17 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 		return biz.EnrichmentResult{}, nil
 	}
 
+	// Only ack on explicit /analyze commands. Every free-form message
+	// fetches XAUUSDT now (gold-only bot), so acking each turn would
+	// spam "Đang kiểm tra..." even for casual chat. The LLM's reply is
+	// still grounded in fresh data via the silently-injected digest.
+	ack := ""
+	if intent.Explicit {
+		ack = fmt.Sprintf("Đang kiểm tra %s...", intent.Symbol)
+	}
 	return biz.EnrichmentResult{
 		Digest: Render(snap),
-		// Keep ack user-friendly: we always fetch multi-TF context internally;
-		// surfacing M15/H1/etc. here is noise and can confuse the bias story.
-		Ack:    fmt.Sprintf("Đang kiểm tra %s...", intent.Symbol),
+		Ack:    ack,
 		Symbol: intent.Symbol,
 	}, nil
 }

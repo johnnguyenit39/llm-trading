@@ -3,6 +3,8 @@ package models
 type Timeframe string
 
 const (
+	TF_M1  Timeframe = "M1"
+	TF_M5  Timeframe = "M5"
 	TF_M15 Timeframe = "M15"
 	TF_H1  Timeframe = "H1"
 	TF_H4  Timeframe = "H4"
@@ -13,6 +15,10 @@ const (
 // BinanceInterval returns the Binance API interval string for a timeframe.
 func (tf Timeframe) BinanceInterval() string {
 	switch tf {
+	case TF_M1:
+		return "1m"
+	case TF_M5:
+		return "5m"
 	case TF_M15:
 		return "15m"
 	case TF_H1:
