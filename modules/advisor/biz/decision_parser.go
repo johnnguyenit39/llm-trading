@@ -39,6 +39,18 @@ type DecisionPayload struct {
 	// Lot is position size in base-asset units (Binance USDT-M linear: qty
 	// in the symbol's base) so we can show estimated PnL in USDT.
 	Lot float64 `json:"lot"`
+	// Confidence is the LLM's self-rated conviction: "low" | "med" | "high".
+	// Drives the coloured badge on the user-visible card and lets us mute
+	// low-conviction pings later. Missing/unrecognised → normalised to "med"
+	// so legacy replies and edge cases still produce a usable trade card.
+	Confidence string `json:"confidence,omitempty"`
+	// Invalidation is a one-line natural-language condition that, when
+	// observed, means the setup is dead (e.g. "M5 close dưới 2342" or
+	// "phá xuống dưới swing low 2340"). Shown to the user so they can
+	// self-monitor without re-asking, and re-read by the LLM on follow-up
+	// turns to decide whether the still-live trade should keep priority
+	// over a fresh flip in the opposite direction.
+	Invalidation string `json:"invalidation,omitempty"`
 }
 
 // decisionFenceRe matches a ```json ... ``` fenced block with any
@@ -117,13 +129,16 @@ func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload) string {
 
 	var b strings.Builder
 	b.WriteString(prose)
-	b.WriteString("\n\n📋 Lệnh gợi ý\n")
+	b.WriteString(fmt.Sprintf("\n\n📋 Lệnh gợi ý %s\n", confidenceBadge(d.Confidence)))
 	b.WriteString(fmt.Sprintf("• Symbol: %s\n", d.Symbol))
 	b.WriteString(fmt.Sprintf("• Lệnh: %s\n", d.Action))
 	b.WriteString(fmt.Sprintf("• Entry: %s\n", formatAdvisorPrice(d.Entry)))
 	b.WriteString(fmt.Sprintf("• SL: %s\n", formatAdvisorPrice(d.StopLoss)))
 	b.WriteString(fmt.Sprintf("• TP: %s\n", formatAdvisorPrice(d.TakeProfit)))
 	b.WriteString(fmt.Sprintf("• Khối lượng (base): %s\n", formatAdvisorLot(d.Lot)))
+	if d.Invalidation != "" {
+		b.WriteString(fmt.Sprintf("• Hủy nếu: %s\n", d.Invalidation))
+	}
 
 	if riskSizingOn {
 		slPct := slPnL / account * 100.0
@@ -283,7 +298,34 @@ func (p DecisionPayload) valid() bool {
 // storage layer sees consistent data (upper-case symbol+action,
 // whitespace stripped). Runs AFTER valid() so we don't mutate a
 // payload we're about to reject.
+//
+// Confidence accepts low/med/medium/high (case-insensitive), folds
+// "medium" → "med", and falls back to "med" on anything unrecognised so
+// the UI never has to render an unknown badge.
 func (p *DecisionPayload) normalise() {
 	p.Symbol = strings.ToUpper(strings.TrimSpace(p.Symbol))
 	p.Action = strings.ToUpper(strings.TrimSpace(p.Action))
+	switch strings.ToLower(strings.TrimSpace(p.Confidence)) {
+	case "high":
+		p.Confidence = "high"
+	case "low":
+		p.Confidence = "low"
+	default:
+		p.Confidence = "med"
+	}
+	p.Invalidation = strings.TrimSpace(p.Invalidation)
+}
+
+// confidenceBadge renders confidence as a single emoji for the card
+// header. Centralised so the LLM contract stays "low/med/high" while
+// the UI swaps the visual without code changes.
+func confidenceBadge(c string) string {
+	switch c {
+	case "high":
+		return "🟢"
+	case "low":
+		return "🔴"
+	default:
+		return "🟡"
+	}
 }

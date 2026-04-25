@@ -22,4 +22,13 @@ type AgentDecision struct {
 	StopLoss   float64 `json:"stop_loss" firestore:"stop_loss"`
 	TakeProfit float64 `json:"take_profit" firestore:"take_profit"`
 	Lot        float64 `json:"lot" firestore:"lot"`
+	// Confidence captures the LLM's self-rated conviction at fire time
+	// ("low" | "med" | "high"). Persisted so we can later analyse hit
+	// rate per confidence band and decide a notification mute threshold.
+	Confidence string `json:"confidence,omitempty" firestore:"confidence,omitempty"`
+	// Invalidation is the natural-language exit rule the LLM committed
+	// to ("M5 close dưới 2342", "phá xuống dưới swing low"). Persisted
+	// so future turns and post-mortems can check whether the price
+	// action actually invalidated the setup.
+	Invalidation string `json:"invalidation,omitempty" firestore:"invalidation,omitempty"`
 }

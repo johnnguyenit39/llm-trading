@@ -139,3 +139,104 @@ func TestExtractDecision_LowercaseNormalises(t *testing.T) {
 		t.Fatalf("bad normalisation: %+v", got)
 	}
 }
+
+func TestExtractDecision_ConfidenceAndInvalidation(t *testing.T) {
+	cases := []struct {
+		name        string
+		raw         string
+		wantConf    string
+		wantInvalid string
+	}{
+		{
+			name:        "high + invalidation roundtrips",
+			raw:         `{"action":"BUY","symbol":"XAUUSDT","entry":2345.2,"stop_loss":2342.8,"take_profit":2349.0,"lot":0.05,"confidence":"high","invalidation":"M5 đóng dưới 2342.5"}`,
+			wantConf:    "high",
+			wantInvalid: "M5 đóng dưới 2342.5",
+		},
+		{
+			name:        "uppercase HIGH normalises to lowercase",
+			raw:         `{"action":"SELL","symbol":"XAUUSDT","entry":2350,"stop_loss":2353,"take_profit":2345,"lot":0.05,"confidence":"  HIGH  ","invalidation":"  phá lên 2354  "}`,
+			wantConf:    "high",
+			wantInvalid: "phá lên 2354",
+		},
+		{
+			name:        "garbage confidence falls back to med",
+			raw:         `{"action":"BUY","symbol":"XAUUSDT","entry":2345,"stop_loss":2343,"take_profit":2348,"lot":0.05,"confidence":"banana","invalidation":""}`,
+			wantConf:    "med",
+			wantInvalid: "",
+		},
+		{
+			name:        "missing confidence defaults to med (legacy compat)",
+			raw:         `{"action":"BUY","symbol":"XAUUSDT","entry":2345,"stop_loss":2343,"take_profit":2348,"lot":0.05}`,
+			wantConf:    "med",
+			wantInvalid: "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reply := "```json\n" + tc.raw + "\n```"
+			d := ExtractDecision(reply)
+			if d == nil {
+				t.Fatalf("expected payload, got nil")
+			}
+			if d.Confidence != tc.wantConf {
+				t.Fatalf("confidence: want %q, got %q", tc.wantConf, d.Confidence)
+			}
+			if d.Invalidation != tc.wantInvalid {
+				t.Fatalf("invalidation: want %q, got %q", tc.wantInvalid, d.Invalidation)
+			}
+		})
+	}
+}
+
+func TestFormatAdvisorReplyForUser_RendersBadgeAndInvalidation(t *testing.T) {
+	t.Setenv("ADVISOR_ACCOUNT_USDT", "0") // disable risk sizing for simpler asserts
+	t.Setenv("ADVISOR_RISK_PCT", "0.5")
+
+	raw := "Vào BUY.\n\n```json\n" +
+		`{"action":"BUY","symbol":"XAUUSDT","entry":2345.2,"stop_loss":2342.8,"take_profit":2349.0,"lot":0.05,"confidence":"high","invalidation":"M5 đóng dưới 2342.5"}` + "\n```"
+	d := ExtractDecision(raw)
+	if d == nil {
+		t.Fatal("expected decision")
+	}
+	out := FormatAdvisorReplyForUser(raw, d)
+
+	if !strings.Contains(out, "📋 Lệnh gợi ý 🟢") {
+		t.Fatalf("missing high-confidence green badge: %s", out)
+	}
+	if !strings.Contains(out, "• Hủy nếu: M5 đóng dưới 2342.5") {
+		t.Fatalf("missing invalidation line: %s", out)
+	}
+}
+
+func TestFormatAdvisorReplyForUser_LowAndMedBadges(t *testing.T) {
+	t.Setenv("ADVISOR_ACCOUNT_USDT", "0")
+	t.Setenv("ADVISOR_RISK_PCT", "0.5")
+
+	for _, tc := range []struct {
+		conf      string
+		wantBadge string
+	}{
+		{"low", "🔴"},
+		{"med", "🟡"},
+		{"", "🟡"}, // missing → defaults to med → 🟡
+	} {
+		raw := "x.\n\n```json\n" +
+			`{"action":"BUY","symbol":"XAUUSDT","entry":2345,"stop_loss":2343,"take_profit":2348,"lot":0.05` +
+			func() string {
+				if tc.conf == "" {
+					return ""
+				}
+				return `,"confidence":"` + tc.conf + `"`
+			}() +
+			`}` + "\n```"
+		d := ExtractDecision(raw)
+		if d == nil {
+			t.Fatalf("expected decision (conf=%q)", tc.conf)
+		}
+		out := FormatAdvisorReplyForUser(raw, d)
+		if !strings.Contains(out, "📋 Lệnh gợi ý "+tc.wantBadge) {
+			t.Fatalf("conf=%q: want badge %q in output, got: %s", tc.conf, tc.wantBadge, out)
+		}
+	}
+}

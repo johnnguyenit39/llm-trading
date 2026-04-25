@@ -138,13 +138,22 @@ B) Khi QUYẾT ĐỊNH vào lệnh (đã đủ confluence):
   "entry": 2345.2,
   "stop_loss": 2342.8,
   "take_profit": 2349.0,
-  "lot": 0.05
+  "lot": 0.05,
+  "confidence": "high",
+  "invalidation": "M5 đóng nến dưới 2342.5 hoặc giá phá xuống dưới 2342.0"
 }
 ` + "```" + `
 
-- Field bắt buộc: action ("BUY" hoặc "SELL"), symbol (luôn là "XAUUSDT"), entry, stop_loss, take_profit, lot — tất cả số thuần (không chuỗi, không đơn vị).
+- Field bắt buộc: action ("BUY" hoặc "SELL"), symbol (luôn là "XAUUSDT"), entry, stop_loss, take_profit, lot, confidence, invalidation. Số là số thuần (không chuỗi, không đơn vị); confidence/invalidation là chuỗi.
 - lot = khối lượng lệnh theo đơn vị base của cặp XAUUSDT (1 lot = 100 oz — backend dùng để ước tính PnL USDT hiển thị cho user).
 - symbol PHẢI đúng "XAUUSDT" (không phải "XAU" / "GOLD").
+- confidence: 1 trong 3 giá trị "low" | "med" | "high":
+    · "high" = setup A+: H1+H4 đồng thuận trend, M1 pattern + H1 confirm cùng hướng, không trap flag, R:R kỳ vọng ≥1.5, vol confirm. Hiển thị 🟢 cho user.
+    · "med"  = setup B: M1 pattern rõ + 1 confluence (H4 trend HOẶC H1 pattern), R:R 1.2-1.5, có thể có 1 dấu hỏi nhỏ. Hiển thị 🟡.
+    · "low"  = scalp cuối cùng: chỉ fire nếu R:R rất đẹp (>=2) bù lại confluence yếu. Mặc định: nếu định emit "low" thì cân nhắc viết "chờ" thay vì fire. Hiển thị 🔴.
+- invalidation: chuỗi tiếng Việt tự nhiên 1 dòng <100 ký tự, mô tả ĐIỀU KIỆN ĐO LƯỜNG ĐƯỢC khiến setup chết. Phải có MỨC GIÁ CỤ THỂ + KHUNG TF.
+    · ĐÚNG: "M5 đóng dưới 2342.5", "phá lên trên 2348 với volume tăng", "RSI M1 vượt 70 và xuất hiện shooting star tại nearestR".
+    · SAI:  "tùy diễn biến", "khi setup không còn đẹp", "nếu thị trường đảo chiều" — quá vague, user không kiểm tra được.
 - KHÔNG chèn comment, không giải thích bên trong JSON. Dấu backtick fence phải chính xác ` + "```" + `json ... ` + "```" + `.
 - Chỉ một JSON block mỗi reply. Nếu không chắc thì KHÔNG fire — viết giải thích, kết thúc.
 

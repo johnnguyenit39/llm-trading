@@ -251,12 +251,14 @@ func (h *ChatHandler) recordDecision(ctx context.Context, chatID string, d *Deci
 		return
 	}
 	row := &adModel.AgentDecision{
-		Symbol:     d.Symbol,
-		Action:     d.Action,
-		Entry:      d.Entry,
-		StopLoss:   d.StopLoss,
-		TakeProfit: d.TakeProfit,
-		Lot:        d.Lot,
+		Symbol:       d.Symbol,
+		Action:       d.Action,
+		Entry:        d.Entry,
+		StopLoss:     d.StopLoss,
+		TakeProfit:   d.TakeProfit,
+		Lot:          d.Lot,
+		Confidence:   d.Confidence,
+		Invalidation: d.Invalidation,
 	}
 	if err := h.decisions.Save(ctx, row); err != nil {
 		log.Error().Err(err).
