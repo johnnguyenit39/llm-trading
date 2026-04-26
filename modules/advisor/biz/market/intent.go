@@ -12,9 +12,10 @@ import (
 // requested" — fall through to chat-only Phase-1 behaviour.
 type Intent struct {
 	// Symbol is the canonical Binance symbol extracted from the message,
-	// or "" if the user didn't mention any symbol we know about. For the
-	// gold-only bot, Detect()/DetectWithFallback() will fill this with
-	// DefaultSymbol so every message triggers a live XAUUSDT fetch.
+	// or "" if the user didn't mention any symbol we know about.
+	// Detect()/DetectWithFallback() fill DefaultSymbol (XAUUSDT) when
+	// nothing in SupportedSymbols matches — BTCUSDT only when the user
+	// explicitly names BTC/bitcoin/BTCUSDT.
 	Symbol string
 
 	// Timeframe is the explicit TF the user asked for (M1/M5/H1/...).
@@ -36,8 +37,8 @@ type Intent struct {
 func (i Intent) WantsAnalysis() bool { return i.Symbol != "" }
 
 // IntentDetector combines a SymbolResolver with a DefaultSymbol
-// fallback so every user message routes to a live fetch on the gold
-// pair. Two entry points:
+// fallback so every user message routes to a live fetch (default XAUUSDT;
+// BTCUSDT when explicitly mentioned). Two entry points:
 //
 //   - Detect(text): free-form text → always returns an Intent with
 //     Symbol set (DefaultSymbol when nothing recognisable was named).
@@ -55,11 +56,10 @@ func NewIntentDetector(resolver *SymbolResolver) *IntentDetector {
 }
 
 // Detect runs the symbol+optional-timeframe heuristic on free-form
-// text. On the gold-only bot, every non-empty message resolves to
-// XAUUSDT — either because the user explicitly said "vàng"/"XAU", or
-// via DefaultSymbol. The LLM then decides whether to actually trade or
-// just chat; we always hand it fresh data so it never quotes stale
-// prices from its own prior reply.
+// text. Every non-empty message resolves to a supported pair: XAUUSDT by
+// default, or BTCUSDT when the user explicitly names BTC/bitcoin; gold
+// aliases ("vàng", "XAU") still map to XAUUSDT. The LLM then decides
+// whether to actually trade or just chat; we always hand it fresh data.
 func (d *IntentDetector) Detect(text string) Intent {
 	sym := d.resolver.Resolve(text)
 	if sym == "" {
@@ -75,7 +75,7 @@ func (d *IntentDetector) Detect(text string) Intent {
 // DetectWithFallback is kept for API compatibility with callers that
 // still pass a pinned LastSymbol. Detect() already fills Symbol
 // unconditionally, so the lastSymbol hint is redundant for the
-// gold-only bot; we accept it without error and delegate.
+// lastSymbol hint; we accept it without error and delegate.
 func (d *IntentDetector) DetectWithFallback(text, lastSymbol string) Intent {
 	_ = lastSymbol
 	return d.Detect(text)
@@ -98,7 +98,7 @@ func (d *IntentDetector) ParseCommand(text string) Intent {
 		}
 	}
 	if rest == "" {
-		// Bare /analyze on the gold-only bot → XAUUSDT scalping.
+		// Bare /analyze → default XAUUSDT scalping.
 		return Intent{Symbol: DefaultSymbol, Timeframe: models.TF_M1, Explicit: true}
 	}
 	sym := d.resolver.Resolve(rest)

@@ -15,17 +15,16 @@ import (
 )
 
 // DefaultSymbol is the pair the bot falls back to when the user doesn't
-// name anything. Gold-only bot: every message routes here.
+// name a supported pair. Primary product is gold; generic chat routes here.
 const DefaultSymbol = "XAUUSDT"
 
-// SupportedSymbols is the advisor's trading universe. The bot is
-// currently gold-only, so this slice is a single entry — everything
-// downstream (resolver aliases, ack messages, fetch plan) reads from
-// here so adding more pairs later is one-line.
-var SupportedSymbols = []string{DefaultSymbol}
+// SupportedSymbols is the advisor's trading universe. Order is not
+// significant for fetching; alias resolution uses the first token match
+// in the user's text.
+var SupportedSymbols = []string{DefaultSymbol, "BTCUSDT"}
 
-// SymbolResolver maps arbitrary user text ("XAU", "vàng", "gold") onto
-// a canonical Binance symbol ("XAUUSDT"). It is scoped to the
+// SymbolResolver maps arbitrary user text ("XAU", "vàng", "btc") onto
+// a canonical Binance symbol (e.g. "XAUUSDT", "BTCUSDT"). It is scoped to the
 // `SupportedSymbols` universe so the advisor can only analyse pairs it
 // has been configured for.
 //
@@ -46,12 +45,15 @@ func NewSymbolResolver() *SymbolResolver {
 	for _, s := range SupportedSymbols {
 		aliases[strings.ToLower(s)] = s
 	}
-	// 2. Hand-curated aliases — gold only while the bot is gold-only.
+	// 2. Hand-curated aliases. Gold is the default product; BTC only when
+	// the user names it (btc / bitcoin / …) — no generic "crypto" token.
 	extra := map[string]string{
-		"xau":  "XAUUSDT",
-		"gold": "XAUUSDT",
-		"vang": "XAUUSDT", // ASCII-folded "vàng"
-		"vàng": "XAUUSDT",
+		"xau":     "XAUUSDT",
+		"gold":    "XAUUSDT",
+		"vang":    "XAUUSDT", // ASCII-folded "vàng"
+		"vàng":    "XAUUSDT",
+		"btc":     "BTCUSDT",
+		"bitcoin": "BTCUSDT",
 	}
 	for alias, canonical := range extra {
 		// Skip aliases whose canonical symbol isn't in SupportedSymbols

@@ -6,12 +6,10 @@ import (
 	"j_ai_trade/trading/models"
 )
 
-// TestDetectGoldOnly pins down the gold-only behaviour: every
-// non-empty message resolves to XAUUSDT — either via an explicit
-// alias ("vàng", "XAU", "gold", "XAUUSDT") or via DefaultSymbol when
-// the user didn't name anything. The optional timeframe is honoured
-// when present; otherwise we default to M1 (scalping entry TF).
-func TestDetectGoldOnly(t *testing.T) {
+// TestDetectDefaultAndBTC: default pair is XAUUSDT; BTCUSDT only when
+// the user names BTC/bitcoin/BTCUSDT. Generic "crypto" without BTC
+// still falls back to XAUUSDT.
+func TestDetectDefaultAndBTC(t *testing.T) {
 	res := NewSymbolResolver()
 	det := NewIntentDetector(res)
 
@@ -32,6 +30,11 @@ func TestDetectGoldOnly(t *testing.T) {
 		{"explicit TF H1 honoured", "bây giờ bao nhiêu H1", "XAUUSDT", models.TF_H1},
 		{"explicit TF H4 honoured", "XAU H4", "XAUUSDT", models.TF_H4},
 		{"scalp keyword maps to M1", "XAU scalp", "XAUUSDT", models.TF_M1},
+		{"explicit BTCUSDT", "BTCUSDT giá bao nhiêu", "BTCUSDT", models.TF_M1},
+		{"btc alias", "btc đang sao", "BTCUSDT", models.TF_M1},
+		{"bitcoin alias", "bitcoin buy hay sell", "BTCUSDT", models.TF_M1},
+		{"crypto without btc still XAU", "crypto giờ thế nào", "XAUUSDT", models.TF_M1},
+		{"first token wins XAU before BTC", "xau và btc", "XAUUSDT", models.TF_M1},
 	}
 
 	for _, tc := range cases {
@@ -47,9 +50,8 @@ func TestDetectGoldOnly(t *testing.T) {
 	}
 }
 
-// TestParseCommand_GoldOnly confirms /analyze [TF] defaults to
-// XAUUSDT on M1, and that an explicit TF is preserved.
-func TestParseCommand_GoldOnly(t *testing.T) {
+// TestParseCommand defaults to XAUUSDT; /analyze btc honours BTCUSDT.
+func TestParseCommand(t *testing.T) {
 	res := NewSymbolResolver()
 	det := NewIntentDetector(res)
 
@@ -64,6 +66,8 @@ func TestParseCommand_GoldOnly(t *testing.T) {
 		{"/analyze H4", "/analyze H4", "XAUUSDT", models.TF_H4},
 		{"/analyze XAU H1", "/analyze XAU H1", "XAUUSDT", models.TF_H1},
 		{"/signal alias", "/signal", "XAUUSDT", models.TF_M1},
+		{"/analyze btc H1", "/analyze btc H1", "BTCUSDT", models.TF_H1},
+		{"/analyze bitcoin", "/analyze bitcoin", "BTCUSDT", models.TF_M1},
 	}
 
 	for _, tc := range cases {

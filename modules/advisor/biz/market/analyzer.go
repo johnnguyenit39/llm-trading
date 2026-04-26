@@ -65,10 +65,9 @@ func NewAnalyzer(intent *IntentDetector, fetcher marketdata.CandleFetcher) *Anal
 func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.EnrichmentHints) (biz.EnrichmentResult, error) {
 	intent := a.resolveIntent(text, hints.LastSymbol)
 	if !intent.WantsAnalysis() {
-		// With gold-only + DefaultSymbol, Detect/ParseCommand always
-		// fill Symbol, so this branch is unreachable in practice. Kept
-		// as a safety net if a future refactor introduces an empty
-		// Intent path.
+		// With DefaultSymbol fallback, Detect/ParseCommand always fill
+		// Symbol, so this branch is unreachable in practice. Kept as a
+		// safety net if a future refactor introduces an empty Intent path.
 		return biz.EnrichmentResult{}, nil
 	}
 
@@ -104,9 +103,9 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 	}
 
 	// Only ack on explicit /analyze commands. Every free-form message
-	// fetches XAUUSDT now (gold-only bot), so acking each turn would
-	// spam "Đang kiểm tra..." even for casual chat. The LLM's reply is
-	// still grounded in fresh data via the silently-injected digest.
+	// still fetches live data (default XAUUSDT, or BTCUSDT when named),
+	// so acking each turn would spam "Đang kiểm tra..." for casual chat.
+	// The LLM's reply stays grounded via the silently-injected digest.
 	ack := ""
 	if intent.Explicit {
 		ack = fmt.Sprintf("Đang kiểm tra %s...", intent.Symbol)

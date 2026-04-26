@@ -268,9 +268,11 @@ func contractSizePerLot(symbol string) float64 {
 	// Gold CFDs typically use 1 lot = 100 ounces.
 	case "XAUUSD", "XAUUSDT":
 		return 100
+	case "BTCUSDT":
+		// Linear perp: PnL USDT = price delta × qty (BTC).
+		return 1
 	default:
-		// Fallback keeps existing behavior where lot is interpreted as
-		// base quantity directly.
+		// Fallback: lot is base quantity directly.
 		return 1
 	}
 }
