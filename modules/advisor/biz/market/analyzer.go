@@ -107,14 +107,18 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 	// fetches XAUUSDT now (gold-only bot), so acking each turn would
 	// spam "Đang kiểm tra..." even for casual chat. The LLM's reply is
 	// still grounded in fresh data via the silently-injected digest.
+	//
+	// Use market.Symbol (post-conversion: "XAUUSD") for what the user
+	// sees; intent.Symbol ("XAUUSDT") is the Binance fetch identifier
+	// and shouldn't leak into chat.
 	ack := ""
 	if intent.Explicit {
-		ack = fmt.Sprintf("Đang kiểm tra %s...", intent.Symbol)
+		ack = fmt.Sprintf("Đang kiểm tra %s...", market.Symbol)
 	}
 	return biz.EnrichmentResult{
 		Digest: Render(snap),
 		Ack:    ack,
-		Symbol: intent.Symbol,
+		Symbol: market.Symbol,
 	}, nil
 }
 
