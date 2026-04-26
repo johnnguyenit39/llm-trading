@@ -1,81 +1,96 @@
-#Version 1.0.0
+# j_ai_trade — Telegram Trading Advisor Bot
 
-# README for CRUD API Author Implementation in Clean Architecture (Go)
+Conversational trading advisor for **gold scalping (XAUUSDT)** delivered over Telegram. Each user message triggers a fresh fetch of multi-timeframe market data + economic-calendar context, which is fed to DeepSeek; the LLM decides whether to emit a `BUY`/`SELL` card with `entry / SL / TP / lot` or recommend waiting.
 
-## Overview
+## What it does
 
-This project is built using **Clean Architecture** principles in Go, designed to help you quickly scaffold CRUD APIs for any object or table in your system. The goal is to keep the architecture modular and maintainable, while providing an easy way to implement API layers for different entities (tables/objects).
+- **Reactive advice** — natural-language chat. M1 entry, M5 confirm, H1/H4 trend.
+- **News awareness** — fetches the ForexFactory weekly calendar; blocks signal generation in the T-15…T+30 window around CPI/FOMC/NFP and warns during pre-event / recovery zones.
+- **Proactive alerts** — push notifications at T-30 / T-15 / T-5 before high-impact USD events. Per-chat opt-in (`/alerts on|off`, default on).
+- **Trade card persistence** — decisions emitted as a `agent_decision` row in Firestore (or in-memory if Firebase isn't configured).
+- **Risk-sized lot** — automatic position sizing so hitting SL costs `ADVISOR_RISK_PCT %` of `ADVISOR_ACCOUNT_USDT`. Disable by setting either to `0`.
 
-To streamline this process, a **mock folder** has been provided. The mock folder contains boilerplate code that can be easily customized to create CRUD operations for your tables. By following this simple process, you can implement the API for any object in just a few steps.
+## Architecture
 
-## Steps to Use the Author Folder
+```
+Telegram  ──►  ChatHandler  ──►  DeepSeek (streamed reply)
+                   │
+                   ├──►  MarketAnalyzer ──►  Binance REST (M1/M5/H1/H4 klines)
+                   ├──►  News Calendar ───►  ForexFactory XML feed
+                   ├──►  AlertWorker (1-min ticker → proactive pushes)
+                   ├──►  SessionStore  (in-memory; 7-day TTL)
+                   └──►  DecisionStore (Firestore | in-memory fallback)
+```
 
-1. **Create Object / Table Definition**:
-    - Start by defining the object or table for which you want to write a CRUD API (e.g., `Tag`, `User`, `Product`, etc.).
+Clean Architecture: every dependency is interface-shaped under `modules/advisor/biz/`. Concrete adapters live alongside (`provider/deepseek`, `transport/telegram`, `storage/memory`, `brokers/binance`).
 
-2. **Use Visual Studio Code Replace Feature**:
-    - Open the mock folder in your code editor (e.g., Visual Studio Code).
-    - Use the **Find and Replace** feature to replace all instances of `Author` with the name of your table/object (e.g., `Tag`).
-    - This will automatically update all references to the mock object in the code.
+Key packages:
 
-3. **Update the File Name**:
-    - After replacing the `Author` references in the code, update the filenames to match your object/table name. For example:
-        - If you were working on a `Tag` object, rename files such as `mock_storage.go`, `mock_transport.go`, etc., to reflect the `Tag` object. 
-        - This ensures your files are named according to the entity you are working with (e.g., `tag_storage.go`, `tag_transport.go`, etc.).
+| Path | Role |
+| --- | --- |
+| `main.go` | Composition root + health server. |
+| `modules/advisor/biz/` | Domain logic (chat handler, prompt builder, decision parser). |
+| `modules/advisor/biz/market/` | Symbol/TF resolution, indicator pipeline, digest renderer. |
+| `modules/advisor/biz/market/news/` | Calendar feed, gate (reactive blackout), alert worker (proactive pushes). |
+| `modules/advisor/provider/deepseek/` | Streaming LLM client. |
+| `modules/advisor/transport/telegram/` | Long-poll adapter + edit-in-place message bubble. |
+| `modules/agent_decision/` | Decision storage interface + Firestore/memory backends. |
+| `brokers/binance/` | REST kline fetcher. |
+| `trading/indicators/` | EMA / RSI / ATR / ADX implementations used by the digest. |
 
-4. **Customize for Your Needs**:
-    - After replacing the mock references, you can further customize the code if necessary to suit your specific business logic or storage requirements.
+## Quickstart
 
-5. **Repeat for Each Object**:
-    - You can repeat these steps for each object or table in your system by defining new objects and following the process for replacing `Author` and renaming files accordingly.
+Requires Go ≥ 1.25.
 
-### Example: Creating CRUD API for Tag
+```bash
+git clone https://github.com/<you>/j_ai_trade.git
+cd j_ai_trade
+cp .env.example .env
+# Fill J_AI_TRADE_ADVISOR + DEEP_SEEK_API_KEY at minimum, then:
+go run .
+```
 
-1. **Define the `Tag` object**:  
-    Create the `Tag` object with the necessary fields for your system (e.g., `ID`, `Name`).
+The process boots the Telegram long-poll loop and a Gin health server on `$PORT` (default `80`) for platform readiness probes.
 
-2. **Replace `Author` with `Tag`**:  
-    In Visual Studio Code, use the Find and Replace feature to replace every instance of `Author` with `Tag`.
+## Environment variables
 
-3. **Rename Files**:  
-    Rename files like `mock_storage.go` to `tag_storage.go`, `mock_transport.go` to `tag_transport.go`, and so on.
+| Var | Required | Purpose |
+| --- | --- | --- |
+| `J_AI_TRADE_ADVISOR` | ✅ | Telegram bot token (separate from the cron signal bot). |
+| `DEEP_SEEK_API_KEY` | ✅ | DeepSeek API key. |
+| `ADVISOR_ALLOWED_USER_IDS` | recommended in prod | Comma-separated Telegram user IDs allowlisted. Empty ⇒ allow everyone (dev only). |
+| `SERVICE_ACCOUNT_FIREBASE_BASE_64` | optional | Base64'd service-account JSON. Unset ⇒ decisions persist in-memory. |
+| `DEEP_SEEK_BASE_URL` | optional | Override LLM endpoint (proxies / compat hosts). |
+| `DEEP_SEEK_MODEL` | optional | `deepseek-chat` (default, fast) or `deepseek-reasoner` (slower, deeper). |
+| `ADVISOR_ACCOUNT_USDT` | optional | Notional account size for risk sizing (default 1000). `0` disables sizing. |
+| `ADVISOR_RISK_PCT` | optional | % of account to lose if SL hit (default 0.5). `0` disables sizing. |
+| `ENV` | optional | `PROD` toggles release-mode Gin and skips `.env` loading. |
+| `PORT` | optional | Health server port (default `80`). |
 
-4. **Adjust Logic**:  
-    Adjust the business logic, storage, and transport layers according to the needs of your `Tag` API.
+## Bot commands
 
-By following this method, you can create a complete CRUD API for any object or table in just a few simple steps.
+| Command | Behaviour |
+| --- | --- |
+| `/start` | Welcome message (also auto-fires once per chat). |
+| `/reset` | Wipes session memory for the current chat. |
+| `/help` | Shows the command list. |
+| `/analyze [SYMBOL] [TF]` | Force a fresh analysis (defaults: `XAUUSDT`, M5/H1 confluence). |
+| `/alerts on \| off` | Toggle proactive news pushes for the chat. Default on. |
 
----
+Bare messages route through the same analyzer; the bot decides whether market data is needed based on the text and pinned `LastSymbol`.
 
-## Folder Structure
+## Tests
 
-The mock folder contains the following layers:
+```bash
+go test ./...
+```
 
-- **Storage Layer**:  
-    Contains the mock implementation for interacting with your data store (e.g., databases, file systems).
+Coverage focuses on the riskiest layers: news gate window logic, alert worker tier/dedupe, calendar refresh + backoff, decision parser & risk sizing, and chat-handler critical paths (commands, panic recovery, decision extraction, stream errors).
 
-- **Business Layer**:  
-    Contains the mock business logic for handling the entity's operations (e.g., validation, transformation).
+## Design notes
 
-- **Transport Layer**:  
-    Contains the mock HTTP transport layer for defining the API routes and HTTP handlers.
-
-Each layer is designed to be interchangeable and easy to extend. By following the replacement process, you only need to update the object/table name to customize the implementation for your specific use case.
-
----
-
-## Benefits
-
-- **Rapid API Creation**:  
-    This approach allows you to quickly create a full set of CRUD APIs for any table or object in your system.
-
-- **Maintainable Architecture**:  
-    Following Clean Architecture principles ensures your code remains modular, maintainable, and scalable as your project grows.
-
-- **Customizable**:  
-    Once the boilerplate code is geneSubscriptiond, you can easily modify it to meet your specific business and application logic requirements.
-
----
-
-## Example Folder Structure
-
+- **Graceful degradation everywhere.** Binance down ⇒ chat-only fallback. ForexFactory feed down ⇒ no news line, no alerts, but the bot keeps replying. Firestore down ⇒ in-memory decisions.
+- **Per-message context budget**: 90 s. The LLM stream and Binance fetch share it via `context.WithTimeout`.
+- **News gate** ranks states `active > pre > recovery > none` and is rendered as a one-line directive in the `[MARKET_DATA]` block; the LLM applies the blackout reactively.
+- **Alert worker** uses single-flight refresh (no pile-on) and per-(eventID, tier, chatID) dedupe so a 1-minute scan tick can't double-push.
+- **Risk sizing** owns lot size only — entry/SL/TP come entirely from the LLM's structural read of the chart.

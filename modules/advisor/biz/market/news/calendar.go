@@ -70,6 +70,13 @@ type Calendar struct {
 	events    []Event   // sorted by Time ascending; nil = cold cache
 	fetchedAt time.Time // zero value = cold cache
 
+	// consecutiveFailures counts back-to-back Refresh errors. Reset to 0
+	// on success. Drives backoff (effectiveTTLLocked doubles the next
+	// poll interval) and log dampening (only the FIRST failure of a
+	// streak logs at Warn — subsequent ones drop to Debug so a multi-day
+	// outage doesn't fill the log).
+	consecutiveFailures int
+
 	// refreshing is the single-flight gate. CompareAndSwap to true =
 	// "I am the one goroutine doing this refresh"; everyone else moves
 	// on. Set back to false in the deferred cleanup of refreshOnce.
@@ -140,16 +147,34 @@ func (c *Calendar) Refresh(ctx context.Context) error {
 
 	events, err := c.feed.Fetch(ctx)
 	if err != nil {
-		log.Warn().Err(err).Msg("news: refresh failed; keeping previous cache")
+		c.mu.Lock()
+		c.consecutiveFailures++
+		failures := c.consecutiveFailures
+		c.mu.Unlock()
+		// Loud-once: a transient blip (single failure) is worth a Warn so
+		// ops notices; a sustained outage drops to Debug so it doesn't
+		// drown the log. effectiveTTLLocked also slows polling under
+		// failure so the noise floor naturally shrinks.
+		if failures == 1 {
+			log.Warn().Err(err).Msg("news: refresh failed; keeping previous cache")
+		} else {
+			log.Debug().Err(err).Int("consecutive_failures", failures).Msg("news: refresh still failing")
+		}
 		return err
 	}
 
 	c.mu.Lock()
 	c.events = events
 	c.fetchedAt = c.now()
+	recovered := c.consecutiveFailures
+	c.consecutiveFailures = 0
 	c.mu.Unlock()
 
-	log.Info().Int("events", len(events)).Msg("news: cache refreshed")
+	if recovered > 0 {
+		log.Info().Int("events", len(events)).Int("after_failures", recovered).Msg("news: cache refreshed (recovered)")
+	} else {
+		log.Info().Int("events", len(events)).Msg("news: cache refreshed")
+	}
 	return nil
 }
 
@@ -257,23 +282,41 @@ func (c *Calendar) maybeKickRefresh(ctx context.Context) {
 }
 
 // effectiveTTLLocked picks between the steady-state and hot TTL based
-// on proximity to the next event. MUST be called with c.mu held (read
-// or write) — it inspects c.events.
+// on proximity to the next event, then applies exponential backoff on
+// consecutive failures so a feed outage doesn't translate into a tight
+// retry loop (specifically: hot-mode 5min × 2^N would re-poll every
+// 5/10/20/40min instead of hammering the same broken endpoint).
+// MUST be called with c.mu held (read or write) — it inspects c.events
+// and c.consecutiveFailures.
 func (c *Calendar) effectiveTTLLocked() time.Duration {
-	if len(c.events) == 0 {
+	base := c.refreshTTL
+	if len(c.events) > 0 {
+		now := c.now()
+		for _, e := range c.events {
+			if e.Time.Before(now) {
+				continue
+			}
+			if e.Time.Sub(now) <= HotWindow {
+				base = HotRefreshTTL
+			}
+			break // events are sorted; first future one is the closest
+		}
+	}
+	if c.consecutiveFailures == 0 {
+		return base
+	}
+	// 2x, 4x, 8x then capped at the steady-state TTL — past that point
+	// there's no value in slowing down further; the ticker's already at
+	// "once an hour".
+	shift := c.consecutiveFailures
+	if shift > 3 {
+		shift = 3
+	}
+	backoff := base << shift
+	if backoff > c.refreshTTL || backoff <= 0 {
 		return c.refreshTTL
 	}
-	now := c.now()
-	for _, e := range c.events {
-		if e.Time.Before(now) {
-			continue
-		}
-		if e.Time.Sub(now) <= HotWindow {
-			return HotRefreshTTL
-		}
-		break // events are sorted; first future one is the closest
-	}
-	return c.refreshTTL
+	return backoff
 }
 
 // StartBackgroundRefresh runs a self-adjusting ticker that polls the

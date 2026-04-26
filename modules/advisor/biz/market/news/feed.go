@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -50,18 +51,26 @@ const DefaultFeedURL = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
 // We resolve the location lazily on first parse rather than in init()
 // so a missing tzdata image only breaks the news subsystem (degraded:
 // no news line) instead of crashing the whole binary at startup.
-var nyLoc *time.Location
+// sync.Once guards the lazy load against concurrent feed fetches.
+var (
+	nyLoc     *time.Location
+	nyLocOnce sync.Once
+	nyLocErr  error
+)
 
 func newYorkLocation() (*time.Location, error) {
-	if nyLoc != nil {
-		return nyLoc, nil
+	nyLocOnce.Do(func() {
+		loc, err := time.LoadLocation("America/New_York")
+		if err != nil {
+			nyLocErr = fmt.Errorf("news: load America/New_York: %w (install tzdata)", err)
+			return
+		}
+		nyLoc = loc
+	})
+	if nyLocErr != nil {
+		return nil, nyLocErr
 	}
-	loc, err := time.LoadLocation("America/New_York")
-	if err != nil {
-		return nil, fmt.Errorf("news: load America/New_York: %w (install tzdata)", err)
-	}
-	nyLoc = loc
-	return loc, nil
+	return nyLoc, nil
 }
 
 // Impact mirrors ForexFactory's three-level severity. We keep the

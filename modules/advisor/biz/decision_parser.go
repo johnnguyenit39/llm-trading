@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 // Risk-sizing defaults. Override via env at process start:
@@ -196,9 +199,18 @@ func riskRewardRatio(tpPnL, slPnL float64) float64 {
 	return w / r
 }
 
+// envFloatWarned dedupes parse-failure warnings per key. Each trade
+// card calls envFloat twice; without dedupe, a single typo in
+// ADVISOR_ACCOUNT_USDT would log on every reply. sync.Map keyed by
+// env var name keeps the warn-once contract cheap and lock-free.
+var envFloatWarned sync.Map
+
 // envFloat reads a float env var, falling back to `def` on unset or
 // unparseable input. No hard failure — a typo in prod shouldn't break
-// trade cards.
+// trade cards — but we log loud-once on the first parse failure per
+// key so a misconfigured ADVISOR_ACCOUNT_USDT / ADVISOR_RISK_PCT can't
+// silently disable risk-sizing for hours before someone notices the
+// trade cards look wrong.
 func envFloat(key string, def float64) float64 {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
@@ -206,6 +218,14 @@ func envFloat(key string, def float64) float64 {
 	}
 	v, err := strconv.ParseFloat(raw, 64)
 	if err != nil {
+		if _, dup := envFloatWarned.LoadOrStore(key, struct{}{}); !dup {
+			log.Warn().
+				Err(err).
+				Str("env", key).
+				Str("value", raw).
+				Float64("default", def).
+				Msg("advisor: invalid float in env, using default (risk-sizing may be off)")
+		}
 		return def
 	}
 	return v

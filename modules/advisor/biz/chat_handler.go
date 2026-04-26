@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -95,9 +96,15 @@ func (h *ChatHandler) Run(ctx context.Context) {
 func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessage) {
 	defer func() {
 		if r := recover(); r != nil {
+			// debug.Stack captures the goroutine's stack trace at the
+			// recover point — without it we get a panic message but no
+			// idea WHICH downstream call (LLM stream? Telegram edit?
+			// store write?) actually blew up, which makes post-mortem
+			// debugging nearly impossible from logs alone.
 			log.Error().
 				Interface("panic", r).
 				Str("chat_id", msg.ChatID).
+				Bytes("stack", debug.Stack()).
 				Msg("advisor: handler panicked")
 		}
 	}()
@@ -163,7 +170,7 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 		}
 		marketBlob = result.Digest
 		if result.Ack != "" {
-			_ = h.transport.SendMessage(ctx, chatID, result.Ack)
+			h.sendOrLog(ctx, chatID, result.Ack, "analyzer_ack")
 		}
 		// Pin the freshly analysed symbol so the NEXT message — even
 		// a bare "bây giờ sao" — can resolve back to this same pair.
@@ -285,15 +292,19 @@ func (h *ChatHandler) handleCommand(ctx context.Context, chatID, text string) bo
 	lower := strings.ToLower(strings.TrimSpace(text))
 	switch lower {
 	case "/start":
-		_ = h.transport.SendMessage(ctx, chatID, WelcomeMessage)
-		_ = h.store.MarkGreeted(ctx, chatID)
+		h.sendOrLog(ctx, chatID, WelcomeMessage, "/start")
+		if err := h.store.MarkGreeted(ctx, chatID); err != nil {
+			log.Debug().Err(err).Str("chat_id", chatID).Msg("advisor: MarkGreeted failed")
+		}
 		return true
 	case "/reset":
-		_ = h.store.Clear(ctx, chatID)
-		_ = h.transport.SendMessage(ctx, chatID, "Đã xoá ngữ cảnh cuộc trò chuyện. Bắt đầu lại từ đầu nhé 🙌")
+		if err := h.store.Clear(ctx, chatID); err != nil {
+			log.Warn().Err(err).Str("chat_id", chatID).Msg("advisor: session clear failed")
+		}
+		h.sendOrLog(ctx, chatID, "Đã xoá ngữ cảnh cuộc trò chuyện. Bắt đầu lại từ đầu nhé 🙌", "/reset")
 		return true
 	case "/help":
-		_ = h.transport.SendMessage(ctx, chatID,
+		h.sendOrLog(ctx, chatID,
 			"Bot scalping — mặc định XAUUSDT; BTCUSDT khi bạn hỏi đích danh BTC.\n\n"+
 				"Lệnh khả dụng:\n"+
 				"/start — lời chào\n"+
@@ -304,7 +315,8 @@ func (h *ChatHandler) handleCommand(ctx context.Context, chatID, text string) bo
 				"  Ví dụ: /analyze, /analyze M5, /analyze btc H1.\n"+
 				"/alerts on|off — bật/tắt cảnh báo trước tin lớn (CPI/FOMC/NFP).\n"+
 				"  Mặc định bật. Mình ping trước 30/15/5 phút khi sắp có tin.\n\n"+
-				"Cứ nhắn tự nhiên — mỗi tin nhắn mình tự fetch dữ liệu mới (M1/M5 entry, H1/H4 trend) rồi trả lời BUY/SELL + entry/SL/TP hoặc khuyên chờ.")
+				"Cứ nhắn tự nhiên — mỗi tin nhắn mình tự fetch dữ liệu mới (M1/M5 entry, H1/H4 trend) rồi trả lời BUY/SELL + entry/SL/TP hoặc khuyên chờ.",
+			"/help")
 		return true
 	case "/alerts", "/alerts on", "/alerts off":
 		h.handleAlertsCommand(ctx, chatID, lower)
@@ -323,17 +335,17 @@ func (h *ChatHandler) handleAlertsCommand(ctx context.Context, chatID, lower str
 	case "/alerts on":
 		if err := h.store.SetAlertsEnabled(ctx, chatID, true); err != nil {
 			log.Warn().Err(err).Str("chat_id", chatID).Msg("advisor: SetAlertsEnabled(true) failed")
-			_ = h.transport.SendMessage(ctx, chatID, "Mình lưu cài đặt không được, bạn thử lại sau ít giây nhé.")
+			h.sendOrLog(ctx, chatID, "Mình lưu cài đặt không được, bạn thử lại sau ít giây nhé.", "/alerts on (err)")
 			return
 		}
-		_ = h.transport.SendMessage(ctx, chatID, "✅ Đã bật cảnh báo tin lớn. Mình sẽ ping bạn trước 30/15/5 phút khi sắp có CPI/FOMC/NFP.")
+		h.sendOrLog(ctx, chatID, "✅ Đã bật cảnh báo tin lớn. Mình sẽ ping bạn trước 30/15/5 phút khi sắp có CPI/FOMC/NFP.", "/alerts on")
 	case "/alerts off":
 		if err := h.store.SetAlertsEnabled(ctx, chatID, false); err != nil {
 			log.Warn().Err(err).Str("chat_id", chatID).Msg("advisor: SetAlertsEnabled(false) failed")
-			_ = h.transport.SendMessage(ctx, chatID, "Mình lưu cài đặt không được, bạn thử lại sau ít giây nhé.")
+			h.sendOrLog(ctx, chatID, "Mình lưu cài đặt không được, bạn thử lại sau ít giây nhé.", "/alerts off (err)")
 			return
 		}
-		_ = h.transport.SendMessage(ctx, chatID, "🔕 Đã tắt cảnh báo proactive. Bạn vẫn thấy warning trong reply khi hỏi phân tích lúc gần tin.")
+		h.sendOrLog(ctx, chatID, "🔕 Đã tắt cảnh báo proactive. Bạn vẫn thấy warning trong reply khi hỏi phân tích lúc gần tin.", "/alerts off")
 	default: // "/alerts"
 		on, err := h.store.AreAlertsEnabled(ctx, chatID)
 		if err != nil {
@@ -344,9 +356,10 @@ func (h *ChatHandler) handleAlertsCommand(ctx context.Context, chatID, lower str
 		if !on {
 			state = "TẮT"
 		}
-		_ = h.transport.SendMessage(ctx, chatID,
+		h.sendOrLog(ctx, chatID,
 			"Cảnh báo proactive đang: "+state+"\n"+
-				"Bật: /alerts on\nTắt: /alerts off")
+				"Bật: /alerts on\nTắt: /alerts off",
+			"/alerts status")
 	}
 }
 
@@ -355,7 +368,20 @@ func (h *ChatHandler) maybeGreet(ctx context.Context, chatID string) {
 	if err != nil || !acquired {
 		return
 	}
-	_ = h.transport.SendMessage(ctx, chatID, WelcomeMessage)
+	h.sendOrLog(ctx, chatID, WelcomeMessage, "greeting")
+}
+
+// sendOrLog wraps a one-shot SendMessage so the swallowed error never
+// disappears silently. Telegram failures here are non-fatal (the user
+// still gets the streamed bubble in the main path) but invisible
+// failures hid bugs in the past — e.g. when an upstream change broke
+// the welcome / ack / /alerts confirmation messages, nothing surfaced
+// in logs and we only noticed via user reports. Debug-level keeps
+// healthy operation quiet while making post-mortem grep-able.
+func (h *ChatHandler) sendOrLog(ctx context.Context, chatID, text, what string) {
+	if err := h.transport.SendMessage(ctx, chatID, text); err != nil {
+		log.Debug().Err(err).Str("chat_id", chatID).Str("what", what).Msg("advisor: SendMessage failed")
+	}
 }
 
 func (h *ChatHandler) persistTurns(ctx context.Context, chatID, userText, assistantText string) {
