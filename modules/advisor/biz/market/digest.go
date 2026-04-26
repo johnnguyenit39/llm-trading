@@ -67,12 +67,18 @@ type TFSummary struct {
 	RangeWidth   float64 `json:"range_width_atr,omitempty"`
 	InRange      bool    `json:"in_range,omitempty"`
 
-	// Phase-3e structure flags. Surfaced only when Direction != "" (we
-	// omit the empty case from the prompt entirely).
+	// Phase-3e structure / imbalance flags. Surfaced only when
+	// Direction != "" (we omit the empty case from the prompt entirely).
 	BOSDir   string  `json:"bos_dir,omitempty"`   // "up" | "down"
 	BOSLevel float64 `json:"bos_level,omitempty"` // broken pivot price
 	BOSAge   int     `json:"bos_age,omitempty"`   // bars since break
 	BOSState string  `json:"bos_state,omitempty"` // "pending" | "retesting" | "confirmed"
+
+	FVGDir    string  `json:"fvg_dir,omitempty"`    // "bull" (support zone) | "bear" (resistance zone)
+	FVGTop    float64 `json:"fvg_top,omitempty"`    // upper bound of gap
+	FVGBottom float64 `json:"fvg_bottom,omitempty"` // lower bound
+	FVGAge    int     `json:"fvg_age,omitempty"`    // bars since gap formed
+	FVGState  string  `json:"fvg_state,omitempty"`  // "open" | "filling"
 
 	// Phase-3d enrichments — cheap scalars moved out of LLM mental-math.
 	EMAStack           string  `json:"ema_stack,omitempty"`            // bullish_full | bullish_partial | ... | choppy | ...
@@ -150,6 +156,11 @@ const (
 // enough to allow a 1-3 bar break + retest, young enough that the
 // signal is still actionable for a scalper.
 const BOSScanWindow = 15
+
+// FVGScanWindow caps how far back to look for an unfilled fair value
+// gap. 25 bars ≈ 25 min on M1, ~2h on M5. Older gaps usually have been
+// mitigated already; bumping the window doesn't add useful signal.
+const FVGScanWindow = 25
 
 // PatternLookback is how many recent CLOSED bars on the entry TF get a
 // full pattern/context/trap analysis emitted into the prompt. Three is
@@ -277,6 +288,18 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 				sum.BOSLevel = bos.Level
 				sum.BOSAge = bos.BarsSinceBreak
 				sum.BOSState = bos.State
+			}
+		}
+		// FVG detection isn't pivot-bound but only adds signal on the
+		// execution TFs — scalpers don't trade H1 imbalances. Limit to
+		// entry TF + M5.
+		if tf == entryTF || tf == models.TF_M5 {
+			if fvg := DetectRecentFVG(closed, FVGScanWindow); fvg.Direction != "" {
+				sum.FVGDir = fvg.Direction
+				sum.FVGTop = fvg.Top
+				sum.FVGBottom = fvg.Bottom
+				sum.FVGAge = fvg.Age
+				sum.FVGState = fvg.State
 			}
 		}
 	}
@@ -708,6 +731,9 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 	}
 	if s.BOSDir != "" {
 		structBits = append(structBits, fmt.Sprintf("bos_%s @ %s [%s, %db ago]", s.BOSDir, f4(s.BOSLevel), s.BOSState, s.BOSAge))
+	}
+	if s.FVGDir != "" {
+		structBits = append(structBits, fmt.Sprintf("fvg_%s %s..%s [%s, %db ago]", s.FVGDir, f4(s.FVGBottom), f4(s.FVGTop), s.FVGState, s.FVGAge))
 	}
 	if len(structBits) > 0 {
 		fmt.Fprintf(b, "  structure: %s\n", strings.Join(structBits, " · "))
