@@ -8,7 +8,6 @@ package marketdata
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"j_ai_trade/brokers/binance"
 	"j_ai_trade/brokers/binance/repository"
@@ -43,17 +42,6 @@ func NewBinanceFetcher(bs *binance.BinanceService) *BinanceFetcher {
 // Fetch pulls the requested candle counts per timeframe. We fetch
 // `minCount + 20` so indicators with warm-up periods (ADX-28, EMA-200)
 // have a cushion against off-by-one boundaries.
-//
-// Forex-flavoured conversion: when the symbol is USDT-quoted (e.g.
-// XAUUSDT) we additionally fetch the live USDTUSD spot rate and scale
-// every OHLC value by it, so callers see prices in real US dollars
-// rather than Tether. Volume stays as-is — it's denominated in the
-// base asset (oz of gold), not the quote. The output Symbol is
-// renamed accordingly (XAUUSDT → XAUUSD) so the rest of the pipeline
-// labels prices honestly. If the rate fetch fails we surface the
-// error rather than silently returning USDT-denominated candles —
-// for a forex trader, a 1-2 pip blind spot is worse than a fallback
-// to chat-only.
 func (f *BinanceFetcher) Fetch(ctx context.Context, symbol string, required map[models.Timeframe]int) (models.MarketData, error) {
 	out := models.MarketData{Symbol: symbol, Candles: map[models.Timeframe][]baseCandle.BaseCandle{}}
 	for tf, minCount := range required {
@@ -86,39 +74,7 @@ func (f *BinanceFetcher) Fetch(ctx context.Context, symbol string, required map[
 		}
 		out.Candles[tf] = ConvertBinanceCandles(symbol, candles)
 	}
-	if strings.HasSuffix(symbol, "USDT") {
-		rate, err := f.bs.FetchSpotTickerPrice(ctx, "USDTUSD")
-		if err != nil {
-			return out, fmt.Errorf("fetch USDTUSD rate: %w", err)
-		}
-		usdSymbol := strings.TrimSuffix(symbol, "T") // XAUUSDT -> XAUUSD
-		ApplyUSDTtoUSDRate(&out, rate, usdSymbol)
-	}
 	return out, nil
-}
-
-// ApplyUSDTtoUSDRate scales every candle's OHLC by the given USDTUSD
-// rate, in place, and renames the MarketData's Symbol (and each
-// candle's Symbol) to the USD-denominated form. Volume is left alone —
-// it counts base-asset units, not quote currency.
-//
-// Exported so unit tests and alt-broker adapters can reuse it without
-// re-deriving the multiplier semantics.
-func ApplyUSDTtoUSDRate(md *models.MarketData, rate float64, usdSymbol string) {
-	if md == nil || rate <= 0 {
-		return
-	}
-	for tf, candles := range md.Candles {
-		for i := range candles {
-			candles[i].Open *= rate
-			candles[i].High *= rate
-			candles[i].Low *= rate
-			candles[i].Close *= rate
-			candles[i].Symbol = usdSymbol
-		}
-		md.Candles[tf] = candles
-	}
-	md.Symbol = usdSymbol
 }
 
 // ConvertBinanceCandles normalises exchange-specific candles into the

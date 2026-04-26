@@ -49,11 +49,3 @@ func (s *BinanceService) Fetch4hCandles(ctx context.Context, symbol string, limi
 func (s *BinanceService) Fetch1dCandles(ctx context.Context, symbol string, limit int) ([]repository.BinanceCandle, error) {
 	return s.repo.FetchCandles(ctx, symbol, "1d", limit)
 }
-
-// FetchSpotTickerPrice returns the latest spot price for a symbol —
-// e.g. FetchSpotTickerPrice(ctx, "USDTUSD") yields the live USDT→USD
-// conversion factor used by forex-style traders to read XAU prices in
-// real US dollars instead of Tether.
-func (s *BinanceService) FetchSpotTickerPrice(ctx context.Context, symbol string) (float64, error) {
-	return s.repo.FetchSpotTickerPrice(ctx, symbol)
-}

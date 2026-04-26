@@ -11,19 +11,11 @@ import (
 )
 
 const (
-	// defaultBinanceURL points at Binance USDT-Margined Futures, where
-	// our klines come from (best gold liquidity / 24h coverage).
 	defaultBinanceURL = "https://fapi.binance.com"
-
-	// defaultBinanceSpotURL is Binance Spot — used only for the small
-	// /api/v3/ticker/price calls we need to convert USDT-denominated
-	// prices into USD (the USDTUSD pair lives on spot, not futures).
-	defaultBinanceSpotURL = "https://api.binance.com"
 )
 
 type binanceRepositoryImpl struct {
-	baseURL string // futures (klines)
-	spotURL string // spot (ticker)
+	baseURL string
 	client  *http.Client
 }
 
@@ -31,7 +23,6 @@ type binanceRepositoryImpl struct {
 func NewBinanceRepository() BinanceRepository {
 	return &binanceRepositoryImpl{
 		baseURL: defaultBinanceURL,
-		spotURL: defaultBinanceSpotURL,
 		client:  &http.Client{},
 	}
 }
@@ -86,46 +77,4 @@ func (r *binanceRepositoryImpl) FetchCandles(ctx context.Context, symbol string,
 	}
 
 	return candles, nil
-}
-
-// FetchSpotTickerPrice hits Binance spot's /api/v3/ticker/price endpoint
-// for a single symbol and returns the latest trade price. Validates the
-// HTTP status and that the parsed price is positive — a zero or
-// negative price would propagate as a silent multiply-by-zero into
-// every converted candle, which is much worse than a loud error.
-func (r *binanceRepositoryImpl) FetchSpotTickerPrice(ctx context.Context, symbol string) (float64, error) {
-	formattedSymbol := utils.ConvertPair(symbol)
-	url := fmt.Sprintf("%s/api/v3/ticker/price?symbol=%s", r.spotURL, formattedSymbol)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("failed to execute request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	var payload struct {
-		Symbol string `json:"symbol"`
-		Price  string `json:"price"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return 0, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	price, err := strconv.ParseFloat(payload.Price, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse price %q: %w", payload.Price, err)
-	}
-	if price <= 0 {
-		return 0, fmt.Errorf("non-positive ticker price %v for %s", price, symbol)
-	}
-	return price, nil
 }

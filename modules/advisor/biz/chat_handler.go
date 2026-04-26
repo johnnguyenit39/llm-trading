@@ -293,15 +293,15 @@ func (h *ChatHandler) handleCommand(ctx context.Context, chatID, text string) bo
 		return true
 	case "/help":
 		_ = h.transport.SendMessage(ctx, chatID,
-			"Bot scalping vàng (XAUUSD spot, quy về USD chuẩn forex).\n\n"+
+			"Bot scalping vàng (XAUUSDT).\n\n"+
 				"Lệnh khả dụng:\n"+
 				"/start — lời chào\n"+
 				"/reset — xoá ngữ cảnh\n"+
 				"/help — xem lệnh\n"+
-				"/analyze [TF] — phân tích kỹ thuật realtime XAUUSD.\n"+
+				"/analyze [TF] — phân tích kỹ thuật realtime XAUUSDT.\n"+
 				"  Mặc định scalping M1; TF hỗ trợ: M1, M5, M15, H1, H4, D1.\n"+
 				"  Ví dụ: /analyze (= M1), /analyze M5, /analyze H1.\n\n"+
-				"Cứ nhắn tự nhiên — mỗi tin nhắn mình tự fetch giá XAU mới nhất (M1/M5 entry, H1/H4 trend context, đã nhân tỉ giá USDTUSD live) rồi trả lời BUY/SELL + entry/SL/TP hoặc khuyên chờ.")
+				"Cứ nhắn tự nhiên — mỗi tin nhắn mình tự fetch giá XAU mới nhất (M1/M5 entry, H1/H4 trend context) rồi trả lời BUY/SELL + entry/SL/TP hoặc khuyên chờ.")
 		return true
 	}
 	return false

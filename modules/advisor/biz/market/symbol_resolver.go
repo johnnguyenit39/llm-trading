@@ -47,16 +47,11 @@ func NewSymbolResolver() *SymbolResolver {
 		aliases[strings.ToLower(s)] = s
 	}
 	// 2. Hand-curated aliases — gold only while the bot is gold-only.
-	// "xauusd" maps to the same Binance pair as "xauusdt": the broker
-	// fetches XAUUSDT klines and the marketdata layer converts prices
-	// to USD via the live USDTUSD rate, so users typing either label
-	// land on the same forex-flavoured analysis.
 	extra := map[string]string{
-		"xau":    "XAUUSDT",
-		"xauusd": "XAUUSDT",
-		"gold":   "XAUUSDT",
-		"vang":   "XAUUSDT", // ASCII-folded "vàng"
-		"vàng":   "XAUUSDT",
+		"xau":  "XAUUSDT",
+		"gold": "XAUUSDT",
+		"vang": "XAUUSDT", // ASCII-folded "vàng"
+		"vàng": "XAUUSDT",
 	}
 	for alias, canonical := range extra {
 		// Skip aliases whose canonical symbol isn't in SupportedSymbols
