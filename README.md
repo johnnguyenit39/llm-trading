@@ -1,4 +1,4 @@
-# j_ai_trade — Telegram Trading Advisor Bot
+# j_ai_trade — Telegram Trading Advisor Bot - Version: 1.0.1
 
 Conversational trading advisor for **gold scalping (XAUUSDT)** delivered over Telegram. Each user message triggers a fresh fetch of multi-timeframe market data + economic-calendar context, which is fed to DeepSeek; the LLM decides whether to emit a `BUY`/`SELL` card with `entry / SL / TP / lot` or recommend waiting.
 
