@@ -72,13 +72,24 @@ func (d *IntentDetector) Detect(text string) Intent {
 	return Intent{Symbol: sym, Timeframe: tf, Explicit: false}
 }
 
-// DetectWithFallback is kept for API compatibility with callers that
-// still pass a pinned LastSymbol. Detect() already fills Symbol
-// unconditionally, so the lastSymbol hint is redundant for the
-// lastSymbol hint; we accept it without error and delegate.
+// DetectWithFallback resolves the symbol from the message; when the user
+// didn't name one we keep the chat's pinned lastSymbol so follow-up
+// turns ("tăng hay giảm?") stay on the same instrument the user just
+// switched to. Only when there's no pinned symbol either do we fall
+// back to DefaultSymbol — that's the first-turn / session-expired path.
 func (d *IntentDetector) DetectWithFallback(text, lastSymbol string) Intent {
-	_ = lastSymbol
-	return d.Detect(text)
+	sym := d.resolver.Resolve(text)
+	if sym == "" {
+		sym = lastSymbol
+	}
+	if sym == "" {
+		sym = DefaultSymbol
+	}
+	tf, ok := ResolveTimeframe(text)
+	if !ok {
+		tf = models.TF_M1
+	}
+	return Intent{Symbol: sym, Timeframe: tf, Explicit: false}
 }
 
 // ParseCommand recognises "/analyze SYMBOL [TF]" (and its alias
