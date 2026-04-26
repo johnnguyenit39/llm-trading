@@ -282,7 +282,8 @@ func (h *ChatHandler) recordDecision(ctx context.Context, chatID string, d *Deci
 // handleCommand processes the small set of built-in slash commands.
 // Returns true when the text was a command (so the caller skips the LLM).
 func (h *ChatHandler) handleCommand(ctx context.Context, chatID, text string) bool {
-	switch strings.ToLower(text) {
+	lower := strings.ToLower(strings.TrimSpace(text))
+	switch lower {
 	case "/start":
 		_ = h.transport.SendMessage(ctx, chatID, WelcomeMessage)
 		_ = h.store.MarkGreeted(ctx, chatID)
@@ -300,11 +301,53 @@ func (h *ChatHandler) handleCommand(ctx context.Context, chatID, text string) bo
 				"/help — xem lệnh\n"+
 				"/analyze [SYMBOL] [TF] — phân tích realtime (mặc định XAUUSDT).\n"+
 				"  TF: M1, M5, M15, H1, H4, D1.\n"+
-				"  Ví dụ: /analyze, /analyze M5, /analyze btc H1.\n\n"+
+				"  Ví dụ: /analyze, /analyze M5, /analyze btc H1.\n"+
+				"/alerts on|off — bật/tắt cảnh báo trước tin lớn (CPI/FOMC/NFP).\n"+
+				"  Mặc định bật. Mình ping trước 30/15/5 phút khi sắp có tin.\n\n"+
 				"Cứ nhắn tự nhiên — mỗi tin nhắn mình tự fetch dữ liệu mới (M1/M5 entry, H1/H4 trend) rồi trả lời BUY/SELL + entry/SL/TP hoặc khuyên chờ.")
+		return true
+	case "/alerts", "/alerts on", "/alerts off":
+		h.handleAlertsCommand(ctx, chatID, lower)
 		return true
 	}
 	return false
+}
+
+// handleAlertsCommand toggles or reports the per-chat opt-in for the
+// proactive news worker. We avoid free-form arg parsing — only the
+// three exact spellings reach this path, so the surface is small and
+// predictable. "/alerts" with no arg shows current state; "on"/"off"
+// flips it.
+func (h *ChatHandler) handleAlertsCommand(ctx context.Context, chatID, lower string) {
+	switch lower {
+	case "/alerts on":
+		if err := h.store.SetAlertsEnabled(ctx, chatID, true); err != nil {
+			log.Warn().Err(err).Str("chat_id", chatID).Msg("advisor: SetAlertsEnabled(true) failed")
+			_ = h.transport.SendMessage(ctx, chatID, "Mình lưu cài đặt không được, bạn thử lại sau ít giây nhé.")
+			return
+		}
+		_ = h.transport.SendMessage(ctx, chatID, "✅ Đã bật cảnh báo tin lớn. Mình sẽ ping bạn trước 30/15/5 phút khi sắp có CPI/FOMC/NFP.")
+	case "/alerts off":
+		if err := h.store.SetAlertsEnabled(ctx, chatID, false); err != nil {
+			log.Warn().Err(err).Str("chat_id", chatID).Msg("advisor: SetAlertsEnabled(false) failed")
+			_ = h.transport.SendMessage(ctx, chatID, "Mình lưu cài đặt không được, bạn thử lại sau ít giây nhé.")
+			return
+		}
+		_ = h.transport.SendMessage(ctx, chatID, "🔕 Đã tắt cảnh báo proactive. Bạn vẫn thấy warning trong reply khi hỏi phân tích lúc gần tin.")
+	default: // "/alerts"
+		on, err := h.store.AreAlertsEnabled(ctx, chatID)
+		if err != nil {
+			log.Warn().Err(err).Str("chat_id", chatID).Msg("advisor: AreAlertsEnabled failed")
+			on = true // optimistic default — matches new-chat semantics
+		}
+		state := "BẬT"
+		if !on {
+			state = "TẮT"
+		}
+		_ = h.transport.SendMessage(ctx, chatID,
+			"Cảnh báo proactive đang: "+state+"\n"+
+				"Bật: /alerts on\nTắt: /alerts off")
+	}
 }
 
 func (h *ChatHandler) maybeGreet(ctx context.Context, chatID string) {

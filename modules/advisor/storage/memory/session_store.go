@@ -21,6 +21,14 @@ const (
 
 	// GreetedTTL is how long we skip duplicate welcomes.
 	GreetedTTL = 30 * 24 * time.Hour
+
+	// AlertActivityWindow is how long after a user's last interaction
+	// they remain eligible for proactive news pushes. Seven days is
+	// long enough to catch weekly traders (don't open chat every day)
+	// but short enough that an abandoned chat doesn't keep receiving
+	// CPI alerts forever. After this window the chat must send a new
+	// message to re-qualify.
+	AlertActivityWindow = 7 * 24 * time.Hour
 )
 
 // SessionStore holds in-memory chat state for one process.
@@ -37,6 +45,20 @@ type chatState struct {
 	symExpire  time.Time
 
 	greetExpire time.Time
+
+	// lastActive is the timestamp of the most recent USER turn
+	// appended for this chat. The news AlertWorker uses it to
+	// distinguish "chat is alive" from "chat that started once,
+	// went silent, and shouldn't get CPI alerts at 3am". Refreshed
+	// only on Append() — assistant turns don't count.
+	lastActive time.Time
+
+	// alertsExplicitlyDisabled tracks the /alerts off opt-out. The
+	// default (zero value = false) means alerts are ENABLED, which is
+	// what we want for new chats: receive the safety net unless they
+	// actively opt out. Inverting the semantic this way means a chat
+	// that's never touched the /alerts command stays subscribed.
+	alertsExplicitlyDisabled bool
 }
 
 // NewSessionStore returns a single-process store. Safe for
@@ -82,6 +104,13 @@ func (s *SessionStore) Append(_ context.Context, chatID string, turn model.Turn)
 		st.turns = st.turns[n-MaxTurns:]
 	}
 	st.turnExpire = now.Add(SessionTTL)
+	// Only USER turns count as "the chat is alive". Assistant turns
+	// fire automatically after every user message, so counting them
+	// would let a one-shot user keep their alert subscription
+	// indefinitely as long as the bot keeps replying to itself.
+	if turn.Role == model.RoleUser {
+		st.lastActive = now
+	}
 	return nil
 }
 
@@ -148,6 +177,56 @@ func (s *SessionStore) SetLastSymbol(_ context.Context, chatID string, symbol st
 	st.lastSymbol = symbol
 	st.symExpire = now.Add(SessionTTL)
 	return nil
+}
+
+// SetAlertsEnabled records the user's /alerts on|off choice. We store
+// the INVERSE flag (alertsExplicitlyDisabled) so the zero-value of an
+// untouched chat means "enabled" — new users get alerts by default
+// without us having to materialise a state record on first contact.
+func (s *SessionStore) SetAlertsEnabled(_ context.Context, chatID string, enabled bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.get(chatID)
+	st.alertsExplicitlyDisabled = !enabled
+	return nil
+}
+
+func (s *SessionStore) AreAlertsEnabled(_ context.Context, chatID string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st, ok := s.chats[chatID]
+	if !ok {
+		// Unknown chat = default-enabled. The worker still won't push
+		// to a chat with zero lastActive (caught in ListAlertSubscribers),
+		// so reporting true here doesn't actually leak unwanted alerts.
+		return true, nil
+	}
+	return !st.alertsExplicitlyDisabled, nil
+}
+
+// ListAlertSubscribers returns chat IDs that:
+//   - have alerts enabled (default-true; only /alerts off opts out), AND
+//   - had a user turn within AlertActivityWindow.
+//
+// Snapshot-style copy so callers can iterate without holding our lock.
+// O(N) over all chats — fine for in-process state where N stays small;
+// a Redis-backed implementation would maintain a sorted set indexed by
+// lastActive instead.
+func (s *SessionStore) ListAlertSubscribers(_ context.Context) ([]string, error) {
+	cutoff := time.Now().Add(-AlertActivityWindow)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]string, 0, len(s.chats))
+	for chatID, st := range s.chats {
+		if st.alertsExplicitlyDisabled {
+			continue
+		}
+		if st.lastActive.Before(cutoff) {
+			continue
+		}
+		out = append(out, chatID)
+	}
+	return out, nil
 }
 
 var _ biz.SessionStore = (*SessionStore)(nil)

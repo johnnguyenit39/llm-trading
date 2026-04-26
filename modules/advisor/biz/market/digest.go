@@ -136,6 +136,13 @@ type PairSnapshot struct {
 	PDH          float64 // previous day high (from D1 prior-closed candle)
 	PDL          float64 // previous day low
 	Session      string  // "ASIA" | "LONDON" | "LONDON_NY_OVERLAP" | "NY" | "LATE_NY"
+
+	// NewsWindow is the pre-rendered economic-calendar gate line, e.g.
+	// "USD CPI m/m in 12min (HIGH) [active]". Empty string = nothing in
+	// proximity; Render() then skips emitting the "News:" section.
+	// Populated by analyzer.go when a news.Gate is attached; nil-safe
+	// if the bot ran without the news subsystem.
+	NewsWindow string
 }
 
 // Pivot window sizes per TF. Entry TF gets 6 for richer structural
@@ -583,6 +590,14 @@ func Render(snap *PairSnapshot) string {
 	}
 	if snap.Session != "" {
 		fmt.Fprintf(&b, "Session: %s UTC\n", snap.Session)
+	}
+	// News line sits between Session and PDH/PDL deliberately: this
+	// puts it just below the temporal context (session) but above the
+	// numeric anchors (prev day H/L). LLMs anchor on early lines, and
+	// a news blackout is a global-context flag we want considered
+	// BEFORE the model starts reasoning about per-TF setups.
+	if snap.NewsWindow != "" {
+		fmt.Fprintf(&b, "News: %s\n", snap.NewsWindow)
 	}
 	if snap.PDH > 0 && snap.PDL > 0 {
 		fmt.Fprintf(&b, "Prev day: H=%s L=%s\n", f4(snap.PDH), f4(snap.PDL))

@@ -50,4 +50,23 @@ type SessionStore interface {
 	// mirrors the session TTL so the memory naturally expires with
 	// the rest of the conversation context.
 	SetLastSymbol(ctx context.Context, chatID string, symbol string) error
+
+	// SetAlertsEnabled flips the per-chat opt-in for proactive news
+	// alerts (T-30/T-15/T-5 push). New chats default to enabled so
+	// users get the safety net by default; /alerts off mutes pushes
+	// without affecting reactive replies.
+	SetAlertsEnabled(ctx context.Context, chatID string, enabled bool) error
+
+	// AreAlertsEnabled reports whether the chat opted out via
+	// /alerts off. Default-true semantics: chats with no record
+	// (never used /alerts) are reported enabled.
+	AreAlertsEnabled(ctx context.Context, chatID string) (bool, error)
+
+	// ListAlertSubscribers returns chat IDs eligible for proactive
+	// news pushes: alerts enabled AND last user activity within the
+	// implementation's "active" window (default 7d). The news worker
+	// calls this on every scan tick; the result is a snapshot — chats
+	// added/removed concurrently with the scan are simply picked up
+	// next tick.
+	ListAlertSubscribers(ctx context.Context) ([]string, error)
 }

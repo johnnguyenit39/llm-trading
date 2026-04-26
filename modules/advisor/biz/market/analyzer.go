@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"j_ai_trade/modules/advisor/biz"
+	"j_ai_trade/modules/advisor/biz/market/news"
 	"j_ai_trade/trading/marketdata"
 	"j_ai_trade/trading/models"
 )
@@ -38,6 +39,14 @@ type Analyzer struct {
 	intent  *IntentDetector
 	fetcher marketdata.CandleFetcher
 
+	// newsGate is OPTIONAL. When attached via WithNewsGate, the
+	// analyzer asks it for the current economic-calendar window state
+	// and pins the rendered line on the snapshot so digest.Render()
+	// emits a "News: ..." section. Nil = no news awareness at all,
+	// which is the legitimate fallback when the news subsystem fails
+	// to initialise (tzdata missing, etc.).
+	newsGate *news.Gate
+
 	// fetchTimeout bounds any single analysis round so a hung Binance
 	// call can't stretch the user's 90s chat-handler budget to the max.
 	fetchTimeout time.Duration
@@ -52,6 +61,15 @@ func NewAnalyzer(intent *IntentDetector, fetcher marketdata.CandleFetcher) *Anal
 		fetcher:      fetcher,
 		fetchTimeout: 15 * time.Second,
 	}
+}
+
+// WithNewsGate attaches the economic-calendar gate. Returns the
+// receiver so init code can chain it after NewAnalyzer. Calling with
+// nil is a no-op — the analyzer simply leaves snap.NewsWindow empty
+// and digest.Render() omits the News line.
+func (a *Analyzer) WithNewsGate(g *news.Gate) *Analyzer {
+	a.newsGate = g
+	return a
 }
 
 // MaybeEnrich implements biz.MarketAnalyzer. It decides whether to run
@@ -100,6 +118,15 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 			Str("tf", string(intent.Timeframe)).
 			Msg("advisor: digest build failed; falling back to chat-only")
 		return biz.EnrichmentResult{}, nil
+	}
+
+	// News gate runs AFTER Build because it only contributes a string
+	// pinned on the snapshot — it doesn't influence indicator math.
+	// Pure read against the in-memory cache (the Calendar's own
+	// background refresher keeps it warm), so this is sub-millisecond
+	// and never blocks the chat path.
+	if a.newsGate != nil {
+		snap.NewsWindow = a.newsGate.RenderNow(ctx)
 	}
 
 	// Only ack on explicit /analyze commands. Every free-form message

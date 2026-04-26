@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<weeklyevents>
+  <event>
+    <title><![CDATA[CPI m/m]]></title>
+    <country><![CDATA[USD]]></country>
+    <date><![CDATA[06-15-2026]]></date>
+    <time><![CDATA[8:30am]]></time>
+    <impact><![CDATA[High]]></impact>
+    <forecast><![CDATA[0.3%]]></forecast>
+    <previous><![CDATA[0.2%]]></previous>
+    <url><![CDATA[https://example.com/cpi]]></url>
+  </event>
+  <event>
+    <title><![CDATA[Retail Sales m/m]]></title>
+    <country><![CDATA[USD]]></country>
+    <date><![CDATA[06-16-2026]]></date>
+    <time><![CDATA[8:30am]]></time>
+    <impact><![CDATA[Medium]]></impact>
+    <forecast><![CDATA[0.4%]]></forecast>
+    <previous><![CDATA[0.1%]]></previous>
+  </event>
+  <event>
+    <title><![CDATA[FOMC Statement]]></title>
+    <country><![CDATA[USD]]></country>
+    <date><![CDATA[06-17-2026]]></date>
+    <time><![CDATA[2:00pm]]></time>
+    <impact><![CDATA[High]]></impact>
+    <forecast><![CDATA[]]></forecast>
+    <previous><![CDATA[]]></previous>
+  </event>
+  <event>
+    <title><![CDATA[Bank Holiday]]></title>
+    <country><![CDATA[GBP]]></country>
+    <date><![CDATA[06-18-2026]]></date>
+    <time><![CDATA[All Day]]></time>
+    <impact><![CDATA[Holiday]]></impact>
+    <forecast><![CDATA[]]></forecast>
+    <previous><![CDATA[]]></previous>
+  </event>
+  <event>
+    <title><![CDATA[Trade Balance]]></title>
+    <country><![CDATA[NZD]]></country>
+    <date><![CDATA[06-15-2026]]></date>
+    <time><![CDATA[10:45pm]]></time>
+    <impact><![CDATA[Low]]></impact>
+    <forecast><![CDATA[]]></forecast>
+    <previous><![CDATA[]]></previous>
+  </event>
+  <event>
+    <title><![CDATA[ECB Press Conference]]></title>
+    <country><![CDATA[EUR]]></country>
+    <date><![CDATA[06-18-2026]]></date>
+    <time><![CDATA[8:45am]]></time>
+    <impact><![CDATA[High]]></impact>
+    <forecast><![CDATA[]]></forecast>
+    <previous><![CDATA[]]></previous>
+  </event>
+  <event>
+    <title><![CDATA[German PMI]]></title>
+    <country><![CDATA[EUR]]></country>
+    <date><![CDATA[06-19-2026]]></date>
+    <time><![CDATA[3:30am]]></time>
+    <impact><![CDATA[Medium]]></impact>
+    <forecast><![CDATA[51.0]]></forecast>
+    <previous><![CDATA[50.5]]></previous>
+  </event>
+  <event>
+    <title><![CDATA[Tentative Speech]]></title>
+    <country><![CDATA[USD]]></country>
+    <date><![CDATA[06-19-2026]]></date>
+    <time><![CDATA[Tentative]]></time>
+    <impact><![CDATA[Medium]]></impact>
+    <forecast><![CDATA[]]></forecast>
+    <previous><![CDATA[]]></previous>
+  </event>
+</weeklyevents>

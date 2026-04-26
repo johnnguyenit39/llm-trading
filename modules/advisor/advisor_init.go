@@ -9,6 +9,7 @@ import (
 	"j_ai_trade/brokers/binance/repository"
 	"j_ai_trade/modules/advisor/biz"
 	"j_ai_trade/modules/advisor/biz/market"
+	"j_ai_trade/modules/advisor/biz/market/news"
 	deepseekProvider "j_ai_trade/modules/advisor/provider/deepseek"
 	telegramTransport "j_ai_trade/modules/advisor/transport/telegram"
 	"j_ai_trade/trading/marketdata"
@@ -74,7 +75,14 @@ func Init(ctx context.Context, deps Deps) {
 	filter := biz.NewUserFilter()
 	handler := biz.NewChatHandler(transport, deps.Sessions, llm, filter)
 
-	if analyzer := buildMarketAnalyzer(); analyzer != nil {
+	// News calendar is shared between the reactive Gate (digest line)
+	// and the proactive AlertWorker (T-30/T-15/T-5 push). Building it
+	// once here keeps both consumers reading the same in-memory cache,
+	// so a single hourly fetch serves the whole subsystem instead of
+	// each layer pulling FF independently.
+	newsCal := buildNewsCalendar(ctx)
+
+	if analyzer := buildMarketAnalyzer(newsCal); analyzer != nil {
 		handler = handler.WithMarketAnalyzer(analyzer)
 		log.Info().Msg("advisor: market analyzer attached")
 	} else {
@@ -88,12 +96,39 @@ func Init(ctx context.Context, deps Deps) {
 		log.Warn().Msg("advisor: decision store disabled — trade JSON will be logged only")
 	}
 
+	// AlertWorker can only start after we have transport + sessions in
+	// hand. Failure at this layer (calendar nil) is silent — the
+	// reactive path still works without proactive push.
+	if newsCal != nil {
+		worker := news.NewAlertWorker(newsCal, transport, deps.Sessions)
+		go worker.Run(ctx)
+		log.Info().Msg("advisor: news alert worker started")
+	}
+
 	go handler.Run(ctx)
 
 	log.Info().
 		Str("transport", transport.Name()).
 		Str("llm", llm.Name()).
 		Msg("advisor: chat bot online")
+}
+
+// buildNewsCalendar wires the ForexFactory feed into a Calendar and
+// kicks off background refresh. Returns nil when timezone data is
+// missing — that's the only foreseeable construction failure, since
+// the feed itself is fetched lazily.
+//
+// Background refresh is intentional: without a heartbeat ticker, a
+// chat that goes quiet around news time would never trigger a lazy
+// refresh, and the AlertWorker would scan against stale or empty
+// data. Pinning a goroutine here is the cheapest way to keep the
+// cache warm across all consumers.
+func buildNewsCalendar(ctx context.Context) *news.Calendar {
+	feed := news.NewForexFactoryFeed("")
+	cal := news.NewCalendar(feed)
+	cal.StartBackgroundRefresh(ctx)
+	log.Info().Msg("advisor: news calendar background refresh started")
+	return cal
 }
 
 // buildMarketAnalyzer instantiates the market pipeline (symbol
@@ -103,15 +138,26 @@ func Init(ctx context.Context, deps Deps) {
 // rarely fails at construction — but we keep the guard for future
 // exchanges that might.
 //
+// The optional newsCal argument enables the economic-calendar gate.
+// Passing nil leaves the analyzer running without news awareness; the
+// digest just won't include a "News:" line. We attach the gate via
+// WithNewsGate AFTER construction so the analyzer's main constructor
+// stays narrow and tests don't need to materialise a Calendar.
+//
 // This lives inside advisor_init because the Binance adapter is the
 // only CandleFetcher we support today. If we add OKX/Bybit later,
 // lift `marketdata.CandleFetcher` into Deps just like the stores.
-func buildMarketAnalyzer() biz.MarketAnalyzer {
+func buildMarketAnalyzer(newsCal *news.Calendar) biz.MarketAnalyzer {
 	repo := repository.NewBinanceRepository()
 	bs := binance.NewBinanceService(repo)
 	fetcher := marketdata.NewBinanceFetcher(bs)
 
 	resolver := market.NewSymbolResolver()
 	intent := market.NewIntentDetector(resolver)
-	return market.NewAnalyzer(intent, fetcher)
+	analyzer := market.NewAnalyzer(intent, fetcher)
+	if newsCal != nil {
+		analyzer = analyzer.WithNewsGate(news.NewGate(newsCal))
+		log.Info().Msg("advisor: news gate attached to analyzer")
+	}
+	return analyzer
 }
