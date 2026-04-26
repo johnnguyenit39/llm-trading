@@ -35,8 +35,9 @@ Key packages:
 | `modules/advisor/provider/deepseek/` | Streaming LLM client. |
 | `modules/advisor/transport/telegram/` | Long-poll adapter + edit-in-place message bubble. |
 | `modules/agent_decision/` | Decision storage interface + Firestore/memory backends. |
-| `brokers/binance/` | REST kline fetcher. |
+| `brokers/binance/` | REST kline fetcher (live + historical via `endTime`). |
 | `trading/indicators/` | EMA / RSI / ATR / ADX implementations used by the digest. |
+| `cmd/backtest/` | Walk-forward LLM evaluation harness (see [Backtest](#backtest)). |
 
 ## Quickstart
 
@@ -86,6 +87,30 @@ go test ./...
 ```
 
 Coverage focuses on the riskiest layers: news gate window logic, alert worker tier/dedupe, calendar refresh + backoff, decision parser & risk sizing, and chat-handler critical paths (commands, panic recovery, decision extraction, stream errors).
+
+## Backtest
+
+Walk-forward harness to measure signal quality without paying spread/slippage. For each sampled timestamp it replays **the exact prod digest** at that moment, calls DeepSeek, parses any `BUY`/`SELL` decision, then walks M1 candles forward to see whether TP or SL hit first.
+
+```bash
+go run ./cmd/backtest -samples=50 -weeks=6
+```
+
+First run pays the API ($0.05–0.15 for 50 samples). Re-runs that don't change the prompt hit the local response cache (`backtest_cache/`) and cost $0.
+
+What the report tells you (printed to stdout + saved to `backtest_report.json`):
+
+- **Hit rate** = `TP / (TP+SL)`, with timeouts excluded.
+- **No-trade ratio** — how often the bot declined to fire (a high-confidence "wait" is not a loss).
+- **Breakdown by confidence** — does `high` actually outperform `med`/`low`?
+- **Avg bars-to-TP** — how fast wins resolve (sanity-check scalp horizon).
+- **Avg MFE/MAE** — were stops too tight (high MAE on losers) or too wide (low MAE on losers)?
+
+CLI flags: `-symbol -samples -weeks -temp -seed -walk-bars -cache -out -prompt -rng-seed`.
+
+**Look-ahead bias note.** DeepSeek's training cutoff is mid-2024. The 6-week default window is fully post-cutoff so the model has no weights-encoded knowledge of those moments — fair test. Stretching `-weeks` past ~80 starts pulling in pre-cutoff data; consider price-shifting or a model with a more recent cutoff if you go that far.
+
+**Determinism.** The harness pins `temperature=0` and `seed=42` so two runs with identical prompts produce byte-identical replies. Iteration loop: tweak `prompt_builder.go` → rerun → diff `backtest_report.json` against the baseline.
 
 ## Design notes
 
