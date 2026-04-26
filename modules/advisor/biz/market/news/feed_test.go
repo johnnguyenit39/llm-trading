@@ -1,6 +1,9 @@
 package news
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -129,5 +132,46 @@ func TestGoldRelevant_Matrix(t *testing.T) {
 		if got != c.want {
 			t.Errorf("goldRelevant(%s,%s) = %v, want %v", c.country, c.impact, got, c.want)
 		}
+	}
+}
+
+// TestForexFactoryFeed_Fetch_OK runs the full HTTP+parse path against a
+// local server so CI never depends on the live ForexFactory CDN.
+func TestForexFactoryFeed_Fetch_OK(t *testing.T) {
+	body, err := os.ReadFile("testdata/ff_sample.xml")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("User-Agent") != "j_ai_trade-news/1.0" {
+			t.Error("expected j_ai_trade User-Agent on outbound request")
+		}
+		w.Header().Set("Content-Type", "application/xml; charset=windows-1252")
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	f := NewForexFactoryFeed(srv.URL)
+	events, err := f.Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if got, want := len(events), 4; got != want {
+		for _, e := range events {
+			t.Logf("ev: %s %s %s", e.Country, e.Title, e.Impact)
+		}
+		t.Fatalf("event count: got %d, want %d (same as parseFeed on fixture)", got, want)
+	}
+}
+
+func TestForexFactoryFeed_Fetch_NonOKStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+	f := NewForexFactoryFeed(srv.URL)
+	_, err := f.Fetch(context.Background())
+	if err == nil {
+		t.Fatal("expected error for non-200 status")
 	}
 }

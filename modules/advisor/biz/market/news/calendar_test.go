@@ -188,3 +188,60 @@ func TestCalendar_HighImpactEventsWithin_FiltersByImpact(t *testing.T) {
 		t.Errorf("high-impact filter: got %+v, want exactly [h]", got)
 	}
 }
+
+// TestCalendar_EffectiveTTL_HotWindow asserts the next event within
+// HotWindow switches the steady-state base TTL to HotRefreshTTL (5m).
+// Same-package access to effectiveTTLLocked is intentional: it locks
+// the policy that maybeKickRefresh relies on.
+func TestCalendar_EffectiveTTL_HotWindow(t *testing.T) {
+	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
+	future := now.Add(30 * time.Minute) // < HotWindow
+	feed := &fakeFeed{
+		events: []Event{
+			{ID: "cpi", Time: future, Country: "USD", Title: "CPI m/m", Impact: "High"},
+		},
+	}
+	cal := NewCalendar(feed).WithRefreshTTL(1 * time.Hour)
+	if err := cal.Refresh(context.Background()); err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	cal = cal.withClock(func() time.Time { return now })
+	cal.mu.RLock()
+	ttl := cal.effectiveTTLLocked()
+	cal.mu.RUnlock()
+	if ttl != HotRefreshTTL {
+		t.Errorf("effective TTL: got %v, want HotRefreshTTL (%v)", ttl, HotRefreshTTL)
+	}
+}
+
+// TestCalendar_EffectiveTTL_BackoffAfterFailureInHotWindow checks that
+// a failed refresh doubles the hot-mode base (5m → 10m) while still
+// below the cap at steady-state 1h — so a flaky CDN doesn't get
+// hammered on the 5m cadence.
+func TestCalendar_EffectiveTTL_BackoffAfterFailureInHotWindow(t *testing.T) {
+	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
+	future := now.Add(30 * time.Minute)
+	feed := &fakeFeed{
+		events: []Event{
+			{ID: "cpi", Time: future, Country: "USD", Title: "CPI m/m", Impact: "High"},
+		},
+	}
+	cal := NewCalendar(feed).WithRefreshTTL(1 * time.Hour)
+	if err := cal.Refresh(context.Background()); err != nil {
+		t.Fatalf("first refresh: %v", err)
+	}
+	feed.mu.Lock()
+	feed.err = errors.New("network down")
+	feed.mu.Unlock()
+	if err := cal.Refresh(context.Background()); err == nil {
+		t.Fatal("expected second refresh to fail")
+	}
+	cal = cal.withClock(func() time.Time { return now })
+	cal.mu.RLock()
+	ttl := cal.effectiveTTLLocked()
+	cal.mu.RUnlock()
+	want := 10 * time.Minute // HotRefreshTTL << 1
+	if ttl != want {
+		t.Errorf("backoff in hot mode: got %v, want %v", ttl, want)
+	}
+}
