@@ -31,7 +31,7 @@ type AdvisorBot struct {
 // Returns error if the env var is empty — caller should treat as disabled.
 func NewAdvisorBot() (*AdvisorBot, error) {
 	token := os.Getenv("J_AI_TRADE_ADVISOR")
-	if os.Getenv("ENV") != "DEV" {
+	if os.Getenv("ENV") == "DEV" {
 		token = os.Getenv("J_AI_TRADE_ADVISOR_DEV")
 	}
 
