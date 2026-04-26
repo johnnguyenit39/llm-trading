@@ -573,6 +573,14 @@ func Render(snap *PairSnapshot) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "[MARKET_DATA] %s · generated %s UTC · entry_tf=%s\n",
 		snap.Symbol, snap.GeneratedAt.Format("2006-01-02 15:04"), snap.EntryTF)
+	// Compact legend: keeps the long field glossary in the blob instead
+	// of duplicating it entirely in the system prompt (tokens + drift).
+	b.WriteString("Digest guide (đọc toàn bộ blob theo nhãn; hệ thống không lặp chi tiết từng trường ở system prompt):\n")
+	b.WriteString("- Current price = giá live. LastClose/close trong từng block TF = nến ĐÃ đóng (không phải live). Không gộp hai số này.\n")
+	b.WriteString("- entry_tf: khung chọn lệnh; bias: H1+H4, xác nhận M5, timing M1/M5. TF trong blob: entry trước, macro sau.\n")
+	b.WriteString("- stack / structure / BOS (pending|retesting|confirmed) / FVG (open|filling) / nearestR|nearestS / BBwidth% / pivot HH-HL-…: backend đã tính — ưu tiên nhãn này; pattern block = chuẩn, không tự bịa tên pattern từ bảng OHLCV thay thế.\n")
+	b.WriteString("- Pattern line: r>=0.6 tốt; TRAP (wick_grab, bb_fakeout, exhaustion) thắng tên nến cùng bar; _INVALIDATED = bỏ qua; vol>=2x ưu tiên hơn.\n")
+	b.WriteString("- Dòng \"News:\" (nếu có) = lịch macro. Khi có [active]/[pre], ưu tiên rule đó; đừng dùng \"ATR mạnh\" thay thế lý do chính.\n\n")
 
 	if snap.CurrentPrice > 0 {
 		fmt.Fprintf(&b, "Current price (live, %s): %s", snap.EntryTF, f4(snap.CurrentPrice))

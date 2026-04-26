@@ -1,6 +1,9 @@
 package biz
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestStripLLMEmphasis_boldAndItalic(t *testing.T) {
 	cases := []struct {
@@ -18,5 +21,16 @@ func TestStripLLMEmphasis_boldAndItalic(t *testing.T) {
 		if got := StripLLMEmphasis(c.in); got != c.out {
 			t.Errorf("StripLLMEmphasis(%q) = %q, want %q", c.in, got, c.out)
 		}
+	}
+}
+
+func TestStripMarketDataDump_RemovesEchosNewsLine(t *testing.T) {
+	in := "Chờ nhé.\nNews: USD CPI m/m in 12min (HIGH) [active]\nVì CPI sắp ra mà thôi."
+	out := StripMarketDataDump(in)
+	if strings.Contains(out, "News: USD CPI") {
+		t.Fatalf("expected News echo stripped, got %q", out)
+	}
+	if !strings.Contains(out, "CPI sắp ra") {
+		t.Fatalf("expected prose kept, got %q", out)
 	}
 }

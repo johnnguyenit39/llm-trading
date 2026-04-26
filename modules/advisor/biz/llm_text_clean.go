@@ -42,7 +42,7 @@ var marketDataStartTagRe = regexp.MustCompile(`(?im)^\s*\[/?MARKET_DATA\]\s*$`)
 // "M15:" / "H1:" / "H4:" / "D1:" on their own line.
 var marketDataLineRe = regexp.MustCompile(
 	`(?im)^\s*(` +
-		`symbol|current_price|tf_alignment|session|prev_day|` +
+		`symbol|current_price|tf_alignment|session|prev_day|news|` +
 		`regime|adx|stack|lastclose|` +
 		`ema\d+|rsi\d*|atr|bbwidth|bb|donchian|swing|` +
 		`close|nearestr|nearests|mom\d+|structure|vol|` +
@@ -56,7 +56,7 @@ var marketDataLineRe = regexp.MustCompile(
 // underneath are formatted with prefixes like "[-1] 2026-04-22 14:30"
 // or "SH 2386.5 14:00 LH" that we also strip below.
 var recentOrLastBlockRe = regexp.MustCompile(
-	`(?im)^\s*(recent (m15|h1|h4|d1)|last \d+ (m15|h1|h4|d1) bar patterns).*$`,
+	`(?im)^\s*(recent (m1|m5|m15|h1|h4|d1)|last \d+ (m1|m5|m15|h1|h4|d1) bar patterns).*$`,
 )
 
 // pivotOrPatternRowRe matches the single-row outputs beneath those
@@ -79,7 +79,8 @@ var multipleBlankLinesRe = regexp.MustCompile(`\n{3,}`)
 // Strategy, in order:
 //  1. Remove full [MARKET_DATA]...[/MARKET_DATA] blocks (bracketed case).
 //  2. Remove stray opening/closing tags on their own line.
-//  3. Remove "key: value" lines whose key matches the digest vocab.
+//  3. Remove "key: value" lines whose key matches the digest vocab
+//     (includes "news" for echoed "News: ..." lines).
 //  4. Remove "Recent <TF> ..." / "Last N <TF> bar patterns" headers
 //     AND the rows underneath (pivot or pattern).
 //  5. Collapse 3+ blank lines to a single blank line for readability.
