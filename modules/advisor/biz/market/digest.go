@@ -67,6 +67,13 @@ type TFSummary struct {
 	RangeWidth   float64 `json:"range_width_atr,omitempty"`
 	InRange      bool    `json:"in_range,omitempty"`
 
+	// Phase-3e structure flags. Surfaced only when Direction != "" (we
+	// omit the empty case from the prompt entirely).
+	BOSDir   string  `json:"bos_dir,omitempty"`   // "up" | "down"
+	BOSLevel float64 `json:"bos_level,omitempty"` // broken pivot price
+	BOSAge   int     `json:"bos_age,omitempty"`   // bars since break
+	BOSState string  `json:"bos_state,omitempty"` // "pending" | "retesting" | "confirmed"
+
 	// Phase-3d enrichments — cheap scalars moved out of LLM mental-math.
 	EMAStack           string  `json:"ema_stack,omitempty"`            // bullish_full | bullish_partial | ... | choppy | ...
 	AtEMA20            bool    `json:"at_ema20,omitempty"`             // LastClose within ±0.3 ATR of EMA20
@@ -127,13 +134,22 @@ type PairSnapshot struct {
 
 // Pivot window sizes per TF. Entry TF gets 6 for richer structural
 // reading; H1 gets 4 because each H1 pivot already carries 4× the
-// "weight" of an M15 pivot. RangeScanWindow is how many recent closed
+// "weight" of an M15 pivot. M5 sits between (5) when it's not the entry
+// TF — the goal is enough pivots for BOS detection without doubling
+// the pivot rendering noise. RangeScanWindow is how many recent closed
 // bars DetectRange examines — 30 bars ≈ 7.5h on M15, 30h on H1.
 const (
 	PivotLimitEntry = 6
+	PivotLimitM5    = 5
 	PivotLimitH1    = 4
 	RangeScanWindow = 30
 )
+
+// BOSScanWindow caps how recent a break must be to qualify as "fresh"
+// for the BOS+retest flag. 15 bars ≈ 15 min on M1, 75 min on M5 — old
+// enough to allow a 1-3 bar break + retest, young enough that the
+// signal is still actionable for a scalper.
+const BOSScanWindow = 15
 
 // PatternLookback is how many recent CLOSED bars on the entry TF get a
 // full pattern/context/trap analysis emitted into the prompt. Three is
@@ -207,8 +223,9 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 	}
 
 	// Pivot sequences + structural flags per TF. Computed BEFORE pattern
-	// analysis. Only M15 + H1 emit pivots — H4/D1 structure is already
-	// captured by regime + EMA stacking and slower pivots rarely drive
+	// analysis. Entry TF + M5 + H1 get the full structural pass — those
+	// are the TFs scalp entries actually fire on. H4/D1 structure is
+	// captured by regime + EMA stacking; slower pivots rarely drive
 	// intraday decisions.
 	snap.Pivots = map[models.Timeframe][]Pivot{}
 	for i := range snap.Summaries {
@@ -218,6 +235,11 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 		switch tf {
 		case entryTF:
 			limit = PivotLimitEntry
+		case models.TF_M5:
+			if tf == entryTF {
+				continue
+			}
+			limit = PivotLimitM5
 		case models.TF_H1:
 			if tf == entryTF {
 				continue
@@ -249,6 +271,12 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 				sum.RangeBottom = rs.Bottom
 				sum.RangeWidth = rs.WidthATR
 				sum.InRange = rs.IsRange
+			}
+			if bos := DetectBOSRetest(closed, pivots, sum.ATR, BOSScanWindow); bos.Direction != "" {
+				sum.BOSDir = bos.Direction
+				sum.BOSLevel = bos.Level
+				sum.BOSAge = bos.BarsSinceBreak
+				sum.BOSState = bos.State
 			}
 		}
 	}
@@ -665,8 +693,9 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 		fmt.Fprintf(b, "  %s\n", strings.Join(ctx, " · "))
 	}
 
-	// Structural flags (rectangle / double top / double bottom) — emit
-	// only when something triggered so blocks stay compact.
+	// Structural flags (rectangle / double top / double bottom / BOS+
+	// retest / FVG) — emit only when something triggered so blocks stay
+	// compact.
 	var structBits []string
 	if s.InRange {
 		structBits = append(structBits, fmt.Sprintf("in_range %s..%s (w=%s ATR)", f4(s.RangeBottom), f4(s.RangeTop), f2(s.RangeWidth)))
@@ -676,6 +705,9 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 	}
 	if s.DoubleBottom > 0 {
 		structBits = append(structBits, fmt.Sprintf("double_bottom @ %s", f4(s.DoubleBottom)))
+	}
+	if s.BOSDir != "" {
+		structBits = append(structBits, fmt.Sprintf("bos_%s @ %s [%s, %db ago]", s.BOSDir, f4(s.BOSLevel), s.BOSState, s.BOSAge))
 	}
 	if len(structBits) > 0 {
 		fmt.Fprintf(b, "  structure: %s\n", strings.Join(structBits, " · "))
