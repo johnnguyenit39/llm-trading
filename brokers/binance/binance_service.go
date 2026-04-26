@@ -6,8 +6,10 @@ package binance
 
 import (
 	"context"
+	"time"
 
 	"j_ai_trade/brokers/binance/repository"
+	"j_ai_trade/trading/models"
 )
 
 // BinanceService is safe to share across goroutines because the
@@ -48,4 +50,17 @@ func (s *BinanceService) Fetch4hCandles(ctx context.Context, symbol string, limi
 // Fetch1dCandles returns `limit` most-recent daily candles.
 func (s *BinanceService) Fetch1dCandles(ctx context.Context, symbol string, limit int) ([]repository.BinanceCandle, error) {
 	return s.repo.FetchCandles(ctx, symbol, "1d", limit)
+}
+
+// FetchCandlesEndingAt returns up to `limit` candles whose close time is
+// at or before `endTime`, for the given timeframe. Used exclusively by
+// the backtest harness to replay history at simulated wall-clocks; live
+// code paths stick with the limit-only helpers above. Pass a zero
+// time.Time to fall through to "most recent N" semantics.
+func (s *BinanceService) FetchCandlesEndingAt(ctx context.Context, symbol string, tf models.Timeframe, endTime time.Time, limit int) ([]repository.BinanceCandle, error) {
+	interval := tf.BinanceInterval()
+	if interval == "" {
+		return nil, nil
+	}
+	return s.repo.FetchCandlesAt(ctx, symbol, interval, endTime, limit)
 }

@@ -12,3 +12,7 @@ test_build
 
 # OS
 .DS_Store
+
+# backtest
+backtest_cache/
+backtest_report*.json

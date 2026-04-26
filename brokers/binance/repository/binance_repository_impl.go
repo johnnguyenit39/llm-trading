@@ -28,10 +28,19 @@ func NewBinanceRepository() BinanceRepository {
 }
 
 func (r *binanceRepositoryImpl) FetchCandles(ctx context.Context, symbol string, interval string, limit int) ([]BinanceCandle, error) {
+	return r.FetchCandlesAt(ctx, symbol, interval, time.Time{}, limit)
+}
+
+func (r *binanceRepositoryImpl) FetchCandlesAt(ctx context.Context, symbol string, interval string, endTime time.Time, limit int) ([]BinanceCandle, error) {
 
 	formatedSymbol := utils.ConvertPair(symbol)
 
 	url := fmt.Sprintf("%s/fapi/v1/klines?symbol=%s&interval=%s&limit=%d", r.baseURL, formatedSymbol, interval, limit)
+	// endTime is appended only when set so the live (most-recent) path
+	// remains a byte-for-byte identical request to before this change.
+	if !endTime.IsZero() {
+		url = fmt.Sprintf("%s&endTime=%d", url, endTime.UnixMilli())
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

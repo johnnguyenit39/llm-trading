@@ -32,9 +32,15 @@ type chatMessage struct {
 }
 
 type chatRequest struct {
-	Model    string        `json:"model"`
-	Messages []chatMessage `json:"messages"`
-	Stream   bool          `json:"stream"`
+	Model       string        `json:"model"`
+	Messages    []chatMessage `json:"messages"`
+	Stream      bool          `json:"stream"`
+	// Temperature/Seed are only emitted when the caller explicitly opts
+	// in (omitempty + pointer). Production chat leaves both nil so we
+	// inherit DeepSeek's defaults (~0.7); the backtest harness sets
+	// Temperature=0 + a fixed Seed for reproducibility.
+	Temperature *float64 `json:"temperature,omitempty"`
+	Seed        *int     `json:"seed,omitempty"`
 }
 
 type streamChunk struct {
@@ -54,6 +60,13 @@ type Client struct {
 	baseURL    string
 	model      string
 	httpClient *http.Client
+
+	// temperature / seed are nil unless the caller explicitly opts in
+	// via WithTemperature / WithSeed. Production leaves them nil so the
+	// API uses its sensible defaults; the backtest harness pins both
+	// for reproducible runs.
+	temperature *float64
+	seed        *int
 }
 
 // New reads DEEP_SEEK_API_KEY / DEEP_SEEK_BASE_URL / DEEP_SEEK_MODEL from
@@ -91,6 +104,23 @@ func New() (*Client, error) {
 // cheap to grep for in logs.
 func (c *Client) Name() string { return "deepseek:" + c.model }
 
+// WithTemperature pins the sampling temperature for every subsequent
+// Stream call. Backtest pipelines set 0 to make the model effectively
+// deterministic (still ~99% reproducible — minor floating-point drift
+// across GPU batches remains). Live chat leaves it unset.
+func (c *Client) WithTemperature(t float64) *Client {
+	c.temperature = &t
+	return c
+}
+
+// WithSeed pins the request seed. Combined with temperature=0 this
+// gives byte-identical responses for byte-identical messages. Backtest
+// only.
+func (c *Client) WithSeed(s int) *Client {
+	c.seed = &s
+	return c
+}
+
 // Stream satisfies biz.LLMProvider. It sends the canonical Turn slice to
 // DeepSeek and emits content deltas as they arrive. The chunk channel
 // closes when the response body ends, ctx is cancelled, or an error
@@ -109,9 +139,11 @@ func (c *Client) Stream(ctx context.Context, turns []model.Turn) (<-chan string,
 		}
 
 		reqBody, err := json.Marshal(chatRequest{
-			Model:    c.model,
-			Messages: msgs,
-			Stream:   true,
+			Model:       c.model,
+			Messages:    msgs,
+			Stream:      true,
+			Temperature: c.temperature,
+			Seed:        c.seed,
 		})
 		if err != nil {
 			errCh <- err
