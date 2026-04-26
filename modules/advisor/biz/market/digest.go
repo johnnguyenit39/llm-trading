@@ -12,12 +12,10 @@ import (
 )
 
 // RawCandleBars is the number of entry-TF raw OHLCV rows emitted into
-// the digest. Reduced from 20 → 10 once pattern + pivot blocks landed:
-// those blocks already encode shape + structure with labels; the raw
-// table is now a fallback for microstructure the LLM wants to
-// double-check, not a primary source. Cutting to 10 saves ~10 lines of
-// prompt per request with no measurable loss of signal.
-const RawCandleBars = 10
+// the digest. Pattern + structure blocks already encode shape with
+// labels; this raw table is just a fallback for microstructure double-
+// checks, so 5 bars is plenty.
+const RawCandleBars = 5
 
 // TFSummary is the per-timeframe digest of what the market looks like
 // right now. Everything is pre-computed so the LLM reads numbers
@@ -576,11 +574,11 @@ func Render(snap *PairSnapshot) string {
 	// Compact legend: keeps the long field glossary in the blob instead
 	// of duplicating it entirely in the system prompt (tokens + drift).
 	b.WriteString("Digest guide (đọc toàn bộ blob theo nhãn; hệ thống không lặp chi tiết từng trường ở system prompt):\n")
-	b.WriteString("- Current price = giá live. LastClose/close trong từng block TF = nến ĐÃ đóng (không phải live). Không gộp hai số này.\n")
-	b.WriteString("- entry_tf: khung chọn lệnh; bias: H1+H4, xác nhận M5, timing M1/M5. TF trong blob: entry trước, macro sau.\n")
-	b.WriteString("- stack / structure / BOS (pending|retesting|confirmed) / FVG (open|filling) / nearestR|nearestS / BBwidth% / pivot HH-HL-…: backend đã tính — ưu tiên nhãn này; pattern block = chuẩn, không tự bịa tên pattern từ bảng OHLCV thay thế.\n")
+	b.WriteString("- Current price = giá live. LastClose/close trong từng block TF = nến ĐÃ đóng. Không gộp hai số này.\n")
+	b.WriteString("- entry_tf: khung chọn lệnh; bias H1+H4, xác nhận M5, timing M1/M5. TF: entry trước, macro sau.\n")
+	b.WriteString("- stack / structure / BOS (pending|retesting|confirmed) / FVG (open|filling) / nearestR|nearestS / ATR p%/50: backend đã tính — ưu tiên nhãn; không bịa pattern từ bảng OHLCV.\n")
 	b.WriteString("- Pattern line: r>=0.6 tốt; TRAP (wick_grab, bb_fakeout, exhaustion) thắng tên nến cùng bar; _INVALIDATED = bỏ qua; vol>=2x ưu tiên hơn.\n")
-	b.WriteString("- Dòng \"News:\" (nếu có) = lịch macro. Khi có [active]/[pre], ưu tiên rule đó; đừng dùng \"ATR mạnh\" thay thế lý do chính.\n\n")
+	b.WriteString("- Dòng \"News:\" = lịch macro. [active]/[pre] đè ATR/vol — đừng dùng \"nến căng\" thay rule news.\n\n")
 
 	if snap.CurrentPrice > 0 {
 		fmt.Fprintf(&b, "Current price (live, %s): %s", snap.EntryTF, f4(snap.CurrentPrice))
@@ -641,14 +639,12 @@ func Render(snap *PairSnapshot) string {
 		}
 	}
 
-	// Pivot sequences — entry TF first, then H1. Gives the LLM raw
-	// structural data to reason about subjective patterns (triangles,
-	// wedges, H&S) without code hard-coding them.
-	for _, sum := range snap.Summaries {
-		if pivs, ok := snap.Pivots[sum.Timeframe]; ok && len(pivs) > 0 {
-			writePivots(&b, sum.Timeframe, pivs)
-		}
-	}
+	// Pivot sequences are intentionally NOT rendered: the structural
+	// flags they feed (BOS, double_top/bottom, range_top/bottom,
+	// swing_high/low) already cover the actionable signal for scalping,
+	// and the raw HH/HL/LH/LL list mostly added prompt noise. Pivots
+	// are still computed and stored on snap.Pivots for any consumer
+	// that wants them.
 
 	if footer := buildFooter(snap); footer != "" {
 		fmt.Fprintf(&b, "\n%s\n", footer)
@@ -716,19 +712,13 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 		fmt.Fprintf(b, "  %s\n", strings.Join(parts, " · "))
 	}
 
-	// Range-context line: BB width + squeeze percentile, price percentile
-	// over 100 bars, nearest resistance/support in ATR.
+	// Range-context line: nearest resistance/support in ATR. We DON'T
+	// render BBwidth%/percentile or close-percentile-over-100-bars: the
+	// ATR percentile on the line above already captures "is this market
+	// compressed or stretched?", and three percentile metrics in one
+	// block ended up just adding prompt noise without an extra
+	// decision-relevant signal.
 	var ctx []string
-	if s.BBWidthPct > 0 {
-		if s.BBWidthPctile > 0 {
-			ctx = append(ctx, fmt.Sprintf("BBwidth %s%% (p%s/50)", f2(s.BBWidthPct), f0(s.BBWidthPctile)))
-		} else {
-			ctx = append(ctx, fmt.Sprintf("BBwidth %s%%", f2(s.BBWidthPct)))
-		}
-	}
-	if s.HasPricePct {
-		ctx = append(ctx, fmt.Sprintf("close p%s/100", f0(s.PricePct100)))
-	}
 	if s.NearestResist > 0 && s.DistResistATR > 0 {
 		ctx = append(ctx, fmt.Sprintf("nearestR %s (+%s ATR)", f4(s.NearestResist), f2(s.DistResistATR)))
 	}
@@ -762,9 +752,11 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 		fmt.Fprintf(b, "  structure: %s\n", strings.Join(structBits, " · "))
 	}
 
-	// Dynamic line: momentum / divergence / squeeze / crossover flags.
-	// Each is a one-token signal; together they describe "direction +
-	// acceleration" for this TF.
+	// Dynamic line: momentum / divergence / squeeze flags. Each is a
+	// one-token signal; together they describe "direction + acceleration"
+	// for this TF. EMA crossover age was removed — it overlapped with
+	// EMAStack ("bullish_full" already implies a recent bull cross) and
+	// rarely changed a decision on its own.
 	var dyn []string
 	if s.MomentumDelta5 != 0 {
 		sign := "+"
@@ -778,9 +770,6 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 	}
 	if s.BBSqueezeReleasing {
 		dyn = append(dyn, "bb_squeeze_releasing")
-	}
-	if s.EMACrossover != "" {
-		dyn = append(dyn, "ema_cross_"+s.EMACrossover)
 	}
 	if len(dyn) > 0 {
 		fmt.Fprintf(b, "  %s\n", strings.Join(dyn, " · "))
@@ -868,28 +857,6 @@ func writePatterns(b *strings.Builder, tf models.Timeframe, pats []BarPattern) {
 		} else {
 			fmt.Fprintf(b, "  [-%d]  %s\n", offset, strings.Join(parts, " · "))
 		}
-	}
-	b.WriteString("\n")
-}
-
-// writePivots emits the recent pivot sequence for a TF: one line per
-// pivot with type (SH/SL), price, timestamp, and HH/HL/LH/LL label.
-// This is the structural primitive the LLM uses to reason about
-// triangles, wedges, H&S, trend breaks, etc. — code deliberately does
-// NOT name these patterns (they're subjective); the LLM infers them
-// from the label sequence.
-func writePivots(b *strings.Builder, tf models.Timeframe, pivs []Pivot) {
-	if len(pivs) == 0 {
-		return
-	}
-	fmt.Fprintf(b, "Recent %s pivots (oldest -> newest):\n", tf)
-	for _, p := range pivs {
-		label := p.Label
-		if label == "" {
-			label = "-"
-		}
-		fmt.Fprintf(b, "  %s %s  %s  %s\n",
-			p.Type, f4(p.Price), p.Time.Format("01-02 15:04"), label)
 	}
 	b.WriteString("\n")
 }
