@@ -89,14 +89,17 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 		return biz.EnrichmentResult{}, nil
 	}
 
-	// Scalping + trend-context bundle: M1 (entry timing), M5
-	// (confirmation), H1/H4 (macro trend strength). Uniform
-	// CandleBudget so every TF has enough warm-up for ADX/EMA.
+	// Scalping + trend-context bundle: M1 (entry timing), M5 (signal +
+	// confirmation), M15 (structural context — range/squeeze/continuity
+	// between M5 and H1; never the entry TF), H1/H4 (macro trend
+	// strength). Uniform CandleBudget so every TF has enough warm-up for
+	// ADX/EMA.
 	required := map[models.Timeframe]int{
-		models.TF_M1: CandleBudget,
-		models.TF_M5: CandleBudget,
-		models.TF_H1: CandleBudget,
-		models.TF_H4: CandleBudget,
+		models.TF_M1:  CandleBudget,
+		models.TF_M5:  CandleBudget,
+		models.TF_M15: CandleBudget,
+		models.TF_H1:  CandleBudget,
+		models.TF_H4:  CandleBudget,
 	}
 
 	fetchCtx, cancel := context.WithTimeout(ctx, a.fetchTimeout)
