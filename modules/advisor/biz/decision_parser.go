@@ -8,9 +8,34 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
+
+// FreshnessContext is the snapshot-side data the trade-card formatter
+// needs to render the "signal taken at..." line and the slippage
+// tolerance band. Zero value disables the freshness block entirely
+// (used by tests and the chat-only fallback when no analyzer ran).
+//
+// Half-band and skip-band are derived from ATRM5 with fixed multipliers
+// (0.2 and 0.5 respectively) — the multipliers are tuned for XAU
+// scalping on 5–30s Telegram lag. Tightening them would cause too many
+// "skip" labels on healthy trends; loosening them would let the user
+// chase entries that are no longer the structure the LLM analysed.
+type FreshnessContext struct {
+	CurrentPrice float64
+	ATRM5        float64
+	GeneratedAt  time.Time
+}
+
+// HasData reports whether the formatter should render the freshness
+// block. ATRM5 is the gate — if the M5 summary was missing we can't
+// compute a meaningful slippage band, and showing only the timestamp
+// alone tends to confuse rather than reassure the user.
+func (f FreshnessContext) HasData() bool {
+	return f.ATRM5 > 0 && f.CurrentPrice > 0
+}
 
 // Risk-sizing defaults. Override via env at process start:
 //   - ADVISOR_ACCOUNT_USDT: notional equity the user wants to risk-size
@@ -111,7 +136,7 @@ func StripDecisionFence(reply string) string {
 // exactly RiskPct% of AccountUSDT (read from env, defaults 1000 /
 // 0.5%). R:R is purely observational — whatever comes out of the
 // entry/SL/TP picked by the model, we just compute and display it.
-func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload) string {
+func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload, fresh FreshnessContext) string {
 	account := envFloat("ADVISOR_ACCOUNT_USDT", defaultAccountUSDT)
 	riskPct := envFloat("ADVISOR_RISK_PCT", defaultRiskPct)
 	riskSizingOn := account > 0 && riskPct > 0
@@ -143,6 +168,10 @@ func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload) string {
 		b.WriteString(fmt.Sprintf("• Hủy nếu: %s\n", d.Invalidation))
 	}
 
+	if fresh.HasData() {
+		b.WriteString(formatFreshnessBlock(d, fresh))
+	}
+
 	if riskSizingOn {
 		slPct := slPnL / account * 100.0
 		tpPct := tpPnL / account * 100.0
@@ -159,6 +188,34 @@ func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload) string {
 	}
 
 	return strings.TrimSpace(b.String())
+}
+
+// formatFreshnessBlock renders the "signal taken at..." stamp + the
+// slippage tolerance band on the trade card. Helps the user decide
+// whether the entry the LLM picked is still valid by the time they see
+// the message — Telegram + LLM streaming + reading lag adds 5–30s, in
+// which gold can drift through a full ATR M5 on news or volatile session
+// opens.
+//
+// Two thresholds, both keyed off ATR M5:
+//   - half = 0.2 ATR M5 → "OK to enter within ±half"
+//   - skip = 0.5 ATR M5 → "if drift > skip, the structure has moved on"
+//
+// We don't gate emission ourselves — the multipliers are guidance the
+// user applies against the broker's current price, not a hard reject.
+func formatFreshnessBlock(d *DecisionPayload, f FreshnessContext) string {
+	half := 0.2 * f.ATRM5
+	skip := 0.5 * f.ATRM5
+	stamp := f.GeneratedAt.UTC().Format("15:04 UTC")
+	var b strings.Builder
+	b.WriteString("\n⏱ Tín hiệu chốt: ")
+	b.WriteString(stamp)
+	b.WriteString(fmt.Sprintf(" · giá tại đó %s (ATR M5 ≈ %s)\n",
+		formatAdvisorPrice(f.CurrentPrice), formatAdvisorPrice(f.ATRM5)))
+	b.WriteString(fmt.Sprintf("• Slippage OK: entry ±%s\n", formatAdvisorPrice(half)))
+	b.WriteString(fmt.Sprintf("• Skip nếu giá hiện đã trôi >%s khỏi entry — kèo cũ, chờ setup mới\n",
+		formatAdvisorPrice(skip)))
+	return b.String()
 }
 
 // sizeLotForRisk picks a base-asset quantity so hitting SL costs

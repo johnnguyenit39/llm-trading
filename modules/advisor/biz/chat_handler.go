@@ -159,6 +159,7 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	// this, the LLM would just quote the stale number from its own
 	// previous reply and the bot would feel frozen in time.
 	marketBlob := ""
+	var fresh FreshnessContext
 	if h.analyzer != nil {
 		lastSymbol, lserr := h.store.GetLastSymbol(ctx, chatID)
 		if lserr != nil {
@@ -169,6 +170,11 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 			log.Warn().Err(aerr).Str("chat_id", chatID).Msg("advisor: market analyzer error")
 		}
 		marketBlob = result.Digest
+		fresh = FreshnessContext{
+			CurrentPrice: result.CurrentPrice,
+			ATRM5:        result.ATRM5,
+			GeneratedAt:  result.GeneratedAt,
+		}
 		if result.Ack != "" {
 			h.sendOrLog(ctx, chatID, result.Ack, "analyzer_ack")
 		}
@@ -233,7 +239,7 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 	historyReply := StripLLMEmphasis(StripMarketDataDump(reply))
 	if decision := ExtractDecision(reply); decision != nil {
 		h.recordDecision(ctx, chatID, decision)
-		historyReply = FormatAdvisorReplyForUser(reply, decision)
+		historyReply = FormatAdvisorReplyForUser(reply, decision, fresh)
 		bubble.ReplaceWith(ctx, historyReply)
 	}
 	h.persistTurns(ctx, chatID, userText, historyReply)

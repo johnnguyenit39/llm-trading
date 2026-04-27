@@ -138,10 +138,29 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 		ack = fmt.Sprintf("Đang kiểm tra %s...", intent.Symbol)
 	}
 	return biz.EnrichmentResult{
-		Digest: Render(snap),
-		Ack:    ack,
-		Symbol: intent.Symbol,
+		Digest:       Render(snap),
+		Ack:          ack,
+		Symbol:       intent.Symbol,
+		CurrentPrice: snap.CurrentPrice,
+		ATRM5:        atrM5(snap),
+		GeneratedAt:  snap.GeneratedAt,
 	}, nil
+}
+
+// atrM5 pulls the M5 ATR-14 off the per-TF summary list. Returns 0 when
+// the M5 summary is missing or its ATR couldn't be computed (insufficient
+// candles) — callers treat 0 as "skip the freshness band" rather than
+// rendering nonsense.
+func atrM5(snap *PairSnapshot) float64 {
+	if snap == nil {
+		return 0
+	}
+	for _, s := range snap.Summaries {
+		if s.Timeframe == models.TF_M5 {
+			return s.ATR
+		}
+	}
+	return 0
 }
 
 // resolveIntent prefers the explicit /analyze command when present —

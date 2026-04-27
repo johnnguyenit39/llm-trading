@@ -3,6 +3,7 @@ package biz
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestExtractDecision_Valid(t *testing.T) {
@@ -72,7 +73,7 @@ func TestFormatAdvisorReplyForUser_SizedByRisk(t *testing.T) {
 	if d == nil {
 		t.Fatal("expected decision")
 	}
-	out := FormatAdvisorReplyForUser(raw, d)
+	out := FormatAdvisorReplyForUser(raw, d, FreshnessContext{})
 
 	if !strings.Contains(out, "XAUUSDT") || !strings.Contains(out, "SELL") {
 		t.Fatalf("missing symbol/action: %s", out)
@@ -106,7 +107,7 @@ func TestFormatAdvisorReplyForUser_LegacyWhenAccountZero(t *testing.T) {
 	if d == nil {
 		t.Fatal("expected decision")
 	}
-	out := FormatAdvisorReplyForUser(raw, d)
+	out := FormatAdvisorReplyForUser(raw, d, FreshnessContext{})
 	if !strings.Contains(out, "Ước tính PnL") {
 		t.Fatalf("expected legacy PnL section: %s", out)
 	}
@@ -199,13 +200,62 @@ func TestFormatAdvisorReplyForUser_RendersBadgeAndInvalidation(t *testing.T) {
 	if d == nil {
 		t.Fatal("expected decision")
 	}
-	out := FormatAdvisorReplyForUser(raw, d)
+	out := FormatAdvisorReplyForUser(raw, d, FreshnessContext{})
 
 	if !strings.Contains(out, "📋 Lệnh gợi ý 🟢") {
 		t.Fatalf("missing high-confidence green badge: %s", out)
 	}
 	if !strings.Contains(out, "• Hủy nếu: M5 đóng dưới 2342.5") {
 		t.Fatalf("missing invalidation line: %s", out)
+	}
+}
+
+func TestFormatAdvisorReplyForUser_FreshnessBlock(t *testing.T) {
+	t.Setenv("ADVISOR_ACCOUNT_USDT", "0")
+	t.Setenv("ADVISOR_RISK_PCT", "0.5")
+
+	raw := "Vào BUY.\n\n```json\n" +
+		`{"action":"BUY","symbol":"XAUUSDT","entry":2345.2,"stop_loss":2342.8,"take_profit":2349.0,"lot":0.05,"confidence":"med","invalidation":"M5 đóng dưới 2342.5"}` + "\n```"
+	d := ExtractDecision(raw)
+	if d == nil {
+		t.Fatal("expected decision")
+	}
+	fresh := FreshnessContext{
+		CurrentPrice: 2345.7,
+		ATRM5:        2.0,
+		GeneratedAt:  time.Date(2026, 4, 27, 14, 23, 0, 0, time.UTC),
+	}
+	out := FormatAdvisorReplyForUser(raw, d, fresh)
+
+	if !strings.Contains(out, "⏱ Tín hiệu chốt: 14:23 UTC") {
+		t.Fatalf("missing timestamp stamp: %s", out)
+	}
+	if !strings.Contains(out, "ATR M5 ≈ 2.0000") {
+		t.Fatalf("missing ATR M5 readout: %s", out)
+	}
+	// 0.2 * 2.0 = 0.40, 0.5 * 2.0 = 1.00 — printed via formatAdvisorPrice
+	// (sub-1000 prices use 4 decimal digits).
+	if !strings.Contains(out, "Slippage OK: entry ±0.4000") {
+		t.Fatalf("missing slippage band: %s", out)
+	}
+	if !strings.Contains(out, "Skip nếu giá hiện đã trôi >1.0000") {
+		t.Fatalf("missing skip band: %s", out)
+	}
+}
+
+func TestFormatAdvisorReplyForUser_FreshnessSkippedWhenZero(t *testing.T) {
+	t.Setenv("ADVISOR_ACCOUNT_USDT", "0")
+	t.Setenv("ADVISOR_RISK_PCT", "0.5")
+
+	raw := "x.\n\n```json\n" +
+		`{"action":"BUY","symbol":"XAUUSDT","entry":2345,"stop_loss":2343,"take_profit":2348,"lot":0.05}` + "\n```"
+	d := ExtractDecision(raw)
+	if d == nil {
+		t.Fatal("expected decision")
+	}
+	out := FormatAdvisorReplyForUser(raw, d, FreshnessContext{})
+	if strings.Contains(out, "⏱") || strings.Contains(out, "Slippage OK") {
+		t.Fatalf("freshness block should be hidden when ctx is zero: %s", out)
 	}
 }
 
@@ -234,7 +284,7 @@ func TestFormatAdvisorReplyForUser_LowAndMedBadges(t *testing.T) {
 		if d == nil {
 			t.Fatalf("expected decision (conf=%q)", tc.conf)
 		}
-		out := FormatAdvisorReplyForUser(raw, d)
+		out := FormatAdvisorReplyForUser(raw, d, FreshnessContext{})
 		if !strings.Contains(out, "📋 Lệnh gợi ý "+tc.wantBadge) {
 			t.Fatalf("conf=%q: want badge %q in output, got: %s", tc.conf, tc.wantBadge, out)
 		}

@@ -1,6 +1,9 @@
 package biz
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // EnrichmentHints are optional context the handler hands to the
 // analyzer so it can recover user intent across turns. Today there's
@@ -35,6 +38,24 @@ type EnrichmentResult struct {
 	// the handler can pin it as the chat's new LastSymbol. Empty
 	// when Digest is empty.
 	Symbol string
+
+	// CurrentPrice is the live price observed at fetch time (the
+	// snapshot's CurrentPrice). Used by the trade-card formatter to
+	// stamp a "signal taken at price X" line so the user can compare
+	// against current broker price before pulling the trigger.
+	CurrentPrice float64
+
+	// ATRM5 is the M5 ATR-14 in the symbol's quote currency, used as
+	// the volatility unit for the slippage tolerance band on the trade
+	// card ("OK to enter within ±0.2 ATR M5; skip if price drifted
+	// >0.5 ATR M5"). Zero when the M5 summary is missing.
+	ATRM5 float64
+
+	// GeneratedAt is the snapshot timestamp (UTC). Rendered on the
+	// trade card so the user can judge how stale the signal is by the
+	// time they see it (Telegram + LLM streaming + reading lag adds
+	// 5–30s typically).
+	GeneratedAt time.Time
 }
 
 // MarketAnalyzer is the seam between the ChatHandler and the Phase-2
