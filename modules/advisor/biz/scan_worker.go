@@ -17,11 +17,13 @@ import (
 // same candle and never operates on a forming bar.
 const scanInterval = 15 * time.Minute
 
-// scanFireDelay shifts the firing edge a few seconds past each M15
-// boundary so Binance has time to index the just-closed candle. Without
-// it, a tick at exactly :00 could fetch a market window where the most
-// recent M15 close hasn't propagated to the klines endpoint yet.
-const scanFireDelay = 30 * time.Second
+// scanFireDelay shifts the firing edge past each M15 boundary. Pinned
+// to 0 by user request so fires happen exactly at :00 :15 :30 :45 —
+// the moments an M15 bar closes. Trade-off: Binance can lag 1–3s
+// indexing the just-closed bar, so a tick at exactly :15:00 may still
+// see the previous bar as the most recent close. Bump to a few seconds
+// later if that becomes a real problem in production.
+const scanFireDelay = 0
 
 // scanLLMTimeout is the wall-clock budget for one LLM call. Mirrors
 // ChatHandler's per-message timeout so a hung provider can't stall the
