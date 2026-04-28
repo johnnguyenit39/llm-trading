@@ -18,10 +18,11 @@ type Intent struct {
 	// explicitly names BTC/bitcoin/BTCUSDT.
 	Symbol string
 
-	// Timeframe is the explicit TF the user asked for (M1/M5/H1/...).
+	// Timeframe is the explicit TF the user asked for (M5/M15/H1/...).
 	// When the user only mentions a symbol without a TF, we default to
-	// TF_M1 — the scalping entry TF. Users who want swing analysis type
-	// "XAU H4" or "/analyze XAU D1" explicitly.
+	// TF_M15 — the bot's primary signal TF. Users who want swing
+	// analysis type "XAU H4" or "/analyze XAU D1" explicitly; users who
+	// want intra-bar timing context type "/analyze M5".
 	Timeframe models.Timeframe
 
 	// Explicit is true when the intent was triggered by /analyze
@@ -67,7 +68,7 @@ func (d *IntentDetector) Detect(text string) Intent {
 	}
 	tf, ok := ResolveTimeframe(text)
 	if !ok {
-		tf = models.TF_M1
+		tf = models.TF_M15
 	}
 	return Intent{Symbol: sym, Timeframe: tf, Explicit: false}
 }
@@ -87,7 +88,7 @@ func (d *IntentDetector) DetectWithFallback(text, lastSymbol string) Intent {
 	}
 	tf, ok := ResolveTimeframe(text)
 	if !ok {
-		tf = models.TF_M1
+		tf = models.TF_M15
 	}
 	return Intent{Symbol: sym, Timeframe: tf, Explicit: false}
 }
@@ -109,8 +110,8 @@ func (d *IntentDetector) ParseCommand(text string) Intent {
 		}
 	}
 	if rest == "" {
-		// Bare /analyze → default XAUUSDT scalping.
-		return Intent{Symbol: DefaultSymbol, Timeframe: models.TF_M1, Explicit: true}
+		// Bare /analyze → default XAUUSDT M15 swing-scalp.
+		return Intent{Symbol: DefaultSymbol, Timeframe: models.TF_M15, Explicit: true}
 	}
 	sym := d.resolver.Resolve(rest)
 	if sym == "" {
@@ -118,7 +119,7 @@ func (d *IntentDetector) ParseCommand(text string) Intent {
 	}
 	tf, ok := ResolveTimeframe(rest)
 	if !ok {
-		tf = models.TF_M1
+		tf = models.TF_M15
 	}
 	return Intent{Symbol: sym, Timeframe: tf, Explicit: true}
 }

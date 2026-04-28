@@ -222,7 +222,7 @@ func TestFormatAdvisorReplyForUser_FreshnessBlock(t *testing.T) {
 	}
 	fresh := FreshnessContext{
 		CurrentPrice: 2345.7,
-		ATRM5:        2.0,
+		ATRM15:       2.0,
 		GeneratedAt:  time.Date(2026, 4, 27, 14, 23, 0, 0, time.UTC),
 	}
 	out := FormatAdvisorReplyForUser(raw, d, fresh)
@@ -230,8 +230,8 @@ func TestFormatAdvisorReplyForUser_FreshnessBlock(t *testing.T) {
 	if !strings.Contains(out, "⏱ Tín hiệu chốt: 14:23 UTC") {
 		t.Fatalf("missing timestamp stamp: %s", out)
 	}
-	if !strings.Contains(out, "ATR M5 ≈ 2.0000") {
-		t.Fatalf("missing ATR M5 readout: %s", out)
+	if !strings.Contains(out, "ATR M15 ≈ 2.0000") {
+		t.Fatalf("missing ATR M15 readout: %s", out)
 	}
 	// 0.2 * 2.0 = 0.40, 0.5 * 2.0 = 1.00 — printed via formatAdvisorPrice
 	// (sub-1000 prices use 4 decimal digits).

@@ -172,7 +172,7 @@ func (h *ChatHandler) handleMessage(parentCtx context.Context, msg IncomingMessa
 		marketBlob = result.Digest
 		fresh = FreshnessContext{
 			CurrentPrice: result.CurrentPrice,
-			ATRM5:        result.ATRM5,
+			ATRM15:       result.ATRM15,
 			GeneratedAt:  result.GeneratedAt,
 		}
 		if result.Ack != "" {
@@ -316,12 +316,12 @@ func (h *ChatHandler) handleCommand(ctx context.Context, chatID, text string) bo
 				"/start — lời chào\n"+
 				"/reset — xoá ngữ cảnh\n"+
 				"/help — xem lệnh\n"+
-				"/analyze [SYMBOL] [TF] — phân tích realtime (mặc định XAUUSDT).\n"+
-				"  TF: M1, M5, M15, H1, H4, D1.\n"+
-				"  Ví dụ: /analyze, /analyze M5, /analyze btc H1.\n"+
+				"/analyze [SYMBOL] [TF] — phân tích realtime (mặc định XAUUSDT M15).\n"+
+				"  TF: M5, M15 (default), H1, H4, D1. M1 vẫn xem được nếu /analyze M1.\n"+
+				"  Ví dụ: /analyze, /analyze M15, /analyze btc H1.\n"+
 				"/alerts on|off — bật/tắt cảnh báo trước tin lớn (CPI/FOMC/NFP).\n"+
 				"  Mặc định bật. Mình ping trước 30/15/5 phút khi sắp có tin.\n\n"+
-				"Cứ nhắn tự nhiên — mỗi tin nhắn mình tự fetch dữ liệu mới (M1/M5 entry, H1/H4 trend) rồi trả lời BUY/SELL + entry/SL/TP hoặc khuyên chờ.",
+				"Cứ nhắn tự nhiên — mỗi tin nhắn mình tự fetch dữ liệu mới (M15 signal, M5 timing, H1/H4/D1 bias) rồi trả lời BUY/SELL + entry/SL/TP hoặc khuyên chờ.",
 			"/help")
 		return true
 	case "/alerts", "/alerts on", "/alerts off":

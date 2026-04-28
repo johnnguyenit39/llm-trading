@@ -45,11 +45,13 @@ type EnrichmentResult struct {
 	// against current broker price before pulling the trigger.
 	CurrentPrice float64
 
-	// ATRM5 is the M5 ATR-14 in the symbol's quote currency, used as
+	// ATRM15 is the M15 ATR-14 in the symbol's quote currency, used as
 	// the volatility unit for the slippage tolerance band on the trade
-	// card ("OK to enter within ±0.2 ATR M5; skip if price drifted
-	// >0.5 ATR M5"). Zero when the M5 summary is missing.
-	ATRM5 float64
+	// card ("OK to enter within ±0.2 ATR M15; skip if price drifted
+	// >0.5 ATR M15"). Zero when the M15 summary is missing. M15 is the
+	// signal TF, so its ATR is the right scale for "did the structure
+	// move on" between snapshot and broker click.
+	ATRM15 float64
 
 	// GeneratedAt is the snapshot timestamp (UTC). Rendered on the
 	// trade card so the user can judge how stale the signal is by the

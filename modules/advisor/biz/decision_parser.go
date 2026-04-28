@@ -18,23 +18,24 @@ import (
 // tolerance band. Zero value disables the freshness block entirely
 // (used by tests and the chat-only fallback when no analyzer ran).
 //
-// Half-band and skip-band are derived from ATRM5 with fixed multipliers
-// (0.2 and 0.5 respectively) — the multipliers are tuned for XAU
-// scalping on 5–30s Telegram lag. Tightening them would cause too many
-// "skip" labels on healthy trends; loosening them would let the user
-// chase entries that are no longer the structure the LLM analysed.
+// Half-band and skip-band are derived from ATRM15 with fixed multipliers
+// (0.2 and 0.5 respectively) — same multipliers as the prior M5-anchored
+// version, but ATR M15 is ~3x M5 so the absolute band widens to match
+// the longer holding time on M15 trades. Tightening would cause too many
+// "skip" labels on healthy trends; loosening would let the user chase
+// entries that are no longer the structure the LLM analysed.
 type FreshnessContext struct {
 	CurrentPrice float64
-	ATRM5        float64
+	ATRM15       float64
 	GeneratedAt  time.Time
 }
 
 // HasData reports whether the formatter should render the freshness
-// block. ATRM5 is the gate — if the M5 summary was missing we can't
+// block. ATRM15 is the gate — if the M15 summary was missing we can't
 // compute a meaningful slippage band, and showing only the timestamp
 // alone tends to confuse rather than reassure the user.
 func (f FreshnessContext) HasData() bool {
-	return f.ATRM5 > 0 && f.CurrentPrice > 0
+	return f.ATRM15 > 0 && f.CurrentPrice > 0
 }
 
 // Risk-sizing defaults. Override via env at process start:
@@ -194,24 +195,24 @@ func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload, fresh Freshn
 // slippage tolerance band on the trade card. Helps the user decide
 // whether the entry the LLM picked is still valid by the time they see
 // the message — Telegram + LLM streaming + reading lag adds 5–30s, in
-// which gold can drift through a full ATR M5 on news or volatile session
-// opens.
+// which gold can drift through a fraction of an M15 ATR on news or
+// volatile session opens.
 //
-// Two thresholds, both keyed off ATR M5:
-//   - half = 0.2 ATR M5 → "OK to enter within ±half"
-//   - skip = 0.5 ATR M5 → "if drift > skip, the structure has moved on"
+// Two thresholds, both keyed off ATR M15:
+//   - half = 0.2 ATR M15 → "OK to enter within ±half"
+//   - skip = 0.5 ATR M15 → "if drift > skip, the structure has moved on"
 //
 // We don't gate emission ourselves — the multipliers are guidance the
 // user applies against the broker's current price, not a hard reject.
 func formatFreshnessBlock(d *DecisionPayload, f FreshnessContext) string {
-	half := 0.2 * f.ATRM5
-	skip := 0.5 * f.ATRM5
+	half := 0.2 * f.ATRM15
+	skip := 0.5 * f.ATRM15
 	stamp := f.GeneratedAt.UTC().Format("15:04 UTC")
 	var b strings.Builder
 	b.WriteString("\n⏱ Tín hiệu chốt: ")
 	b.WriteString(stamp)
-	b.WriteString(fmt.Sprintf(" · giá tại đó %s (ATR M5 ≈ %s)\n",
-		formatAdvisorPrice(f.CurrentPrice), formatAdvisorPrice(f.ATRM5)))
+	b.WriteString(fmt.Sprintf(" · giá tại đó %s (ATR M15 ≈ %s)\n",
+		formatAdvisorPrice(f.CurrentPrice), formatAdvisorPrice(f.ATRM15)))
 	b.WriteString(fmt.Sprintf("• Slippage OK: entry ±%s\n", formatAdvisorPrice(half)))
 	b.WriteString(fmt.Sprintf("• Skip nếu giá hiện đã trôi >%s khỏi entry — kèo cũ, chờ setup mới\n",
 		formatAdvisorPrice(skip)))

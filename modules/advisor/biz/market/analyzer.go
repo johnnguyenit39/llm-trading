@@ -89,17 +89,18 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 		return biz.EnrichmentResult{}, nil
 	}
 
-	// Scalping + trend-context bundle: M1 (entry timing), M5 (signal +
-	// confirmation), M15 (structural context — range/squeeze/continuity
-	// between M5 and H1; never the entry TF), H1/H4 (macro trend
-	// strength). Uniform CandleBudget so every TF has enough warm-up for
-	// ADX/EMA.
+	// M15-anchored swing-scalp bundle: M15 (signal TF — pattern + structure
+	// + entry), M5 (confirm/timing — fire trigger before M15 closes when
+	// price is at the M15 level), H1/H4 (bias + trend strength), D1 (macro
+	// context — daily range/PDH/PDL). M1 dropped: holding time on M15 is
+	// 1–4h, M1 noise gets washed out and contributes nothing to entry/SL.
+	// Uniform CandleBudget so every TF has enough warm-up for ADX/EMA.
 	required := map[models.Timeframe]int{
-		models.TF_M1:  CandleBudget,
 		models.TF_M5:  CandleBudget,
 		models.TF_M15: CandleBudget,
 		models.TF_H1:  CandleBudget,
 		models.TF_H4:  CandleBudget,
+		models.TF_D1:  CandleBudget,
 	}
 
 	fetchCtx, cancel := context.WithTimeout(ctx, a.fetchTimeout)
@@ -145,21 +146,22 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 		Ack:          ack,
 		Symbol:       intent.Symbol,
 		CurrentPrice: snap.CurrentPrice,
-		ATRM5:        atrM5(snap),
+		ATRM15:       atrM15(snap),
 		GeneratedAt:  snap.GeneratedAt,
 	}, nil
 }
 
-// atrM5 pulls the M5 ATR-14 off the per-TF summary list. Returns 0 when
-// the M5 summary is missing or its ATR couldn't be computed (insufficient
+// atrM15 pulls the M15 ATR-14 off the per-TF summary list. Returns 0 when
+// the M15 summary is missing or its ATR couldn't be computed (insufficient
 // candles) — callers treat 0 as "skip the freshness band" rather than
-// rendering nonsense.
-func atrM5(snap *PairSnapshot) float64 {
+// rendering nonsense. M15 is the signal TF, so its ATR is the right unit
+// for the slippage tolerance band on the trade card.
+func atrM15(snap *PairSnapshot) float64 {
 	if snap == nil {
 		return 0
 	}
 	for _, s := range snap.Summaries {
-		if s.Timeframe == models.TF_M5 {
+		if s.Timeframe == models.TF_M15 {
 			return s.ATR
 		}
 	}

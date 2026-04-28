@@ -122,12 +122,14 @@ func tokenize(text string) []string {
 }
 
 // tfAliases recognises common ways users reference timeframes in chat.
-// Scalping defaults: "scalp"/"scalping" map to M1 now that the bot
-// operates on M1/M5 entry timing instead of M15.
+// Defaults: "scalp"/"scalping" map to M15 — the bot's primary signal TF.
+// M1 alias kept so users can still inspect M1 explicitly via /analyze M1
+// even though M1 is no longer fetched by the auto-enrichment path.
 var tfAliases = map[string]models.Timeframe{
-	"m1": models.TF_M1, "1m": models.TF_M1, "scalp": models.TF_M1, "scalping": models.TF_M1,
+	"m1": models.TF_M1, "1m": models.TF_M1,
 	"m5": models.TF_M5, "5m": models.TF_M5,
 	"m15": models.TF_M15, "15m": models.TF_M15, "15": models.TF_M15,
+	"scalp": models.TF_M15, "scalping": models.TF_M15,
 	"h1": models.TF_H1, "1h": models.TF_H1, "hourly": models.TF_H1,
 	"h4": models.TF_H4, "4h": models.TF_H4,
 	"d1": models.TF_D1, "1d": models.TF_D1, "daily": models.TF_D1, "day": models.TF_D1,
@@ -135,7 +137,7 @@ var tfAliases = map[string]models.Timeframe{
 
 // ResolveTimeframe extracts the first explicit timeframe mention from
 // the user's text. Returns ("", false) when none is found — callers
-// default to TF_M1 (the scalping entry TF).
+// default to TF_M15 (the bot's primary signal TF).
 func ResolveTimeframe(text string) (models.Timeframe, bool) {
 	for _, tok := range tokenize(text) {
 		if tf, ok := tfAliases[tok]; ok {
