@@ -75,6 +75,9 @@ func Init(ctx context.Context, deps Deps) {
 	filter := biz.NewUserFilter()
 	handler := biz.NewChatHandler(transport, deps.Sessions, llm, filter)
 
+	// Periodic M15 scan worker is started later (after analyzer is built)
+	// since it needs the same MarketAnalyzer the chat handler uses.
+
 	// News calendar is shared between the reactive Gate (digest line)
 	// and the proactive AlertWorker (T-30/T-15/T-5 push). Building it
 	// once here keeps both consumers reading the same in-memory cache,
@@ -82,7 +85,8 @@ func Init(ctx context.Context, deps Deps) {
 	// each layer pulling FF independently.
 	newsCal := buildNewsCalendar(ctx)
 
-	if analyzer := buildMarketAnalyzer(newsCal); analyzer != nil {
+	analyzer := buildMarketAnalyzer(newsCal)
+	if analyzer != nil {
 		handler = handler.WithMarketAnalyzer(analyzer)
 		log.Info().Msg("advisor: market analyzer attached")
 	} else {
@@ -106,6 +110,17 @@ func Init(ctx context.Context, deps Deps) {
 	}
 
 	go handler.Run(ctx)
+
+	// Periodic M15 market-scan broadcast: only starts when both the
+	// analyzer is live (otherwise nothing to scan) AND the allowlist
+	// is populated (otherwise no recipients). Run() itself handles the
+	// empty-allowlist case by logging + returning so we don't need a
+	// pre-check here.
+	if analyzer != nil {
+		scan := biz.NewScanWorker(transport, llm, analyzer, deps.Decisions, filter)
+		go scan.Run(ctx)
+		log.Info().Msg("advisor: periodic M15 scan worker scheduled")
+	}
 
 	log.Info().
 		Str("transport", transport.Name()).

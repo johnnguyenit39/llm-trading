@@ -40,6 +40,22 @@ func NewUserFilter() *UserFilter {
 	return &UserFilter{allowed: m}
 }
 
+// Subscribers returns the configured allowlist as a slice of chat IDs
+// suitable for proactive broadcasts. Returns nil when ADVISOR_ALLOWED_USER_IDS
+// is unset — callers MUST treat nil as "no broadcast target" rather than
+// "broadcast to everyone", because the reactive path's "allow-everyone"
+// semantics don't translate to push: we can't iterate "every Telegram user".
+func (f *UserFilter) Subscribers() []string {
+	if f.allowed == nil {
+		return nil
+	}
+	out := make([]string, 0, len(f.allowed))
+	for id := range f.allowed {
+		out = append(out, id)
+	}
+	return out
+}
+
 // ShouldHandle returns true if we should process this message. The second
 // return value is a short reason string useful for debug logs when false.
 func (f *UserFilter) ShouldHandle(msg IncomingMessage) (bool, string) {
