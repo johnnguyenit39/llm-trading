@@ -212,11 +212,13 @@ func (w *ScanWorker) runOnce(parentCtx context.Context) {
 		GeneratedAt:  result.GeneratedAt,
 	}
 
-	rendered := StripLLMEmphasis(StripMarketDataDump(reply))
-	if decision := ExtractDecision(reply); decision != nil {
-		w.persistDecision(parentCtx, decision)
-		rendered = FormatAdvisorReplyForUser(reply, decision, fresh)
+	decision := ExtractDecision(reply)
+	if decision == nil {
+		log.Info().Msg("advisor: scan tick produced no trade decision; skipping broadcast")
+		return
 	}
+	w.persistDecision(parentCtx, decision)
+	rendered := FormatAdvisorReplyForUser(reply, decision, fresh)
 
 	w.broadcast(parentCtx, subs, rendered)
 }
