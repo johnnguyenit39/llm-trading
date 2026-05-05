@@ -12,17 +12,18 @@ import (
 )
 
 // scanInterval is the cadence at which the periodic market scan fires.
-// Pinned to 15 minutes to match the M15 signal TF: every fire processes
-// exactly one freshly closed M15 bar, so the LLM never re-analyses the
-// same candle and never operates on a forming bar.
-const scanInterval = 15 * time.Minute
+// Pinned to 5 minutes to match the M5 entry-timing TF: every fire
+// processes a freshly closed M5 bar so the LLM can catch M5 entry
+// triggers (engulfing/pin bar r≥0.7) at M15 structure levels without
+// waiting a full 15-minute bar. M15 remains the primary signal TF for
+// structure — the LLM still anchors entry/SL to M15 levels; M5 just
+// tightens the pull-trigger timing.
+const scanInterval = 5 * time.Minute
 
-// scanFireDelay shifts the firing edge past each M15 boundary. Pinned
-// to 0 by user request so fires happen exactly at :00 :15 :30 :45 —
-// the moments an M15 bar closes. Trade-off: Binance can lag 1–3s
-// indexing the just-closed bar, so a tick at exactly :15:00 may still
-// see the previous bar as the most recent close. Bump to a few seconds
-// later if that becomes a real problem in production.
+// scanFireDelay shifts the firing edge past each M5 boundary. Pinned
+// to 0 so fires happen exactly at :00 :05 :10 ... — the moments an M5
+// bar closes. Binance can lag 1–3s on the just-closed bar; bump a few
+// seconds if stale-candle misses become frequent in production.
 const scanFireDelay = 0
 
 // scanLLMTimeout is the wall-clock budget for one LLM call. Mirrors
@@ -36,21 +37,31 @@ const scanSendTimeout = 5 * time.Second
 
 // scanScrutinyText is the synthetic user message handed to the analyzer
 // + LLM each tick. It mirrors what a user typing in chat would say so
-// the analyzer's intent detector resolves it cleanly to XAUUSDT M15
-// without any new code path. The instruction at the end pins the reply
-// framing the user requested ("Tôi đang định kì scan thị trường mỗi
-// M15..."); the LLM treats it as part of the user turn.
-const scanScrutinyText = "scan thị trường XAU M15 — đây là lần scan định kỳ tự động (15 phút/lần). " +
-	"Phân tích bias H1/H4/D1, structure M15, và quyết định: nên chờ hay vào lệnh. " +
-	"BẮT BUỘC mở đầu reply bằng câu: \"Tôi đang định kỳ scan thị trường mỗi 15 phút, hiện tại thị trường đang ...\" " +
-	"(điền vào ... bằng nhận định ngắn về regime/trend). " +
-	"Sau đó kết luận nên chờ (kèm điều kiện cần) hoặc vào lệnh (kèm JSON đúng schema)."
+// the analyzer's intent detector resolves it cleanly to XAUUSDT without
+// any new code path.
+//
+// Scan fires every M5 close. The LLM role here:
+//   - Use M15 structure (BOS/FVG/EMA20/range edge) as the anchor for
+//     entry price and SL — same as in chat-triggered analysis.
+//   - Use M5 as the entry-timing trigger: if a M5 pattern r≥0.7 has
+//     formed AT an M15 structure level this bar, that is sufficient to
+//     fire a trade card even if the M15 bar hasn't closed yet.
+//   - Use H1/H4/D1 for bias/context as usual.
+//   - If no valid M5 trigger exists at a meaningful M15 level → wait.
+const scanScrutinyText = "scan thị trường XAU — đây là lần scan định kỳ tự động (5 phút/lần). " +
+	"Dữ liệu có đủ M5/M15/H1/H4/D1. " +
+	"Vai trò từng TF: M15 = structure/entry anchor (BOS/FVG/EMA20/range edge); M5 = timing trigger (pattern r≥0.7 tại M15 level = đủ để vào lệnh); H1/H4/D1 = bias. " +
+	"Quyết định: nếu M5 có confirm tại M15 structure hợp lệ → vào lệnh (JSON). Nếu không → chờ (text ngắn, điều kiện cần thêm). " +
+	"BẮT BUỘC mở đầu reply bằng: \"Scan M5 [HH:MM] — \" rồi nhận định ngắn về setup hiện tại (1 câu)."
 
-// ScanWorker drives the periodic M15 market scan: every 15 minutes
-// (aligned to wall-clock M15 boundaries + a small ingestion buffer) it
+// ScanWorker drives the periodic M5 market scan: every 5 minutes
+// (aligned to wall-clock M5 boundaries + a small ingestion buffer) it
 // runs ONE analyzer + LLM cycle on XAUUSDT, then fans the result out to
-// every configured allowlist user. It's the proactive sibling of
-// ChatHandler — same building blocks, no inbound message.
+// every configured allowlist user. M15 remains the structure/signal TF;
+// M5 is the entry-timing trigger the LLM uses to pull the trigger early
+// when a valid pattern forms at an M15 level mid-bar.
+// It's the proactive sibling of ChatHandler — same building blocks, no
+// inbound message.
 //
 // Lifecycle: Run() blocks until ctx is cancelled. Failure modes are
 // non-fatal at every layer:
@@ -111,7 +122,7 @@ func NewScanWorker(
 // tick rather than queueing — back-to-back broadcasts would just spam.
 func (w *ScanWorker) Run(ctx context.Context) {
 	if w.transport == nil || w.llm == nil || w.analyzer == nil || w.filter == nil {
-		log.Warn().Msg("advisor: scan worker missing deps; periodic scan disabled")
+		log.Warn().Msg("advisor: scan worker missing deps; periodic M5 scan disabled")
 		return
 	}
 	subs := w.filter.Subscribers()
@@ -126,7 +137,7 @@ func (w *ScanWorker) Run(ctx context.Context) {
 	log.Info().
 		Dur("first_fire_in", wait).
 		Int("subscribers", len(subs)).
-		Msg("advisor: periodic M15 scan worker started")
+		Msg("advisor: periodic M5 scan worker started")
 	select {
 	case <-ctx.Done():
 		return
@@ -148,12 +159,14 @@ func (w *ScanWorker) Run(ctx context.Context) {
 }
 
 // timeUntilNextFire computes the duration from `from` to the next
-// M15 boundary plus fireDelay. Returns a positive duration always: when
-// `from` is exactly on an M15 boundary we still wait a full interval
+// M5 boundary plus fireDelay. Returns a positive duration always: when
+// `from` is exactly on an M5 boundary we still wait a full interval
 // rather than firing immediately and risking a stale candle window.
+// nextSlot can reach 60 when min=55–59; Go's time.Add handles the
+// hour rollover correctly so no explicit clamping is needed.
 func (w *ScanWorker) timeUntilNextFire(from time.Time) time.Duration {
 	min := from.Minute()
-	nextSlot := ((min / 15) + 1) * 15
+	nextSlot := ((min / 5) + 1) * 5
 	next := time.Date(from.Year(), from.Month(), from.Day(), from.Hour(), 0, 0, 0, from.Location()).
 		Add(time.Duration(nextSlot) * time.Minute).
 		Add(w.fireDelay)
