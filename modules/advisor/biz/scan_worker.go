@@ -49,7 +49,7 @@ const scanSendTimeout = 5 * time.Second
 //   - Use H1/H4/D1 for bias/context as usual.
 //   - If no valid M5 trigger exists at a meaningful M15 level → wait.
 const scanScrutinyText = "scan thị trường XAU — đây là lần scan định kỳ tự động (5 phút/lần). " +
-	"Dữ liệu có đủ M5/M15/H1/H4/D1. " +
+	"Dữ liệu có đủ M1/M5/M15/H1/H4/D1. " +
 	"Vai trò từng TF: M15 = structure/entry anchor (BOS/FVG/EMA20/range edge); M5 = timing trigger (pattern r≥0.7 tại M15 level = đủ để vào lệnh); H1/H4/D1 = bias. " +
 	"Quyết định: nếu M5 có confirm tại M15 structure hợp lệ → vào lệnh (JSON). Nếu không → chờ (text ngắn, điều kiện cần thêm). " +
 	"BẮT BUỘC mở đầu reply bằng: \"Scan M5 [HH:MM] — \" rồi nhận định ngắn về setup hiện tại (1 câu)."

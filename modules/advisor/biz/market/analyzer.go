@@ -89,13 +89,14 @@ func (a *Analyzer) MaybeEnrich(ctx context.Context, text string, hints biz.Enric
 		return biz.EnrichmentResult{}, nil
 	}
 
-	// M15-anchored swing-scalp bundle: M15 (signal TF — pattern + structure
-	// + entry), M5 (confirm/timing — fire trigger before M15 closes when
-	// price is at the M15 level), H1/H4 (bias + trend strength), D1 (macro
-	// context — daily range/PDH/PDL). M1 dropped: holding time on M15 is
-	// 1–4h, M1 noise gets washed out and contributes nothing to entry/SL.
+	// Full 6-TF bundle: M1 (microstructure / wick context), M5
+	// (confirm/timing trigger), M15 (signal TF — structure + entry), H1/H4
+	// (bias + trend), D1 (macro range/PDH/PDL). M1 gives the LLM candlestick
+	// microstructure at the moment of entry without changing the strategy —
+	// M15 remains the anchor for BOS/FVG/structure; M5 fires the trigger.
 	// Uniform CandleBudget so every TF has enough warm-up for ADX/EMA.
 	required := map[models.Timeframe]int{
+		models.TF_M1:  CandleBudget,
 		models.TF_M5:  CandleBudget,
 		models.TF_M15: CandleBudget,
 		models.TF_H1:  CandleBudget,
