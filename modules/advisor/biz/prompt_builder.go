@@ -116,7 +116,7 @@ B) VÀO LỆNH — chỉ emit JSON khi đủ ĐỒNG THỜI:
 ` + "```" + `
 
 - Field bắt buộc: action ("BUY"|"SELL"), symbol ("XAUUSDT"|"BTCUSDT" đúng cặp [MARKET_DATA]), entry, stop_loss, take_profit, lot, confidence, invalidation. Số là số thuần.
-- LOT mặc định: 0.01 cho XAUUSDT, 0.001 cho BTCUSDT. Backend tự resize theo % risk tài khoản — KHÔNG cần tối ưu lot, cứ ghi default.
+- LOT mặc định: 0.01 cho XAUUSDT, 0.01 cho BTCUSDT. Backend tự resize theo % risk tài khoản — KHÔNG cần tối ưu lot, cứ ghi default.
 - confidence:
     · "high" 🟢 = A+: H1+H4 cùng hướng + ≥1 trigger mạnh (BOS [confirmed] cùng hướng / FVG [filling]+pattern), không trap, R:R≥1.5, vol confirm. BOS+FVG cùng vùng → mặc định high.
     · "med"  🟡 = 1 trigger rõ + (H4 đồng thuận HOẶC H1/H4 neutral); hoặc setup B với pattern + vol; hoặc setup C đủ điều kiện (tối đa med).

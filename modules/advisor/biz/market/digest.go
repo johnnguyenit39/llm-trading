@@ -3,6 +3,7 @@ package market
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -88,6 +89,12 @@ type TFSummary struct {
 	RSIDivergence      string  `json:"rsi_divergence,omitempty"`       // "bearish" | "bullish" | ""
 	BBSqueezeReleasing bool    `json:"bb_squeeze_releasing,omitempty"`
 	EMACrossover       string  `json:"ema_crossover,omitempty"`        // "bull_3ago" / "bear_5ago" / ""
+
+	// Round-level flags: true when NearestResist/Support coincides with a
+	// psychological round-number increment ($50 for gold, $500 for BTC).
+	// Not in JSON — the [round] tag on the rendered text carries the signal.
+	NearestResistIsRound bool `json:"-"`
+	NearestSupportIsRound bool `json:"-"`
 }
 
 // RawCandle is a single OHLCV row rendered into the digest so the LLM
@@ -141,6 +148,21 @@ type PairSnapshot struct {
 	// Populated by analyzer.go when a news.Gate is attached; nil-safe
 	// if the bot ran without the news subsystem.
 	NewsWindow string
+
+	// Correlation is the DXY proxy computed from EUR/USD candles (inverse
+	// relationship: EUR up = DXY down = gold tailwind). Nil when the
+	// EURUSDT fetch failed or the symbol is not XAUUSDT.
+	Correlation *CorrelationMini
+}
+
+// CorrelationMini is a compact DXY-proxy read derived from EUR/USD.
+// EUR/USD moves inversely to DXY, so EUR trending up = DXY falling =
+// macro tailwind for gold; EUR trending down = DXY rising = headwind.
+type CorrelationMini struct {
+	M15Regime string  // simpleRegime output for EUR/USD M15
+	H1Regime  string  // simpleRegime output for EUR/USD H1
+	DXYBias   string  // "bullish" | "bearish" | "neutral"
+	Mom5ATR   float64 // EUR/USD M15 5-bar momentum in ATR units (negative = EUR falling = DXY rising)
 }
 
 // Pivot window sizes per TF. Entry TF gets 6 for richer structural
@@ -505,10 +527,26 @@ func fillRangeContext(sum *TFSummary, closes []float64) {
 
 	// Nearest resistance / support picked from pre-computed levels. We
 	// deliberately exclude EMAs (they drift with price — bad anchors)
-	// and BBMid (it's a mean, not a level). Distance in ATR lets the
-	// LLM compare tightness across any symbol without unit math.
+	// and BBMid (it's a mean, not a level). Round number levels ($50 for
+	// gold, $500 for BTC) are added as psychological anchors — traders
+	// cluster orders there regardless of indicator math.
 	if sum.ATR > 0 {
+		step := roundStep(last)
 		levels := []float64{sum.BBUpper, sum.BBLower, sum.DonchHigh, sum.DonchLow, sum.SwingHigh, sum.SwingLow}
+		if step > 0 {
+			above := math.Ceil(last/step) * step
+			if above <= last {
+				above += step
+			}
+			below := math.Floor(last/step) * step
+			if below >= last {
+				below -= step
+			}
+			levels = append(levels, above)
+			if below > 0 {
+				levels = append(levels, below)
+			}
+		}
 		for _, lv := range levels {
 			if lv <= 0 {
 				continue
@@ -525,9 +563,11 @@ func fillRangeContext(sum *TFSummary, closes []float64) {
 		}
 		if sum.NearestResist > 0 {
 			sum.DistResistATR = (sum.NearestResist - last) / sum.ATR
+			sum.NearestResistIsRound = step > 0 && isRoundLevel(sum.NearestResist, step)
 		}
 		if sum.NearestSupport > 0 {
 			sum.DistSupportATR = (last - sum.NearestSupport) / sum.ATR
+			sum.NearestSupportIsRound = step > 0 && isRoundLevel(sum.NearestSupport, step)
 		}
 	}
 }
@@ -895,4 +935,34 @@ func f4(v float64) string {
 		return "0"
 	}
 	return fmt.Sprintf("%.4f", v)
+}
+
+// ----- round-level helpers -----
+
+// roundStep returns the psychological round-number increment for a
+// given price. Gold (~3000+) uses $50 steps; BTC (~10k–100k) uses $500;
+// lower-priced instruments fall through to coarser buckets.
+func roundStep(price float64) float64 {
+	switch {
+	case price >= 10000:
+		return 500
+	case price >= 1000:
+		return 50
+	case price >= 100:
+		return 10
+	default:
+		return 1
+	}
+}
+
+// isRoundLevel returns true when price lands exactly on (or within 1%
+// of) a roundStep multiple — e.g. 3250.00 with step 50. Floating-point
+// arithmetic can leave tiny remainders on exact multiples so we allow a
+// 1% tolerance of the step size.
+func isRoundLevel(price, step float64) bool {
+	if step <= 0 {
+		return false
+	}
+	rem := math.Mod(price, step)
+	return rem < step*0.01 || rem > step*0.99
 }
