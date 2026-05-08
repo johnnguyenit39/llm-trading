@@ -10,7 +10,7 @@ import (
 	"j_ai_trade/modules/advisor/biz"
 	"j_ai_trade/modules/advisor/biz/market"
 	"j_ai_trade/modules/advisor/biz/market/news"
-	deepseekProvider "j_ai_trade/modules/advisor/provider/deepseek"
+	"j_ai_trade/modules/advisor/provider"
 	telegramTransport "j_ai_trade/modules/advisor/transport/telegram"
 	"j_ai_trade/trading/marketdata"
 )
@@ -66,7 +66,7 @@ func Init(ctx context.Context, deps Deps) {
 		return
 	}
 
-	llm, err := deepseekProvider.New()
+	llm, err := provider.New()
 	if err != nil {
 		log.Warn().Err(err).Msg("advisor: LLM provider init failed — chat disabled")
 		return

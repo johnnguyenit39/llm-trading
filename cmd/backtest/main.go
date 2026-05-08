@@ -39,7 +39,7 @@ import (
 	"j_ai_trade/modules/advisor/biz"
 	"j_ai_trade/modules/advisor/biz/market"
 	"j_ai_trade/modules/advisor/model"
-	"j_ai_trade/modules/advisor/provider/deepseek"
+	"j_ai_trade/modules/advisor/provider"
 	"j_ai_trade/trading/models"
 )
 
@@ -58,17 +58,16 @@ func main() {
 	bs := binance.NewBinanceService(repository.NewBinanceRepository())
 	hist := newHistoricalFetcher(bs)
 
-	client, err := deepseek.New()
+	llm, err := provider.NewConfigured(&cfg.temperature, &cfg.seed)
 	if err != nil {
-		log.Fatal().Err(err).Msg("backtest: DeepSeek client init failed")
+		log.Fatal().Err(err).Msg("backtest: LLM provider init failed")
 	}
-	client = client.WithTemperature(cfg.temperature).WithSeed(cfg.seed)
 
 	cache, err := newFileCache(cfg.cacheDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("backtest: cache init failed")
 	}
-	runner := newLLMRunner(client, cache, deepseekModelFromEnv(), cfg.temperature, cfg.seed)
+	runner := newLLMRunner(llm, cache, llm.Name(), cfg.temperature, cfg.seed)
 
 	timestamps := sampleTimestamps(cfg)
 	log.Info().
@@ -81,7 +80,7 @@ func main() {
 		Symbol:      cfg.symbol,
 		Samples:     len(timestamps),
 		Weeks:       cfg.weeks,
-		Model:       deepseekModelFromEnv(),
+		Model:       llm.Name(),
 		Temperature: cfg.temperature,
 		Seed:        cfg.seed,
 		GeneratedAt: time.Now().UTC(),
@@ -275,13 +274,6 @@ func sortTimes(ts []time.Time) {
 			ts[j], ts[j-1] = ts[j-1], ts[j]
 		}
 	}
-}
-
-func deepseekModelFromEnv() string {
-	if v := os.Getenv("DEEP_SEEK_MODEL"); v != "" {
-		return v
-	}
-	return "deepseek-chat"
 }
 
 // Compile-time check that we depend on model.Turn / Role consts so a

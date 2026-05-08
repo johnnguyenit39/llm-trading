@@ -6,23 +6,21 @@ import (
 
 	"j_ai_trade/modules/advisor/biz"
 	"j_ai_trade/modules/advisor/model"
-	"j_ai_trade/modules/advisor/provider/deepseek"
 )
 
-// llmRunner wraps the streaming DeepSeek client + cache so the backtest
-// loop has a simple "messages → reply (string), cost-or-cached" call.
-// We collect chunks from Stream and concatenate; for backtest there is
-// no UI to update incrementally so streaming is just a wire-level
-// detail.
+// llmRunner wraps any biz.LLMProvider + file cache so the backtest loop
+// has a simple "messages → reply (string), cost-or-cached" call. Chunks
+// from Stream are concatenated; for backtest there is no UI to update
+// incrementally so streaming is just a wire-level detail.
 type llmRunner struct {
-	client      *deepseek.Client
+	client      biz.LLMProvider
 	cache       *fileCache
 	model       string
 	temperature *float64
 	seed        *int
 }
 
-func newLLMRunner(client *deepseek.Client, cache *fileCache, modelName string, temp float64, seed int) *llmRunner {
+func newLLMRunner(client biz.LLMProvider, cache *fileCache, modelName string, temp float64, seed int) *llmRunner {
 	t := temp
 	s := seed
 	return &llmRunner{
@@ -73,7 +71,3 @@ func (r *llmRunner) Run(ctx context.Context, turns []model.Turn) (reply string, 
 	return full, false, nil
 }
 
-// Compile-time check: the runner is invoked with biz.LLMProvider-shaped
-// turns even though we use the Stream method directly. Keeping the
-// import live makes the dependency obvious to readers.
-var _ biz.LLMProvider = (*deepseek.Client)(nil)
