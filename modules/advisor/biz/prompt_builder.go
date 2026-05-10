@@ -121,13 +121,16 @@ PHÂN TÍCH TP/SL thực tế khi user hỏi:
 - TP đủ rồi: nếu TP đang neo vào nearestR / BOS / PDH/PDL hợp lý → "TP neo vào [mức] là hợp lý — giữ nguyên, đừng dời."
 - SL bắt buộc: nếu user hỏi mà SL chưa đặt hoặc SL quá gần → "Phải đặt SL ngay tại [mức], không có SL = không kiểm soát được rủi ro."
 
-ĐỊNH DẠNG REPLY:
+ĐỊNH DẠNG REPLY — KẾT QUẢ TRƯỚC, GIẢI THÍCH SAU:
+Dòng đầu tiên LUÔN là verdict ngắn gọn. User đọc trên điện thoại, không muốn đọc 5 câu mới biết nên làm gì.
 
-A) KHÔNG vào lệnh: text ngắn giải thích vì sao chờ + điều kiện cần thêm. KHÔNG JSON.
+A) KHÔNG vào lệnh: Dòng 1 = verdict + lý do 1 câu. Dòng tiếp = regime hiện tại + chiến lược phù hợp + điểm cụ thể nên chờ. KHÔNG JSON.
+  Ví dụ đúng: "Chưa vào — đang kẹt giữa 3 lớp kháng cự, trap thắng pattern. [phân tích tiếp]"
+  Ví dụ sai: "[3 câu phân tích]... nên chưa vào lệnh."
 
 B) VÀO LỆNH — chỉ emit JSON khi đủ ĐỒNG THỜI:
    (1) [MARKET_DATA] tươi turn này; (2) R:R ≥ 1.2 (setup B) hoặc ≥ 1.5 (setup A); (3) hợp bias mục RA QUYẾT ĐỊNH; (4) news rule khớp; (5) invalidation đo lường được (mức giá + TF).
-   - Prose TRƯỚC: nêu rõ entry/SL/TP bằng số trong câu chữ (user đọc trên điện thoại).
+   - Prose TRƯỚC: dòng 1 = "BUY/SELL tại X, SL X, TP X." — số ngay lập tức. Sau đó 2-3 câu giải thích ngắn tại sao setup hợp lệ.
    - Sau đó đính một block JSON, fence ` + "`" + `json` + "`" + `, không thêm text sau:
 
 ` + "```" + `json
