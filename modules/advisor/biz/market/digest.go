@@ -18,6 +18,12 @@ import (
 // checks, so 5 bars is plenty.
 const RawCandleBars = 5
 
+// RawCandleBarsM1 is the number of M1 raw OHLCV rows emitted for entry
+// timing context. 15 bars = 15 minutes — covers the current M15 bar's
+// full M1 structure so the LLM can judge whether price action is clean
+// enough to enter right now.
+const RawCandleBarsM1 = 15
+
 // TFSummary is the per-timeframe digest of what the market looks like
 // right now. Everything is pre-computed so the LLM reads numbers
 // directly and doesn't do any math. Field names are short because they
@@ -131,6 +137,7 @@ type PairSnapshot struct {
 	CurrentPrice float64                           // live price on the entry TF (from the unclosed bar)
 	Summaries    []TFSummary                       // ordered: entry TF first, then higher TFs
 	RawBars      []RawCandle                       // last ~10 OHLCV rows of the entry TF (anti-repaint: closed only)
+	RawBarsM1    []RawCandle                       // last 15 M1 rows for entry-timing microstructure context
 	Patterns     map[models.Timeframe][]BarPattern // per-TF recent bar patterns; each TF uses its OWN LevelContext
 	Pivots       map[models.Timeframe][]Pivot      // per-TF pivot sequence (HH/HL/LH/LL) — structural primitive for LLM
 
@@ -202,6 +209,11 @@ const PatternLookback = 3
 // read, and keeping it short cuts prompt noise.
 const PatternLookbackH1 = 2
 
+// PatternLookbackM5 is the pattern window for M5 confirmation bars.
+// M5 is the trigger/confirm TF for scalp entries — 2 bars is enough to
+// catch the confirmation candle without adding noise from older bars.
+const PatternLookbackM5 = 2
+
 // Build produces a PairSnapshot from fetched multi-TF candles. Returns
 // an error if the entry TF has no candles (nothing useful to say).
 func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*PairSnapshot, error) {
@@ -257,6 +269,29 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 				Close:  c.Close,
 				Volume: c.Volume,
 			})
+		}
+	}
+
+	// M1 raw bars for entry-timing context. Skip if M1 is the entry TF
+	// (already covered by RawBars above) or if M1 data is unavailable.
+	if entryTF != models.TF_M1 {
+		m1Candles := market.Get(models.TF_M1)
+		closedM1 := indicators.ClosedCandles(m1Candles)
+		if n := len(closedM1); n > 0 {
+			start := n - RawCandleBarsM1
+			if start < 0 {
+				start = 0
+			}
+			for _, c := range closedM1[start:] {
+				snap.RawBarsM1 = append(snap.RawBarsM1, RawCandle{
+					Time:   c.OpenTime.UTC(),
+					Open:   c.Open,
+					High:   c.High,
+					Low:    c.Low,
+					Close:  c.Close,
+					Volume: c.Volume,
+				})
+			}
 		}
 	}
 
@@ -345,6 +380,13 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 	if entryTF != models.TF_H1 {
 		if h1Pats := analyzeTFPatterns(market, models.TF_H1, snap.Summaries, PatternLookbackH1); len(h1Pats) > 0 {
 			snap.Patterns[models.TF_H1] = h1Pats
+		}
+	}
+	// M5 trigger/confirm patterns — pin bars and engulfing on M5 are the
+	// most common scalp entry signals. Skip if entry TF IS M5.
+	if entryTF != models.TF_M5 {
+		if m5Pats := analyzeTFPatterns(market, models.TF_M5, snap.Summaries, PatternLookbackM5); len(m5Pats) > 0 {
+			snap.Patterns[models.TF_M5] = m5Pats
 		}
 	}
 	return snap, nil
@@ -669,6 +711,9 @@ func Render(snap *PairSnapshot) string {
 
 	if len(snap.RawBars) > 0 {
 		writeRawBars(&b, snap.EntryTF, snap.RawBars)
+	}
+	if len(snap.RawBarsM1) > 0 {
+		writeRawBars(&b, models.TF_M1, snap.RawBarsM1)
 	}
 
 	// Emit pattern blocks in summary order (entry TF first, then higher

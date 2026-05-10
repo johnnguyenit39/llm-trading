@@ -129,6 +129,12 @@ func detectSingleBar(b baseCandle.BaseCandle) (string, float64) {
 		if upper >= 2*body && lower <= body {
 			return "shooting_star", upper / rng
 		}
+		// Spinning top: small body with meaningful wicks on both sides —
+		// neither bull nor bear won the bar. Both wicks ≥ 20% range so we
+		// don't label a near-doji with a tiny lower wick as spinning_top.
+		if lower >= 0.2*rng && upper >= 0.2*rng {
+			return "spinning_top", bodyRatio
+		}
 	}
 
 	return "normal", bodyRatio
