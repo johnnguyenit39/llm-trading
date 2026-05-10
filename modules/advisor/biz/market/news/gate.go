@@ -200,8 +200,12 @@ func (g *Gate) Render(w Window) string {
 		when = fmt.Sprintf("%dmin ago", mins)
 	}
 	impact := strings.ToUpper(w.Event.Impact)
-	return fmt.Sprintf("%s %s %s (%s) [%s]",
+	base := fmt.Sprintf("%s %s %s (%s) [%s]",
 		w.Event.Country, w.Event.Title, when, impact, w.State)
+	if w.Event.Forecast != "" || w.Event.Previous != "" {
+		base += fmt.Sprintf(" | forecast: %s, prev: %s", w.Event.Forecast, w.Event.Previous)
+	}
+	return base
 }
 
 // RenderNow is a convenience that combines WindowAt + Render against

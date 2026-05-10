@@ -89,11 +89,13 @@ type Event struct {
 	// ID is a stable hash of (title, country, time) used by the alert
 	// worker to dedupe pushes across feed refreshes. Forecast updates
 	// don't change the ID — only schedule changes do.
-	ID      string
-	Time    time.Time // UTC
-	Title   string
-	Country string // "USD" / "EUR" / etc.
-	Impact  string // "High" | "Medium" (Low filtered out before reaching here)
+	ID       string
+	Time     time.Time // UTC
+	Title    string
+	Country  string // "USD" / "EUR" / etc.
+	Impact   string // "High" | "Medium" (Low filtered out before reaching here)
+	Forecast string // consensus estimate, e.g. "0.3%" — empty when not published yet
+	Previous string // prior period actual, e.g. "0.2%"
 }
 
 // Feed is the abstraction the Calendar depends on. Tests use a fake;
@@ -241,11 +243,13 @@ func normaliseEvent(r rawEvent, loc *time.Location) (Event, bool) {
 		return Event{}, false
 	}
 	return Event{
-		ID:      makeEventID(title, country, t),
-		Time:    t.UTC(),
-		Title:   title,
-		Country: country,
-		Impact:  impact,
+		ID:       makeEventID(title, country, t),
+		Time:     t.UTC(),
+		Title:    title,
+		Country:  country,
+		Impact:   impact,
+		Forecast: strings.TrimSpace(r.Forecast),
+		Previous: strings.TrimSpace(r.Previous),
 	}, true
 }
 
