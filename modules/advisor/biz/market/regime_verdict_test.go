@@ -159,9 +159,11 @@ func TestDeriveOverall(t *testing.T) {
 			"UPTREND_WEAKENING", "caution_buy",
 		},
 		{
-			"uptrend_weakening_h1_consolidating",
+			// H1 consolidating (ranging) INSIDE H4 uptrend = bull flag,
+			// wait for breakout — same as ranging_in_uptrend, not weakening.
+			"ranging_in_uptrend_h1_consolidating",
 			voteTrendUp, voteConsolidBull, voteTrendUp,
-			"UPTREND_WEAKENING", "caution_buy",
+			"RANGING_IN_UPTREND", "consolidation_watch_buy",
 		},
 		{
 			"downtrend_weakening_h1_fading",

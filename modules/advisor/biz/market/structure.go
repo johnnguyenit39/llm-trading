@@ -13,6 +13,21 @@ type BOSRetest struct {
 	Level          float64 // broken pivot price
 	BarsSinceBreak int     // 0 = break is on the latest closed bar
 	State          string  // "pending" | "retesting" | "confirmed"
+	// BreakVolMult is the break candle's volume relative to the 20-bar
+	// average before the break. < 0.8 = weak break (fake-out likely);
+	// > 1.5 = strong institutional break; 0 = not computable.
+	BreakVolMult float64
+}
+
+// FailedBreakout captures a "close-through then close-back" event: a bar
+// closed through a swing pivot level (not just a wick) and a subsequent
+// bar closed back on the original side. Stronger reversal signal than
+// wick_grab because confirmed-break trapped participants now add to the
+// reversal momentum (their stops fuel the move back).
+type FailedBreakout struct {
+	Direction string  // "failed_up" | "failed_down" | ""
+	Level     float64 // the swing level that was broken then reclaimed
+	Age       int     // bars since the failure candle (0 = most recent)
 }
 
 // DetectBOSRetest scans pivots newest-first and returns the freshest
@@ -108,10 +123,86 @@ func DetectBOSRetest(closed []baseCandle.BaseCandle, pivots []Pivot, atr float64
 		if p.Type == "SL" {
 			dir = "down"
 		}
-		best = BOSRetest{Direction: dir, Level: p.Price, BarsSinceBreak: age, State: state}
+		// Break candle volume vs 20-bar prior avg. Low volume on the
+		// break = weak institutional participation = higher fake-out risk.
+		breakVolMult := 0.0
+		if breakIdx > 0 && closed[breakIdx].Volume > 0 {
+			start := breakIdx - 20
+			if start < 0 {
+				start = 0
+			}
+			var sumVol float64
+			for _, c := range closed[start:breakIdx] {
+				sumVol += c.Volume
+			}
+			count := breakIdx - start
+			if count > 0 && sumVol > 0 {
+				breakVolMult = closed[breakIdx].Volume / (sumVol / float64(count))
+			}
+		}
+		best = BOSRetest{Direction: dir, Level: p.Price, BarsSinceBreak: age, State: state, BreakVolMult: breakVolMult}
 		bestAge = age
 		if age == 0 {
 			break
+		}
+	}
+	return best
+}
+
+// DetectFailedBreakout scans the most recent maxAge bars for a "close
+// through pivot → close back" sequence using the provided pivot list.
+// It returns the most recent such event. Only closed-bar closes are
+// used — no wick-based signals (those are wick_grab, a distinct flag).
+func DetectFailedBreakout(closed []baseCandle.BaseCandle, pivots []Pivot, maxAge int) FailedBreakout {
+	n := len(closed)
+	if n < 3 || len(pivots) == 0 {
+		return FailedBreakout{}
+	}
+	minBarIdx := n - maxAge
+	if minBarIdx < 0 {
+		minBarIdx = 0
+	}
+	var best FailedBreakout
+	bestAge := -1
+
+	for k := len(pivots) - 1; k >= 0; k-- {
+		p := pivots[k]
+		// Find first bar in window whose CLOSE crossed the pivot.
+		breakIdx := -1
+		breakDir := ""
+		for j := minBarIdx; j < n; j++ {
+			if p.Type == "SH" && closed[j].Close > p.Price {
+				breakIdx = j
+				breakDir = "failed_up"
+				break
+			}
+			if p.Type == "SL" && closed[j].Close < p.Price {
+				breakIdx = j
+				breakDir = "failed_down"
+				break
+			}
+		}
+		if breakIdx < 0 {
+			continue
+		}
+		// Find first bar after the break whose CLOSE returned to the
+		// original side — that's the "failure" bar.
+		for j := breakIdx + 1; j < n; j++ {
+			failAge := n - 1 - j
+			if breakDir == "failed_up" && closed[j].Close < p.Price {
+				if bestAge < 0 || failAge < bestAge {
+					best = FailedBreakout{Direction: breakDir, Level: p.Price, Age: failAge}
+					bestAge = failAge
+				}
+				break
+			}
+			if breakDir == "failed_down" && closed[j].Close > p.Price {
+				if bestAge < 0 || failAge < bestAge {
+					best = FailedBreakout{Direction: breakDir, Level: p.Price, Age: failAge}
+					bestAge = failAge
+				}
+				break
+			}
 		}
 	}
 	return best

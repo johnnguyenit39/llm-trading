@@ -176,6 +176,11 @@ type RangeStructure struct {
 	TopTouches int
 	BotTouches int
 	WidthATR   float64
+	// Age is the number of consecutive recent bars that have stayed
+	// inside the range boundaries (±touchTol ATR). Short age = fresh
+	// consolidation; long age (>15 bars on M15) = compression building
+	// toward breakout, asymmetric range probability rises.
+	Age int
 }
 
 // DetectRange runs a minimal rectangle test over the last `window`
@@ -219,6 +224,17 @@ func DetectRange(candles []baseCandle.BaseCandle, atr float64, window int) Range
 	}
 	if rs.TopTouches >= minTouches && rs.BotTouches >= minTouches {
 		rs.IsRange = true
+	}
+	// Range age: count consecutive bars from the END that stayed inside
+	// boundaries (±touchTol ATR). A bar outside breaks the streak. Long
+	// streak = old compression = breakout risk rising.
+	for j := len(slice) - 1; j >= 0; j-- {
+		c := slice[j]
+		if c.High <= top+tol && c.Low >= bot-tol {
+			rs.Age++
+		} else {
+			break
+		}
 	}
 	return rs
 }

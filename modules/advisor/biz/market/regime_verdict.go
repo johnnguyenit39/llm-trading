@@ -176,18 +176,26 @@ func deriveOverall(h4, h1, m15 string) (overall, mode string) {
 		return "DOWNTREND", "trend_follow_sell"
 	}
 
+	// ── H4 trending, H1 consolidating inside trend = bull/bear flag ────
+	// H1 RANGE within H4 TREND_UP is a consolidation (bull flag), NOT a
+	// weakening trend. The right call is wait for breakout continuation,
+	// NOT caution — trading range edges here fades the H4 trend.
+	if h4 == voteTrendUp && h1 == voteConsolidBull {
+		return "RANGING_IN_UPTREND", "consolidation_watch_buy"
+	}
+	if h4 == voteTrendDown && h1 == voteConsolidBear {
+		return "RANGING_IN_DOWNTREND", "consolidation_watch_sell"
+	}
+
 	// ── H4 trending, H1 fading = trend still alive but losing steam ─────
-	if h4 == voteTrendUp && (h1 == voteTrendUpFading || h1 == voteConsolidBull) {
+	if h4 == voteTrendUp && h1 == voteTrendUpFading {
 		return "UPTREND_WEAKENING", "caution_buy"
 	}
-	if h4 == voteTrendDown && (h1 == voteTrendDownFading || h1 == voteConsolidBear) {
+	if h4 == voteTrendDown && h1 == voteTrendDownFading {
 		return "DOWNTREND_WEAKENING", "caution_sell"
 	}
 
-	// ── H4 trending, H1 fully ranging/choppy = H1 consolidation phase ───
-	// This is the CRITICAL case the user described: H4 still up, H1
-	// going sideways. The right action is NOT to trade the H1 range
-	// edges — that fades the H4 trend. Wait for breakout continuation.
+	// ── H4 trending, H1 fully ranging/choppy (not in-trend consolidation)
 	if h4 == voteTrendUp && (h1 == voteRange || h1 == voteChoppy) {
 		return "RANGING_IN_UPTREND", "consolidation_watch_buy"
 	}

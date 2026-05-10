@@ -74,16 +74,34 @@ type TFSummary struct {
 
 	// Phase-3e structure / imbalance flags. Surfaced only when
 	// Direction != "" (we omit the empty case from the prompt entirely).
-	BOSDir   string  `json:"bos_dir,omitempty"`   // "up" | "down"
-	BOSLevel float64 `json:"bos_level,omitempty"` // broken pivot price
-	BOSAge   int     `json:"bos_age,omitempty"`   // bars since break
-	BOSState string  `json:"bos_state,omitempty"` // "pending" | "retesting" | "confirmed"
+	BOSDir       string  `json:"bos_dir,omitempty"`   // "up" | "down"
+	BOSLevel     float64 `json:"bos_level,omitempty"` // broken pivot price
+	BOSAge       int     `json:"bos_age,omitempty"`   // bars since break
+	BOSState     string  `json:"bos_state,omitempty"` // "pending" | "retesting" | "confirmed"
+	BOSBreakVol  float64 `json:"bos_vol,omitempty"`   // break-candle vol / 20-bar avg; < 0.8 = weak break
 
 	FVGDir    string  `json:"fvg_dir,omitempty"`    // "bull" (support zone) | "bear" (resistance zone)
 	FVGTop    float64 `json:"fvg_top,omitempty"`    // upper bound of gap
 	FVGBottom float64 `json:"fvg_bottom,omitempty"` // lower bound
 	FVGAge    int     `json:"fvg_age,omitempty"`    // bars since gap formed
 	FVGState  string  `json:"fvg_state,omitempty"`  // "open" | "filling"
+
+	// FailedBreakout: a close-through followed by close-back on the same
+	// pivot — stronger reversal signal than wick_grab (trapped participants
+	// fuel the reversal). Age 0 = happened on last closed bar.
+	FBDir   string  `json:"fb_dir,omitempty"`   // "failed_up" | "failed_down"
+	FBLevel float64 `json:"fb_level,omitempty"` // pivot level that was broken then reclaimed
+	FBAge   int     `json:"fb_age,omitempty"`   // bars since failure candle
+
+	// RangeAge: consecutive bars from the most recent that stayed inside
+	// the detected range (only set when InRange=true). > 15 bars on M15
+	// = old compression, breakout probability rising.
+	RangeAge int `json:"range_age,omitempty"`
+
+	// AsymmetricRange: set when InRange=true AND a higher-TF trend exists.
+	// "buy_side" = trade range bottom only; "sell_side" = range top only.
+	// Fading the dominant trend at the other boundary = wrong side.
+	AsymmetricRange string `json:"asym_range,omitempty"` // "buy_side" | "sell_side" | ""
 
 	// Phase-3d enrichments — cheap scalars moved out of LLM mental-math.
 	EMAStack           string  `json:"ema_stack,omitempty"`            // bullish_full | bullish_partial | ... | choppy | ...
@@ -223,6 +241,11 @@ const PatternLookbackH1 = 2
 // catch the confirmation candle without adding noise from older bars.
 const PatternLookbackM5 = 2
 
+// PatternLookbackH4 is the pattern window for H4 context bars.
+// H4 patterns are CONTEXT only (not entry triggers): a wick_grab_high or
+// exhaustion on H4 overrides M15 entry bias. 2 bars = 8h of structure.
+const PatternLookbackH4 = 2
+
 // Build produces a PairSnapshot from fetched multi-TF candles. Returns
 // an error if the entry TF has no candles (nothing useful to say).
 func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*PairSnapshot, error) {
@@ -356,18 +379,25 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 				sum.RangeBottom = rs.Bottom
 				sum.RangeWidth = rs.WidthATR
 				sum.InRange = rs.IsRange
+				sum.RangeAge = rs.Age
 			}
 			if bos := DetectBOSRetest(closed, pivots, sum.ATR, BOSScanWindow); bos.Direction != "" {
 				sum.BOSDir = bos.Direction
 				sum.BOSLevel = bos.Level
 				sum.BOSAge = bos.BarsSinceBreak
 				sum.BOSState = bos.State
+				sum.BOSBreakVol = bos.BreakVolMult
+			}
+			if fb := DetectFailedBreakout(closed, pivots, BOSScanWindow); fb.Direction != "" {
+				sum.FBDir = fb.Direction
+				sum.FBLevel = fb.Level
+				sum.FBAge = fb.Age
 			}
 		}
-		// FVG detection isn't pivot-bound but only adds signal on the
-		// execution TFs — scalpers don't trade H1 imbalances. Limit to
-		// entry TF + M5.
-		if tf == entryTF || tf == models.TF_M5 {
+		// FVG detection: entry TF + M5 (execution) + H4 (context zone).
+		// H4 FVG = macro imbalance zone that can act as strong resistance
+		// (bear FVG) or support (bull FVG) against M15 entries.
+		if tf == entryTF || tf == models.TF_M5 || tf == models.TF_H4 {
 			if fvg := DetectRecentFVG(closed, FVGScanWindow); fvg.Direction != "" {
 				sum.FVGDir = fvg.Direction
 				sum.FVGTop = fvg.Top
@@ -401,6 +431,46 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 			snap.Patterns[models.TF_M5] = m5Pats
 		}
 	}
+	// H4 context patterns — not entry triggers but OVERRIDE context:
+	// exhaustion or wick_grab_high on H4 overrides M15 BUY bias.
+	// Skip if H4 is already the entry TF.
+	if entryTF != models.TF_H4 {
+		if h4Pats := analyzeTFPatterns(market, models.TF_H4, snap.Summaries, PatternLookbackH4); len(h4Pats) > 0 {
+			snap.Patterns[models.TF_H4] = h4Pats
+		}
+	}
+
+	// AsymmetricRange: when entry TF is in a range but H4 (primary) or H1
+	// (secondary) is trending, only one side of the range is tradeable.
+	// H4 takes precedence over H1 for the bias call.
+	sumByTF := make(map[models.Timeframe]*TFSummary, len(snap.Summaries))
+	for i := range snap.Summaries {
+		sumByTF[snap.Summaries[i].Timeframe] = &snap.Summaries[i]
+	}
+	if entrySum, ok := sumByTF[entryTF]; ok && entrySum.InRange {
+		assigned := false
+		if h4 := sumByTF[models.TF_H4]; h4 != nil {
+			switch h4.Regime {
+			case "TREND_UP":
+				entrySum.AsymmetricRange = "buy_side"
+				assigned = true
+			case "TREND_DOWN":
+				entrySum.AsymmetricRange = "sell_side"
+				assigned = true
+			}
+		}
+		if !assigned {
+			if h1 := sumByTF[models.TF_H1]; h1 != nil {
+				switch h1.Regime {
+				case "TREND_UP":
+					entrySum.AsymmetricRange = "buy_side"
+				case "TREND_DOWN":
+					entrySum.AsymmetricRange = "sell_side"
+				}
+			}
+		}
+	}
+
 	return snap, nil
 }
 
@@ -703,7 +773,11 @@ func Render(snap *PairSnapshot) string {
 	b.WriteString("- Current price = giá live. LastClose/close trong từng block TF = nến ĐÃ đóng. Không gộp hai số này.\n")
 	b.WriteString("- entry_tf: khung chọn lệnh; bias H1+H4, xác nhận M5, timing M1/M5. TF: entry trước, macro sau.\n")
 	b.WriteString("- stack / structure / BOS (pending|retesting|confirmed) / FVG (open|filling) / nearestR|nearestS / ATR p%/50: backend đã tính — ưu tiên nhãn; không bịa pattern từ bảng OHLCV.\n")
-	b.WriteString("- Pattern line: r>=0.6 tốt; TRAP (wick_grab, bb_fakeout, exhaustion) thắng tên nến cùng bar; _INVALIDATED = bỏ qua; vol>=2x ưu tiên hơn.\n")
+	b.WriteString("- bos vol=Xx [weak_break]: break candle volume so với avg. < 0.8x = break yếu, fake-out cao.\n")
+	b.WriteString("- in_range age=Nb [buy_side|sell_side]: số nến range liên tục; buy_side = chỉ BUY đáy range (H4 uptrend); sell_side = chỉ SELL đỉnh range.\n")
+	b.WriteString("- failed_breakout_failed_up/down: close vượt level rồi close trở lại — signal đảo chiều mạnh hơn wick_grab.\n")
+	b.WriteString("- H4 pattern block = CONTEXT không phải entry trigger; exhaustion/wick_grab H4 đè M15 bias.\n")
+	b.WriteString("- Pattern line: r>=0.6 tốt; TRAP (wick_grab, bb_fakeout, exhaustion) thắng tên nến cùng bar; _INVALIDATED = không tồn tại; vol>=2x ưu tiên hơn.\n")
 	b.WriteString("- Dòng \"News:\" = lịch macro. [active]/[pre] đè ATR/vol — đừng dùng \"nến căng\" thay rule news.\n\n")
 
 	if snap.CurrentPrice > 0 {
@@ -871,11 +945,14 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 	}
 
 	// Structural flags (rectangle / double top / double bottom / BOS+
-	// retest / FVG) — emit only when something triggered so blocks stay
-	// compact.
+	// retest / FVG / failed breakout) — emit only when triggered.
 	var structBits []string
 	if s.InRange {
-		structBits = append(structBits, fmt.Sprintf("in_range %s..%s (w=%s ATR)", f4(s.RangeBottom), f4(s.RangeTop), f2(s.RangeWidth)))
+		rangeLabel := fmt.Sprintf("in_range %s..%s (w=%s ATR, age=%db)", f4(s.RangeBottom), f4(s.RangeTop), f2(s.RangeWidth), s.RangeAge)
+		if s.AsymmetricRange != "" {
+			rangeLabel += " [" + s.AsymmetricRange + "]"
+		}
+		structBits = append(structBits, rangeLabel)
 	}
 	if s.DoubleTop > 0 {
 		structBits = append(structBits, fmt.Sprintf("double_top @ %s", f4(s.DoubleTop)))
@@ -884,10 +961,20 @@ func writeTFBlock(b *strings.Builder, s TFSummary) {
 		structBits = append(structBits, fmt.Sprintf("double_bottom @ %s", f4(s.DoubleBottom)))
 	}
 	if s.BOSDir != "" {
-		structBits = append(structBits, fmt.Sprintf("bos_%s @ %s [%s, %db ago]", s.BOSDir, f4(s.BOSLevel), s.BOSState, s.BOSAge))
+		bosLine := fmt.Sprintf("bos_%s @ %s [%s, %db ago]", s.BOSDir, f4(s.BOSLevel), s.BOSState, s.BOSAge)
+		if s.BOSBreakVol > 0 {
+			bosLine += fmt.Sprintf(" vol=%sx", f2(s.BOSBreakVol))
+			if s.BOSBreakVol < 0.8 {
+				bosLine += " [weak_break]"
+			}
+		}
+		structBits = append(structBits, bosLine)
 	}
 	if s.FVGDir != "" {
 		structBits = append(structBits, fmt.Sprintf("fvg_%s %s..%s [%s, %db ago]", s.FVGDir, f4(s.FVGBottom), f4(s.FVGTop), s.FVGState, s.FVGAge))
+	}
+	if s.FBDir != "" {
+		structBits = append(structBits, fmt.Sprintf("failed_breakout_%s @ %s [%db ago]", s.FBDir, f4(s.FBLevel), s.FBAge))
 	}
 	if len(structBits) > 0 {
 		fmt.Fprintf(b, "  structure: %s\n", strings.Join(structBits, " · "))

@@ -5,6 +5,8 @@
 # Live debug:   set log level to Info in analyzer.go MaybeEnrich() to print real blobs
 #
 # Scenario: XAUUSDT bullish, M15 BOS+FVG confluence, FOMC pre-news window.
+# New fields shown: H4 patterns, range_age, asym_range, failed_breakout,
+#                   bos vol + [weak_break], regime_verdict fix.
 # ─────────────────────────────────────────────────────────────────────────
 
 [MARKET_DATA] XAUUSDT · generated 2026-05-08 14:30 UTC · entry_tf=M15
@@ -12,7 +14,11 @@ Digest guide (đọc toàn bộ blob theo nhãn; hệ thống không lặp chi t
 - Current price = giá live. LastClose/close trong từng block TF = nến ĐÃ đóng. Không gộp hai số này.
 - entry_tf: khung chọn lệnh; bias H1+H4, xác nhận M5, timing M1/M5. TF: entry trước, macro sau.
 - stack / structure / BOS (pending|retesting|confirmed) / FVG (open|filling) / nearestR|nearestS / ATR p%/50: backend đã tính — ưu tiên nhãn; không bịa pattern từ bảng OHLCV.
-- Pattern line: r>=0.6 tốt; TRAP (wick_grab, bb_fakeout, exhaustion) thắng tên nến cùng bar; _INVALIDATED = bỏ qua; vol>=2x ưu tiên hơn.
+- bos vol=Xx [weak_break]: break candle volume so với avg. < 0.8x = break yếu, fake-out cao.
+- in_range age=Nb [buy_side|sell_side]: số nến range liên tục; buy_side = chỉ BUY đáy range (H4 uptrend); sell_side = chỉ SELL đỉnh range.
+- failed_breakout_failed_up/down: close vượt level rồi close trở lại — signal đảo chiều mạnh hơn wick_grab.
+- H4 pattern block = CONTEXT không phải entry trigger; exhaustion/wick_grab H4 đè M15 bias.
+- Pattern line: r>=0.6 tốt; TRAP (wick_grab, bb_fakeout, exhaustion) thắng tên nến cùng bar; _INVALIDATED = không tồn tại; vol>=2x ưu tiên hơn.
 - Dòng "News:" = lịch macro. [active]/[pre] đè ATR/vol — đừng dùng "nến căng" thay rule news.
 
 Current price (live, M15): 3245.80 (intrabar +0.32 ATR vs LastClose)
@@ -22,50 +28,51 @@ News: FOMC Minutes 19:00 ET [pre]
 Prev day: H=3268.50 L=3221.30
 Next closes: M15 in 3m, H1 in 33m, H4 in 3h33m, D1 in 9h30m
 
-M15 (regime: trending_up, ADX 32, stack: bullish_full)
-  LastClose 3241.20  EMA20 3238.50 [at]  EMA50 3229.80  EMA200 3198.40
+Regime verdict (Go-computed — dùng làm anchor, không override bằng cảm tính):
+  H4  : TREND_UP                 — ADX 38↑, stack bullish, structure intact
+  H1  : TREND_UP                 — ADX 41↑, stack bullish, structure intact
+  M15 : TREND_UP                 — ADX 32↑, stack bullish, structure intact
+  Overall : STRONG_UPTREND
+  Mode    : trend_follow_buy → Setup A: chờ pullback BUY theo trend
 
+M15 (regime: TREND_UP, ADX 32↑, stack: bullish_full)
+  LastClose 3241.20  EMA20 3238.50 [at]  EMA50 3229.80  EMA200 3198.40
   RSI14 58.3  ATR 4.8200 (0.15%, p72/50)  BB 3231.60..3241.00..3250.40
-  swingH 3268.50 · swingL 3221.30
+  swingH 3268.50 · swingL 3221.30 · donch20 3268.50/3221.30
   nearestR 3250.40 (+1.92 ATR) · nearestS 3232.10 (-1.89 ATR)
-  structure: bos_bull @ 3238.20 [confirmed, 3b ago] · fvg_bull 3235.40..3238.20 [filling, 5b ago]
+  structure: bos_up @ 3238.20 [confirmed, 3b ago] vol=1.62x · fvg_bull 3235.40..3238.20 [filling, 5b ago]
   mom5 +0.41 ATR
 
-M5 (regime: trending_up, ADX 24, stack: bullish_partial)
+M5 (regime: TREND_UP, ADX 24, stack: bullish_partial)
   LastClose 3244.60  EMA20 3242.10  EMA50 3238.70
-
   RSI14 62.1  ATR 1.6400 (0.05%, p68/50)  BB 3239.20..3243.80..3248.40
   nearestR 3250.40 (+3.54 ATR) · nearestS 3238.20 (-3.90 ATR)
-  structure: bos_bull @ 3238.20 [confirmed, 9b ago]
+  structure: bos_up @ 3238.20 [confirmed, 9b ago] vol=1.43x
   mom5 +0.28 ATR
 
-M1 (regime: trending_up, ADX 18, stack: bullish_partial)
+M1 (regime: TREND_UP, ADX 18, stack: bullish_partial)
   LastClose 3245.20  EMA20 3244.80  EMA50 3242.30
-
   RSI14 64.7  ATR 0.5800 (0.02%, p55/50)  BB 3243.10..3245.00..3246.90
   nearestR 3246.90 (+2.91 ATR) · nearestS 3243.10 (-3.62 ATR)
 
-H1 (regime: trending_up, ADX 41, stack: bullish_full)
+H1 (regime: TREND_UP, ADX 41↑, stack: bullish_full)
   LastClose 3238.60  EMA20 3231.40  EMA50 3218.70  EMA200 3185.20
-
   RSI14 61.8  ATR 12.4000 (0.38%, p78/50)  BB 3214.80..3236.40..3258.00
   swingH 3268.50 · swingL 3198.20
   nearestR 3268.50 (+2.41 ATR) · nearestS 3221.30 (-1.40 ATR)
-  structure: bos_bull @ 3221.30 [confirmed, 12b ago]
+  structure: bos_up @ 3221.30 [confirmed, 12b ago] vol=2.14x
   mom5 +0.52 ATR
 
-H4 (regime: trending_up, ADX 38, stack: bullish_full)
+H4 (regime: TREND_UP, ADX 38↑, stack: bullish_full)
   LastClose 3224.80  EMA20 3198.60  EMA50 3172.40  EMA200 3098.50
-
   RSI14 63.2  ATR 28.6000 (0.88%, p81/50)  BB 3162.40..3214.20..3266.00
   swingH 3268.50 · swingL 3148.30
   nearestR 3268.50 (+1.53 ATR) · nearestS 3198.60 (-0.91 ATR)
-  structure: bos_bull @ 3198.60 [confirmed, 8b ago]
+  structure: bos_up @ 3198.60 [confirmed, 8b ago] vol=1.87x
   mom5 +0.38 ATR
 
-D1 (regime: trending_up, ADX 29, stack: bullish_full)
+D1 (regime: TREND_UP, ADX 29, stack: bullish_full)
   LastClose 3221.30  EMA20 3156.80  EMA50 3089.40  EMA200 2892.10
-
   RSI14 68.4  ATR 48.2000 (1.49%, p74/50)  BB 3098.20..3198.60..3299.00
   swingH 3500.10 · swingL 2956.40
   nearestR 3268.50 (+0.97 ATR) · nearestS 3148.30 (-1.51 ATR)
@@ -74,11 +81,6 @@ Recent M15 candles (oldest -> newest, UTC):
   05-08 13:45  O=3232.10 H=3239.80 L=3231.40 C=3238.60 V=1842.30
   05-08 14:00  O=3238.60 H=3244.20 L=3236.90 C=3241.20 V=2103.70
   05-08 14:15  O=3241.20 H=3247.40 L=3240.80 C=3245.60 V=1967.40
-
-Last 3 M15 bar patterns (oldest -> newest):
-  [-2] 05-08 13:45  engulfing_bull · r=0.72 · prior=DOWN · at_support · vol=2.10x
-  [-1] 05-08 14:00  marubozu_bull · r=0.81 · prior=UP
-  [-0] 05-08 14:15  normal
 
 Recent M1 candles (oldest -> newest, UTC):
   05-08 14:16  O=3241.20 H=3241.80 L=3240.90 C=3241.50 V=312.40
@@ -97,10 +99,98 @@ Recent M1 candles (oldest -> newest, UTC):
   05-08 14:29  O=3245.90 H=3246.30 L=3245.60 C=3246.10 V=267.80
   05-08 14:30  O=3246.10 H=3246.50 L=3245.80 C=3246.20 V=189.40
 
-Last 3 M5 bar patterns (oldest -> newest):
-  [-2] 05-08 14:20  pin_bar_bull · r=0.68 · at_support
+Last 3 M15 bar patterns (oldest -> newest):
+  [-2] 05-08 13:45  engulfing_bull · r=0.72 · prior=DOWN · at_support · vol=2.10x
+  [-1] 05-08 14:00  marubozu_bull · r=0.81 · prior=UP
+  [-0] 05-08 14:15  normal
+
+Last 2 M5 bar patterns (oldest -> newest):
   [-1] 05-08 14:25  engulfing_bull · r=0.74 · prior=DOWN · vol=1.80x
   [-0] 05-08 14:30  normal
 
-{"entry_tf":"M15","price":3245.8,"regimes":{"D1":"trending_up","H1":"trending_up","H4":"trending_up","M1":"trending_up","M15":"trending_up","M5":"trending_up"},"symbol":"XAUUSDT"}
+Last 2 H1 bar patterns (oldest -> newest):
+  [-1] 05-08 13:00  hammer · r=0.71 · prior=DOWN · at_support · vol=1.40x
+  [-0] 05-08 14:00  normal
+
+Last 2 H4 bar patterns (oldest -> newest):
+  [-1] 05-08 08:00  normal · prior=UP
+  [-0] 05-08 12:00  normal · prior=UP
+
+{"entry_tf":"M15","price":3245.8,"regimes":{"D1":"TREND_UP","H1":"TREND_UP","H4":"TREND_UP","M1":"TREND_UP","M15":"TREND_UP","M5":"TREND_UP"},"symbol":"XAUUSDT"}
+[/MARKET_DATA]
+
+# ─────────────────────────────────────────────────────────────────────────
+# Scenario 2: Consolidation trong uptrend — range_age + asymmetric range
+# H4 uptrend, H1 ranging → RANGING_IN_UPTREND, chỉ BUY đáy range
+# ─────────────────────────────────────────────────────────────────────────
+
+[MARKET_DATA] XAUUSDT · generated 2026-05-09 09:15 UTC · entry_tf=M15
+Digest guide (đọc toàn bộ blob theo nhãn; hệ thống không lặp chi tiết từng trường ở system prompt):
+- in_range age=Nb [buy_side|sell_side]: buy_side = chỉ BUY đáy range; sell_side = chỉ SELL đỉnh range.
+- failed_breakout_failed_up/down: close vượt level rồi close trở lại — reversal mạnh hơn wick_grab.
+- H4 pattern block = CONTEXT; exhaustion/wick_grab H4 đè M15 bias.
+- bos vol=Xx [weak_break]: break yếu, cần M5 confirm thêm.
+
+Current price (live, M15): 3251.40 (intrabar -0.12 ATR vs LastClose)
+TF alignment: 3/4 bullish (M15 choppy)
+Session: 09:15 UTC
+Prev day: H=3268.50 L=3221.30
+Next closes: M15 in 12m, H1 in 45m, H4 in 2h45m, D1 in 14h45m
+
+Regime verdict (Go-computed — dùng làm anchor, không override bằng cảm tính):
+  H4  : TREND_UP                 — ADX 36↑, stack bullish, structure intact
+  H1  : CONSOLIDATING_BULL       — range nén trong H4 uptrend, ADX 22↓ — bull flag, chờ breakout lên
+  M15 : RANGE                    — ADX 17, bounce genuine giữa levels
+  Overall : RANGING_IN_UPTREND
+  Mode    : consolidation_watch_buy → KHÔNG trade biên range; chờ breakout lên rồi BUY hoặc BUY tại đáy range gần support H4
+
+M15 (regime: RANGE, ADX 17, stack: bullish_partial)
+  LastClose 3252.10  EMA20 3251.30  EMA50 3249.80  EMA200 3230.10
+  RSI14 51.2  ATR 3.9400 (0.12%, p38/50)  BB 3244.20..3251.80..3259.40
+  swingH 3262.80 · swingL 3241.50
+  nearestR 3259.40 (+1.86 ATR) · nearestS 3244.20 (-1.99 ATR)
+  structure: in_range 3241.50..3262.80 (w=5.41 ATR, age=18b) [buy_side]
+
+M5 (regime: RANGE, ADX 15, stack: bullish_partial)
+  LastClose 3251.80  EMA20 3251.40  EMA50 3250.20
+  RSI14 49.8  ATR 1.3100 (0.04%, p32/50)  BB 3248.60..3251.50..3254.40
+  nearestR 3254.40 (+2.02 ATR) · nearestS 3248.60 (-2.44 ATR)
+
+H1 (regime: RANGE, ADX 22↓, price_compressing, stack: bullish_partial)
+  LastClose 3252.40  EMA20 3249.10  EMA50 3242.30  EMA200 3198.60
+  RSI14 54.1  ATR 8.2000 (0.25%, p29/50)  BB 3238.20..3251.60..3265.00
+  swingH 3268.50 · swingL 3234.20
+  nearestR 3265.00 (+1.54 ATR) · nearestS 3238.20 (-1.73 ATR)
+  structure: in_range 3234.20..3268.50 (w=4.19 ATR, age=9b) [buy_side]
+  mom5 -0.08 ATR
+
+H4 (regime: TREND_UP, ADX 36↑, stack: bullish_full)
+  LastClose 3238.60  EMA20 3212.40  EMA50 3186.20  EMA200 3102.80
+  RSI14 61.4  ATR 26.8000 (0.82%, p76/50)  BB 3172.10..3218.40..3264.70
+  swingH 3268.50 · swingL 3162.10
+  nearestR 3268.50 (+1.11 ATR) · nearestS 3212.40 (-0.98 ATR)
+  structure: bos_up @ 3198.60 [confirmed, 14b ago] vol=2.31x
+  mom5 +0.22 ATR
+
+D1 (regime: TREND_UP, ADX 31, stack: bullish_full)
+  LastClose 3241.50  EMA20 3168.20  EMA50 3094.10  EMA200 2897.30
+  RSI14 67.2  ATR 46.8000 (1.44%, p72/50)  BB 3112.40..3204.80..3297.20
+  swingH 3500.10 · swingL 2956.40
+  nearestR 3268.50 (+0.58 ATR) · nearestS 3162.10 (-1.70 ATR)
+
+Recent M15 candles (oldest -> newest, UTC):
+  05-09 08:30  O=3248.20 H=3253.10 L=3247.80 C=3252.60 V=1231.40
+  05-09 08:45  O=3252.60 H=3254.40 L=3250.90 C=3251.80 V=987.20
+  05-09 09:00  O=3251.80 H=3253.60 L=3250.40 C=3252.10 V=1043.80
+
+Last 3 M15 bar patterns (oldest -> newest):
+  [-2] 05-09 08:30  spinning_top · r=0.21 · prior=UP
+  [-1] 05-09 08:45  inside_bar · r=0.58 · prior=UP
+  [-0] 05-09 09:00  normal
+
+Last 2 H4 bar patterns (oldest -> newest):
+  [-1] 05-09 04:00  shooting_star · r=0.68 · prior=UP · at_resistance · wick_grab_high
+  [-0] 05-09 08:00  inside_bar · r=0.44 · prior=DOWN
+
+{"entry_tf":"M15","price":3251.4,"regimes":{"D1":"TREND_UP","H1":"RANGE","H4":"TREND_UP","M15":"RANGE","M5":"RANGE"},"symbol":"XAUUSDT"}
 [/MARKET_DATA]
