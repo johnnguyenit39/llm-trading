@@ -180,7 +180,7 @@ func FormatAdvisorReplyForUser(rawReply string, d *DecisionPayload, fresh Freshn
 		b.WriteString(fmt.Sprintf("• SL: %+.2f USDT (%+.2f%%)\n", slPnL, slPct))
 		b.WriteString(fmt.Sprintf("• TP: %+.2f USDT (%+.2f%%)\n", tpPnL, tpPct))
 		if rr := riskRewardRatio(tpPnL, slPnL); rr > 0 {
-			b.WriteString(fmt.Sprintf("• R:R %.2f (DeepSeek tự chọn theo cấu trúc thị trường)\n", rr))
+			b.WriteString(fmt.Sprintf("• R:R %.2f\n", rr))
 		}
 	} else {
 		b.WriteString("\n💰 Ước tính PnL (USDT, linear, theo khối lượng trên)\n")

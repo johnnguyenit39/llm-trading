@@ -175,3 +175,53 @@ func TestForexFactoryFeed_Fetch_NonOKStatus(t *testing.T) {
 		t.Fatal("expected error for non-200 status")
 	}
 }
+
+// TestParseFeed_ForecastPrevious verifies that forecast and previous
+// values from the XML are captured in the Event struct. The fixture
+// has: CPI forecast=0.3% prev=0.2%, Retail Sales forecast=0.4%
+// prev=0.1%, FOMC with both empty.
+func TestParseFeed_ForecastPrevious(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatalf("load tzdata: %v", err)
+	}
+	f, err := os.Open("testdata/ff_sample.xml")
+	if err != nil {
+		t.Fatalf("open fixture: %v", err)
+	}
+	defer f.Close()
+
+	events, err := parseFeed(f, loc)
+	if err != nil {
+		t.Fatalf("parseFeed: %v", err)
+	}
+
+	cases := []struct {
+		title            string
+		wantForecast     string
+		wantPrevious     string
+	}{
+		{"CPI m/m", "0.3%", "0.2%"},
+		{"Retail Sales m/m", "0.4%", "0.1%"},
+		{"FOMC Statement", "", ""},
+	}
+
+	byTitle := make(map[string]Event)
+	for _, e := range events {
+		byTitle[e.Title] = e
+	}
+
+	for _, c := range cases {
+		e, ok := byTitle[c.title]
+		if !ok {
+			t.Errorf("event %q not found in parsed events", c.title)
+			continue
+		}
+		if e.Forecast != c.wantForecast {
+			t.Errorf("%s Forecast: got %q, want %q", c.title, e.Forecast, c.wantForecast)
+		}
+		if e.Previous != c.wantPrevious {
+			t.Errorf("%s Previous: got %q, want %q", c.title, e.Previous, c.wantPrevious)
+		}
+	}
+}
