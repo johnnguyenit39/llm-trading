@@ -118,6 +118,7 @@ func startHealthServer(ctx context.Context) *http.Server {
 // buildDecisionStore returns a Firestore-backed DecisionStore when the
 // Firebase app is available; otherwise it falls back to an in-memory
 // store so local dev (no SERVICE_ACCOUNT_FIREBASE_BASE_64) still boots.
+// When Firestore is available it also launches a weekly cleanup goroutine.
 func buildDecisionStore(ctx context.Context) abiz.DecisionStore {
 	if firecfg.App == nil {
 		log.Warn().Msg("firestore: Firebase app not initialized — decisions persist in memory only")
@@ -129,5 +130,36 @@ func buildDecisionStore(ctx context.Context) abiz.DecisionStore {
 		return decisionMemory.NewStore()
 	}
 	log.Info().Msg("firestore: decision store online (collection=agent_decisions)")
-	return decisionFirestore.NewStore(client)
+	store := decisionFirestore.NewStore(client)
+	startDecisionPruner(ctx, store)
+	return store
+}
+
+// startDecisionPruner launches a goroutine that deletes agent_decisions
+// documents older than 7 days. It runs once at startup then every week.
+func startDecisionPruner(ctx context.Context, store *decisionFirestore.Store) {
+	go func() {
+		ticker := time.NewTicker(7 * 24 * time.Hour)
+		defer ticker.Stop()
+
+		purge := func() {
+			cutoff := time.Now().UTC().Add(-7 * 24 * time.Hour)
+			n, err := store.PurgeOlderThan(ctx, cutoff)
+			if err != nil {
+				log.Warn().Err(err).Msg("firestore: decision purge failed")
+				return
+			}
+			log.Info().Int("deleted", n).Msg("firestore: purged agent_decisions older than 7 days")
+		}
+
+		purge()
+		for {
+			select {
+			case <-ticker.C:
+				purge()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }

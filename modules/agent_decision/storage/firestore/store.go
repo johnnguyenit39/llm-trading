@@ -6,10 +6,12 @@ package firestore
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cloud.google.com/go/firestore"
 	"github.com/google/uuid"
+	"google.golang.org/api/iterator"
 
 	"j_ai_trade/modules/agent_decision/biz"
 	"j_ai_trade/modules/agent_decision/model"
@@ -49,6 +51,52 @@ func (s *Store) Save(ctx context.Context, d *model.AgentDecision) error {
 
 	_, err := s.client.Collection(s.collection).Doc(d.ID.String()).Create(ctx, d)
 	return err
+}
+
+// PurgeOlderThan deletes every document whose created_at is before
+// before. Returns the number of documents deleted. Uses batches of 400
+// to stay safely under Firestore's 500-op-per-batch limit.
+func (s *Store) PurgeOlderThan(ctx context.Context, before time.Time) (int, error) {
+	iter := s.client.Collection(s.collection).
+		Where("created_at", "<", before).
+		Documents(ctx)
+	defer iter.Stop()
+
+	var deleted int
+	batch := s.client.Batch()
+	batchSize := 0
+
+	flush := func() error {
+		if batchSize == 0 {
+			return nil
+		}
+		_, err := batch.Commit(ctx)
+		batch = s.client.Batch()
+		batchSize = 0
+		return err
+	}
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return deleted, fmt.Errorf("purge query: %w", err)
+		}
+		batch.Delete(doc.Ref)
+		batchSize++
+		deleted++
+		if batchSize >= 400 {
+			if err := flush(); err != nil {
+				return deleted, fmt.Errorf("purge commit: %w", err)
+			}
+		}
+	}
+	if err := flush(); err != nil {
+		return deleted, fmt.Errorf("purge commit: %w", err)
+	}
+	return deleted, nil
 }
 
 var _ biz.Store = (*Store)(nil)
