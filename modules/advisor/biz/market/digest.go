@@ -96,6 +96,10 @@ type TFSummary struct {
 	BBSqueezeReleasing bool    `json:"bb_squeeze_releasing,omitempty"`
 	EMACrossover       string  `json:"ema_crossover,omitempty"`        // "bull_3ago" / "bear_5ago" / ""
 
+	// Regime transition signals — detect trend→range handoff early.
+	ADXSlope        float64 `json:"adx_slope,omitempty"`         // ADX change per bar over last 5 bars; negative = fading
+	PriceCompressing bool   `json:"price_compressing,omitempty"` // true when 10-bar high-low < 1.5×ATR
+
 	// Round-level flags: true when NearestResist/Support coincides with a
 	// psychological round-number increment ($50 for gold, $500 for BTC).
 	// Not in JSON — the [round] tag on the rendered text carries the signal.
@@ -490,7 +494,31 @@ func summariseTF(candles []baseCandle.BaseCandle, tf models.Timeframe) TFSummary
 		sum.DonchHigh, sum.DonchLow = indicators.DonchianChannel(closed, 20)
 	}
 	sum.SwingHigh, sum.SwingLow = indicators.SwingHighLow(closed, 3)
-	sum.Regime = simpleRegime(sum.ADX14, sum.EMA20, sum.EMA50)
+
+	// ADX slope: how fast trend strength is changing over last 5 bars.
+	// Requires enough candles for a meaningful past ADX reading.
+	if len(closed) >= 20 {
+		pastADX := indicators.ADX(closed[:len(closed)-5], 14)
+		sum.ADXSlope = (sum.ADX14 - pastADX) / 5
+	}
+
+	// Price compression: 10-bar high-low range vs ATR.
+	// Tight range while ADX still elevated = post-trend consolidation.
+	if len(closed) >= 10 && sum.ATR > 0 {
+		window := closed[len(closed)-10:]
+		maxH, minL := window[0].High, window[0].Low
+		for _, c := range window[1:] {
+			if c.High > maxH {
+				maxH = c.High
+			}
+			if c.Low < minL {
+				minL = c.Low
+			}
+		}
+		sum.PriceCompressing = (maxH - minL) < 1.5*sum.ATR
+	}
+
+	sum.Regime = simpleRegime(sum.ADX14, sum.EMA20, sum.EMA50, sum.ADXSlope, sum.PriceCompressing)
 
 	fillRangeContext(&sum, closes)
 	fillEMAContext(&sum)
@@ -614,19 +642,27 @@ func fillRangeContext(sum *TFSummary, closes []float64) {
 	}
 }
 
-// simpleRegime is a lightweight ADX+EMA label used only for LLM
-// context. It's deliberately crude — the LLM is the real decision
-// maker, not this label. The thresholds (20/25) match the standard
-// Wilder dead-zone convention.
-func simpleRegime(adx, ema20, ema50 float64) string {
+// simpleRegime labels the current market mode for LLM consumption.
+// adxSlope is ADX change per bar over the last 5 bars (negative = fading).
+// compressing is true when the 10-bar price range is tight relative to ATR.
+// TREND_UP_FADING / TREND_DOWN_FADING signal the dangerous transition zone
+// where trend indicators still read "up/down" but momentum is evaporating —
+// the most common cause of failed pullback-buy entries.
+func simpleRegime(adx, ema20, ema50, adxSlope float64, compressing bool) string {
 	switch {
 	case adx < 20:
 		return "RANGE"
 	case adx < 25:
 		return "CHOPPY"
 	case ema20 > ema50:
+		if adxSlope < -1.0 || compressing {
+			return "TREND_UP_FADING"
+		}
 		return "TREND_UP"
 	case ema20 < ema50:
+		if adxSlope < -1.0 || compressing {
+			return "TREND_DOWN_FADING"
+		}
 		return "TREND_DOWN"
 	default:
 		return "TREND"
@@ -739,9 +775,19 @@ func Render(snap *PairSnapshot) string {
 }
 
 func writeTFBlock(b *strings.Builder, s TFSummary) {
-	// Header: regime + ADX + EMA stack label. Stack tells the LLM the
-	// EMA story in one token instead of three number comparisons.
-	fmt.Fprintf(b, "%s (regime: %s, ADX %s", s.Timeframe, s.Regime, f0(s.ADX14))
+	// Header: regime + ADX + slope direction + EMA stack.
+	// adx_rising/fading tells LLM whether trend strength is building or
+	// evaporating — critical context that the raw ADX number alone misses.
+	adxDir := ""
+	if s.ADXSlope > 1.0 {
+		adxDir = "↑"
+	} else if s.ADXSlope < -1.0 {
+		adxDir = "↓"
+	}
+	fmt.Fprintf(b, "%s (regime: %s, ADX %s%s", s.Timeframe, s.Regime, f0(s.ADX14), adxDir)
+	if s.PriceCompressing {
+		b.WriteString(", price_compressing")
+	}
 	if s.EMAStack != "" {
 		fmt.Fprintf(b, ", stack: %s", s.EMAStack)
 	}
