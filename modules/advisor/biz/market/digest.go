@@ -160,6 +160,11 @@ type PairSnapshot struct {
 	// if the bot ran without the news subsystem.
 	NewsWindow string
 
+	// RegimeVerdict is the cross-TF regime assessment computed in pure Go
+	// from the per-TF summaries. Injected near the top of the blob so the
+	// LLM anchors on a deterministic verdict before reading raw data.
+	RegimeVerdict RegimeVerdict
+
 	// Correlation is the DXY proxy computed from EUR/USD candles (inverse
 	// relationship: EUR up = DXY down = gold tailwind). Nil when the
 	// EURUSDT fetch failed or the symbol is not XAUUSDT.
@@ -255,6 +260,9 @@ func Build(market models.MarketData, entryTF models.Timeframe, now time.Time) (*
 	if len(snap.Summaries) > 0 {
 		snap.IntrabarMove = computeIntrabarMove(currentPrice, snap.Summaries[0])
 	}
+
+	// Cross-TF regime verdict — computed after all summaries are ready.
+	snap.RegimeVerdict = ComputeRegimeVerdict(snap.Summaries)
 
 	// Raw OHLCV window for the entry TF only. ClosedCandles drops the
 	// forming bar so the LLM never sees a repainting close price.
@@ -740,6 +748,8 @@ func Render(snap *PairSnapshot) string {
 	} else {
 		b.WriteString("\n")
 	}
+
+	RenderRegimeVerdict(&b, snap.RegimeVerdict)
 
 	for _, s := range snap.Summaries {
 		writeTFBlock(&b, s)
