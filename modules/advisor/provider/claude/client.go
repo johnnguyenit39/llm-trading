@@ -31,12 +31,26 @@ type apiMessage struct {
 	Content string `json:"content"`
 }
 
+// systemBlock is a single content block in the top-level system array.
+// Setting CacheControl marks it as a prompt-cache candidate — Anthropic
+// reuses the KV cache for this block on subsequent calls with identical text,
+// cutting both latency and cost for the fixed system prompt.
+type systemBlock struct {
+	Type         string        `json:"type"`
+	Text         string        `json:"text"`
+	CacheControl *cacheControl `json:"cache_control,omitempty"`
+}
+
+type cacheControl struct {
+	Type string `json:"type"` // "ephemeral"
+}
+
 type apiRequest struct {
-	Model     string       `json:"model"`
-	Messages  []apiMessage `json:"messages"`
-	System    string       `json:"system,omitempty"`
-	MaxTokens int          `json:"max_tokens"`
-	Stream    bool         `json:"stream"`
+	Model     string        `json:"model"`
+	Messages  []apiMessage  `json:"messages"`
+	System    []systemBlock `json:"system,omitempty"`
+	MaxTokens int           `json:"max_tokens"`
+	Stream    bool          `json:"stream"`
 	// Temperature is only emitted when explicitly set (omitempty + pointer).
 	Temperature *float64 `json:"temperature,omitempty"`
 }
@@ -133,9 +147,13 @@ func (c *Client) Stream(ctx context.Context, turns []model.Turn) (<-chan string,
 		}
 
 		reqBody, err := json.Marshal(apiRequest{
-			Model:       c.model,
-			Messages:    msgs,
-			System:      strings.Join(systemParts, "\n\n"),
+			Model:    c.model,
+			Messages: msgs,
+			System: []systemBlock{{
+				Type:         "text",
+				Text:         strings.Join(systemParts, "\n\n"),
+				CacheControl: &cacheControl{Type: "ephemeral"},
+			}},
 			MaxTokens:   c.maxTokens,
 			Stream:      true,
 			Temperature: c.temperature,
