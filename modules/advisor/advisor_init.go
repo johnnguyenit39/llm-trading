@@ -111,16 +111,13 @@ func Init(ctx context.Context, deps Deps) {
 
 	go handler.Run(ctx)
 
-	// Periodic M15 market-scan broadcast: only starts when both the
-	// analyzer is live (otherwise nothing to scan) AND the allowlist
-	// is populated (otherwise no recipients). Run() itself handles the
-	// empty-allowlist case by logging + returning so we don't need a
-	// pre-check here.
-	if analyzer != nil {
-		scan := biz.NewScanWorker(transport, llm, analyzer, deps.Decisions, filter)
-		go scan.Run(ctx)
-		log.Info().Msg("advisor: periodic M15 scan worker scheduled")
-	}
+	// Periodic M15 market-scan broadcast — disabled to avoid burning LLM tokens.
+	// Uncomment to re-enable auto scan every 5 minutes.
+	// if analyzer != nil {
+	// 	scan := biz.NewScanWorker(transport, llm, analyzer, deps.Decisions, filter)
+	// 	go scan.Run(ctx)
+	// 	log.Info().Msg("advisor: periodic M15 scan worker scheduled")
+	// }
 
 	log.Info().
 		Str("transport", transport.Name()).
